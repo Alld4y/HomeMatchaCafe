@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+!.env.test
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.test
+
+# SvelteKit & Build Outputs
+.svelte-kit/
+**/.svelte-kit/
+build/
+**/build/
+dist/
+**/dist/
+.output/
+**/.output/
+.vercel/
+.netlify/
+.wrangler/
+
+# Uploaded Customer Slips & Runtime Data
+home-matcha-cafe/static/uploads/slips/*
+!home-matcha-cafe/static/uploads/slips/.gitkeep
+server/uploads/*
+!server/uploads/.gitkeep
+home-matcha-cafe/data/*.json
+
+# Logs & Cache
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm
+.eslintcache
+.cache/
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+**/vite.config.js.timestamp-*
+**/vite.config.ts.timestamp-*
+
+# OS & Editor Files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo

@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Output
+.output/
+.vercel/
+.netlify/
+.wrangler/
+/.svelte-kit
+/build
+/dist
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Uploaded Customer Slips & Local JSON Cache
+/static/uploads/slips/*
+!/static/uploads/slips/.gitkeep
+/data/*.json
+
+# Logs & Vite Cache
+*.log
+npm-debug.log*
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*

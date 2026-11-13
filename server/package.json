@@ -1,0 +1,30 @@
+{
+  "name": "matcha-server",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "main": "app.js",
+  "scripts": {
+    "dev": "nodemon app.js"
+  },
+  "dependencies": {
+    "@google/genai": "^2.10.0",
+    "canvas": "^3.2.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "form-data": "^4.0.6",
+    "jsqr": "^1.4.0",
+    "multer": "^2.2.0",
+    "node-fetch": "^3.3.2",
+    "nodemon": "^3.1.14",
+    "pg": "^8.22.0",
+    "promptpay-qr": "^0.5.0",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.35.2",
+    "string-similarity": "^4.0.4",
+    "tesseract.js": "^7.0.0"
+  }
+}
