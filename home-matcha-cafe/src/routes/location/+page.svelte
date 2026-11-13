@@ -40,11 +40,12 @@
         )
     );
 
-    // รายการวันที่เปิดรับออเดอร์
-    let openDates = $derived(scheduleDays.filter((d) => d.isOpen));
+    // รายการวันที่เปิดรับออเดอร์และยังมีรอบเปิดให้สั่งได้ (ไม่เลยเวลาตัดรอบทั้งหมด)
+    let orderableDates = $derived(scheduleDays.filter((d) => d.isOpen && !d.isPastAllCutoffs));
+    let allDisplayDates = $derived(scheduleDays.filter((d) => d.isOpen));
 
     // วันที่เลือกในปัจจุบัน
-    let selectedDayInfo = $derived(openDates.find((d) => d.dateStr === selectedDateStr));
+    let selectedDayInfo = $derived(allDisplayDates.find((d) => d.dateStr === selectedDateStr));
 
     // เมื่อเปลี่ยนวันที่ ให้เลือกรอบแรกที่เปิดในวันนั้นอัตโนมัติถ้ารอบเดิมไม่อยู่ในรายการ
     $effect(() => {
@@ -136,16 +137,18 @@
                 scheduleDays = data.days || [];
                 storeSettings = data.settings || null;
 
-                // เลือกวันแรกที่สามารถสั่งได้ (ถ้ามีเมนูบ่ม ให้เลือกวันแรกที่ยังไม่เลยเวลาปิดรับเมนูบ่ม)
-                if (openDates.length > 0) {
-                    const currentSelectedValid = openDates.some(d => d.dateStr === selectedDateStr) &&
+                // เลือกวันแรกที่สามารถสั่งได้ (ข้ามวันที่เลยเวลาตัดรอบของวันนี้ไปหาวันถัดไปที่ยังสั่งได้)
+                if (orderableDates.length > 0) {
+                    const currentSelectedValid = orderableDates.some(d => d.dateStr === selectedDateStr) &&
                         (!hasFermentedItem || isDateValidForFermented(selectedDateStr));
                     if (!selectedDateStr || !currentSelectedValid) {
                         const firstValidDate = hasFermentedItem
-                            ? (openDates.find(d => isDateValidForFermented(d.dateStr)) || openDates[0])
-                            : openDates[0];
+                            ? (orderableDates.find(d => isDateValidForFermented(d.dateStr)) || orderableDates[0])
+                            : orderableDates[0];
                         selectedDateStr = firstValidDate.dateStr;
                     }
+                } else if (allDisplayDates.length > 0) {
+                    selectedDateStr = allDisplayDates[0].dateStr;
                 }
             }
         } catch (e) {
@@ -311,9 +314,10 @@
                     <label class="form-label" for="deliveryDate">
                         <span>วันที่ต้องการให้จัดส่ง</span>
                     </label>
-                    {#if openDates.length === 0}
-                        <div style="padding: 0.75rem; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; color: #be123c; font-size: 0.85rem;">
-                            ขณะนี้ยังไม่มีรอบเปิดรับออเดอร์ในระบบ กรุณาลองใหม่อีกครั้งนะคะ
+                    {#if orderableDates.length === 0}
+                        <div style="padding: 0.9rem 1.1rem; background: #fff1f2; border: 1.5px solid #fecdd3; border-radius: 12px; color: #be123c; font-size: 0.88rem; line-height: 1.5;">
+                            ⚠️ <strong>ขณะนี้ร้านยังไม่เปิดรับออเดอร์</strong><br>
+                            ขออภัยในความไม่สะดวกนะคะ 🍵 ไม่มีรอบจัดส่งที่สามารถสั่งได้ในระยะเวลาที่กำหนด กรุณากลับมาสั่งใหม่อีกครั้งนะคะ
                         </div>
                     {:else}
                         <select 
@@ -322,10 +326,11 @@
                             bind:value={selectedDateStr}
                             style="font-weight: 600;"
                         >
-                            {#each openDates as day}
+                            {#each allDisplayDates as day}
+                                {@const isPastCutoffs = Boolean(day.isPastAllCutoffs)}
                                 {@const fermentedOk = isDateValidForFermented(day.dateStr)}
-                                <option value={day.dateStr}>
-                                    วัน{day.dayNameTh}ที่ {day.dayNum} {day.monthNameTh} ({day.dateStr}) - {hasFermentedItem ? (fermentedOk ? '✓ สั่งเมนูบ่มได้ (เลือกได้ทุกรอบ)' : '⚠️ เลยเวลาเมนูบ่ม (ได้เฉพาะเมนูไม่บ่ม)') : 'เปิดรับออเดอร์'}
+                                <option value={day.dateStr} disabled={isPastCutoffs}>
+                                    วัน{day.dayNameTh}ที่ {day.dayNum} {day.monthNameTh} ({day.dateStr}) - {isPastCutoffs ? '⛔ ปิดรับรอบวันนี้แล้ว (เลยเวลาตัดรอบ)' : hasFermentedItem ? (fermentedOk ? '✓ สั่งเมนูบ่มได้ (เลือกได้ทุกรอบ)' : '⚠️ เลยเวลาเมนูบ่ม (ได้เฉพาะเมนูไม่บ่ม)') : '✓ เปิดรับออเดอร์'}
                                 </option>
                             {/each}
                         </select>
@@ -493,7 +498,7 @@
                 type="submit" 
                 class="btn-matcha-primary" 
                 style="width: 100%; padding: 0.95rem; font-size: 1.05rem;"
-                disabled={isSubmitting || openDates.length === 0}
+                disabled={isSubmitting || orderableDates.length === 0}
             >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                     <polyline points="9 18 15 12 9 6"></polyline>

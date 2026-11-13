@@ -28,6 +28,11 @@
     let storeSettings = $state<StoreSettingsData | null>(null);
     let isLoadingSchedule = $state(true);
     let selectedPreviewDate = $state<string>('');
+    let storeStatus = $state<'open' | 'closed_today_can_preorder' | 'closed_store'>('open');
+    let storeStatusBadgeText = $state<string>('🟢 เปิดรับออเดอร์ตามปกติ');
+    let storeStatusDesc = $state<string>('');
+    let isTodayOrderable = $state<boolean>(true);
+    let hasAnyOrderableSlot = $state<boolean>(true);
 
     let activePreviewDay = $derived(
         scheduleDays.find((d) => d.dateStr === selectedPreviewDate) ||
@@ -90,20 +95,25 @@
                 const data = await res.json();
                 scheduleDays = data.days || [];
                 storeSettings = data.settings || null;
+                storeStatus = data.storeStatus || (storeSettings?.isMasterOpen === false ? 'closed_store' : 'open');
+                storeStatusBadgeText = data.storeStatusBadgeText || '';
+                storeStatusDesc = data.storeStatusDesc || '';
+                isTodayOrderable = data.isTodayOrderable ?? true;
+                hasAnyOrderableSlot = data.hasAnyOrderableSlot ?? true;
 
-                const firstOpen = scheduleDays.find((d) => d.isOpen);
+                const firstOpen = scheduleDays.find((d) => d.isOpen && d.canOrderNow) || scheduleDays.find((d) => d.isOpen);
                 if (firstOpen) {
                     selectedPreviewDate = firstOpen.dateStr;
                 } else if (scheduleDays.length > 0) {
                     selectedPreviewDate = scheduleDays[0].dateStr;
                 }
 
-                // ถ้าร้านปิดรับออเดอร์ ให้ขึ้น Alert แจ้งเตือนทันที
-                if (storeSettings && !storeSettings.isMasterOpen) {
+                // หากร้านปิดรับออเดอร์ (สวิตช์ปิด หรือไม่มีรอบเปิดเลยในช่วงที่กำหนด) ให้ขึ้น Alert แจ้งเตือนทันที
+                if (storeStatus === 'closed_store') {
                     swal.fire({
                         icon: 'info',
-                        title: 'ขณะนี้ร้านปิดรับออเดอร์',
-                        text: storeSettings.closedAlertMessage || 'ขณะนี้ร้านปิดรับออเดอร์ชั่วคราว ขออภัยในความไม่สะดวกนะคะ 🍵',
+                        title: 'ขณะนี้ร้านยังไม่เปิดรับออเดอร์',
+                        text: storeStatusDesc || storeSettings?.closedAlertMessage || 'ขณะนี้ร้านยังไม่เปิดรับออเดอร์ ขออภัยในความไม่สะดวกนะคะ 🍵',
                         confirmButtonColor: '#456f2f',
                         confirmButtonText: 'รับทราบ'
                     });
@@ -125,23 +135,36 @@
     <div class="hero-glow-bg"></div>
 
     <div class="hero-content">
-        <!-- แถบแจ้งเตือนหากร้านปิดรับออเดอร์ -->
-        {#if storeSettings && !storeSettings.isMasterOpen}
-            <div class="store-closed-banner">
+        <!-- แถบแจ้งเตือนสถานะร้าน -->
+        {#if storeStatus === 'closed_store'}
+            <div class="store-closed-banner" style="background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 14px; padding: 0.9rem 1.1rem; margin-bottom: 1.25rem;">
                 <div style="display: inline-flex; align-items: center; gap: 0.4rem; color: #b91c1c; font-weight: 800; font-size: 0.95rem; margin-bottom: 0.2rem;">
-                    <span>⚠️ ขณะนี้ร้านปิดรับออเดอร์</span>
+                    <span>⚠️ ขณะนี้ร้านยังไม่เปิดรับออเดอร์</span>
                 </div>
                 <p style="margin: 0; color: #7f1d1d; font-size: 0.82rem; line-height: 1.4;">
-                    {storeSettings.closedAlertMessage || 'ขณะนี้ร้านปิดรับออเดอร์ชั่วคราว คุณยังสามารถดูเมนูและเช็คตารางเปิดรอบจัดส่งได้ค่ะ'}
+                    {storeStatusDesc || 'ขณะนี้ร้านยังไม่เปิดรับออเดอร์ ขออภัยในความไม่สะดวกนะคะ 🍵 คุณยังสามารถดูรายการเครื่องดื่มได้ค่ะ'}
+                </p>
+            </div>
+        {:else if storeStatus === 'closed_today_can_preorder'}
+            <div class="store-notice-banner" style="background: #fffbeb; border: 1.5px solid #fef3c7; border-radius: 14px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-align: center;">
+                <span style="font-size: 1.1rem;">⏰</span>
+                <p style="margin: 0; color: #92400e; font-size: 0.85rem; font-weight: 600;">
+                    <strong>รอบส่งวันนี้ปิดรับแล้ว</strong> แต่คุณสามารถสั่งล่วงหน้าสำหรับวันถัดไปได้ค่ะ 🍵
                 </p>
             </div>
         {/if}
 
         <!-- ป้ายรอบจัดส่งของทางร้าน -->
-        <div class="hero-badge delivery-info-pill">
-            <span class="pulse-dot" style="background: {storeSettings?.isMasterOpen ? '#16a34a' : '#ef4444'}; flex-shrink: 0;"></span>
-            <span>🚚 <strong>รอบเช้า</strong> 07:00–08:00 | <strong>รอบเที่ยง</strong> 12:30–13:00</span>
-            <span class="hide-on-xs" style="color: var(--matcha-primary); font-weight: 700;">· สั่งล่วงหน้าได้ 🍵</span>
+        <div class="hero-badge delivery-info-pill" style="border-color: {storeStatus === 'closed_store' ? '#fca5a5' : storeStatus === 'closed_today_can_preorder' ? '#fde68a' : 'var(--border-matcha)'}; background: {storeStatus === 'closed_store' ? '#fef2f2' : storeStatus === 'closed_today_can_preorder' ? '#fffdf5' : '#ffffff'};">
+            <span class="pulse-dot" style="background: {storeStatus === 'closed_store' ? '#ef4444' : storeStatus === 'closed_today_can_preorder' ? '#f59e0b' : '#16a34a'}; flex-shrink: 0;"></span>
+            {#if storeStatus === 'closed_store'}
+                <span style="color: #991b1b; font-weight: 700;">🔴 ขณะนี้ร้านยังไม่เปิดรับออเดอร์</span>
+            {:else if storeStatus === 'closed_today_can_preorder'}
+                <span style="color: #92400e; font-weight: 700;">🟠 ปิดรับรอบวันนี้แล้ว · สั่งล่วงหน้าได้ 🍵</span>
+            {:else}
+                <span>🚚 <strong>รอบเช้า</strong> 07:00–08:00 | <strong>รอบเที่ยง</strong> 12:30–13:00</span>
+                <span class="hide-on-xs" style="color: var(--matcha-primary); font-weight: 700;">· สั่งล่วงหน้าได้ 🍵</span>
+            {/if}
         </div>
 
         <!-- ชื่อร้านและคำโปรย -->
@@ -170,7 +193,23 @@
         <p class="hero-sub font-kanit" style="font-size: 15px;">สามารถสั่งออเดอร์ล่วงหน้าได้<br>โดยจะมีรอบจัดส่งในวันและเวลาที่ร้านเปิด</p>
         <!-- ปุ่ม Action หลัก (อยู่ใกล้มือ กดง่ายบนมือถือ) -->
         <div class="hero-actions">
-            <button onclick={() => goto('/menu')} class="btn-matcha-primary hero-main-btn">
+            <button 
+                onclick={() => {
+                    if (storeStatus === 'closed_store') {
+                        swal.fire({
+                            icon: 'info',
+                            title: 'ขณะนี้ร้านยังไม่เปิดรับออเดอร์',
+                            text: storeStatusDesc || 'ขณะนี้ร้านยังไม่เปิดรับออเดอร์ ขออภัยในความไม่สะดวกนะคะ 🍵',
+                            confirmButtonColor: '#456f2f',
+                            confirmButtonText: 'รับทราบ'
+                        });
+                        return;
+                    }
+                    goto('/menu');
+                }} 
+                class="btn-matcha-primary hero-main-btn"
+                style={storeStatus === 'closed_store' ? 'opacity: 0.85; filter: grayscale(20%);' : ''}
+            >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                     <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
                     <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
@@ -178,7 +217,7 @@
                     <line x1="10" y1="1" x2="10" y2="4"></line>
                     <line x1="14" y1="1" x2="14" y2="4"></line>
                 </svg>
-                สั่งเครื่องดื่มเลย (Order Now)
+                {storeStatus === 'closed_store' ? 'ร้านยังไม่เปิดรับออเดอร์' : 'สั่งเครื่องดื่มเลย (Order Now)'}
             </button>
             <button onclick={() => goto('/success')} class="btn-matcha-outline hero-sub-btn">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

@@ -52,6 +52,8 @@
         isMasterOpen: boolean;
         closedAlertMessage: string;
         advanceBookingHours: number;
+        maxAdvanceDays?: number;
+        advanceBookingMode?: 'days' | 'hours';
         fermentedCutoffTime: string;
         fermentedItemIds: string[];
         deliveryRounds: DeliveryRoundConfig[];
@@ -85,7 +87,9 @@
     let settings = $state<StoreSettingsData>({
         isMasterOpen: true,
         closedAlertMessage: 'ขณะนี้ร้านปิดรับออเดอร์ชั่วคราวค่ะ',
-        advanceBookingHours: 24,
+        advanceBookingHours: 72,
+        maxAdvanceDays: 3,
+        advanceBookingMode: 'days',
         fermentedCutoffTime: '23:00',
         fermentedItemIds: ['cold-fermented-matcha-oat-latte'],
         loyaltyEnabled: true,
@@ -2039,25 +2043,95 @@
                 </div>
             </div>
 
-            <!-- 3. ตั้งค่าการเปิดรับออเดอร์ล่วงหน้า (Advance Booking Hours) -->
-            <div class="form-card" style="padding: 1.5rem; text-align: left;">
-                <h3 style="margin: 0 0 0.35rem 0; font-size: 1.25rem; color: var(--matcha-deep);">
-                    ⏰ ตั้งค่าเปิดรับออเดอร์ล่วงหน้า
-                </h3>
-                <p style="margin: 0 0 1rem 0; font-size: 0.85rem; color: var(--text-muted);">
-                    กำหนดว่าจะเปิดรับออเดอร์ก่อนวันที่ขายกี่ชั่วโมง (นับถอยหลังย้อนกลับจากเที่ยงคืน 00:00 น. ของวันเปิดขาย เช่น 24 ชม. = สั่งได้ตั้งแต่เที่ยงคืนของวันก่อนหน้า)
-                </p>
+            <!-- 3. ตั้งค่าระยะเวลาการสั่งล่วงหน้า (Max Advance Booking) & ปิดร้านอัตโนมัติ -->
+            <div class="form-card" style="padding: 1.5rem; text-align: left; background: #ffffff; border: 1.5px solid var(--border-matcha); border-radius: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem;">
+                    <div>
+                        <h3 style="margin: 0 0 0.25rem 0; font-size: 1.25rem; color: var(--matcha-deep);">
+                            ⏰ กำหนดระยะเวลาการสั่งล่วงหน้า (Advance Booking Limit)
+                        </h3>
+                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted); line-height: 1.45;">
+                            กำหนดว่าจะอนุญาตให้ลูกค้าสั่งล่วงหน้าได้ไม่เกินกี่วัน หรือกี่ชั่วโมงนับจากปัจจุบัน
+                        </p>
+                    </div>
+                </div>
 
-                <div style="display: flex; align-items: center; gap: 0.75rem; max-width: 320px;">
-                    <input 
-                        type="number" 
-                        min="1" 
-                        max="168"
-                        class="form-input" 
-                        bind:value={settings.advanceBookingHours} 
-                        style="font-size: 1.1rem; font-weight: 700; width: 120px;"
-                    />
-                    <span style="font-weight: 600; color: #334155;">ชั่วโมง</span>
+                <!-- ตัวเลือกรูปแบบ: รายวัน หรือ รายชั่วโมง -->
+                <div style="display: flex; align-items: center; gap: 1.5rem; margin: 1rem 0; padding: 0.85rem 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; flex-wrap: wrap;">
+                    <span style="font-size: 0.9rem; font-weight: 700; color: #334155;">รูปแบบการนับเวลา:</span>
+                    <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; font-weight: 600;">
+                        <input 
+                            type="radio" 
+                            name="advanceMode" 
+                            value="days" 
+                            checked={settings.advanceBookingMode !== 'hours'}
+                            onchange={() => (settings.advanceBookingMode = 'days')}
+                            style="accent-color: var(--matcha-primary); width: 18px; height: 18px;"
+                        />
+                        <span>📅 กำหนดเป็นจำนวนวัน (Days)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; font-weight: 600;">
+                        <input 
+                            type="radio" 
+                            name="advanceMode" 
+                            value="hours" 
+                            checked={settings.advanceBookingMode === 'hours'}
+                            onchange={() => (settings.advanceBookingMode = 'hours')}
+                            style="accent-color: var(--matcha-primary); width: 18px; height: 18px;"
+                        />
+                        <span>⏱️ กำหนดเป็นรายชั่วโมง (Hours)</span>
+                    </label>
+                </div>
+
+                {#if settings.advanceBookingMode === 'hours'}
+                    <!-- ช่องกรอกจำนวนชั่วโมง -->
+                    <div style="margin-bottom: 1rem;">
+                        <label class="form-label" for="advHoursInput" style="font-size: 0.85rem; display: block; margin-bottom: 0.35rem;">
+                            สั่งล่วงหน้าได้ไม่เกินกี่ชั่วโมง (นับจากปัจจุบัน):
+                        </label>
+                        <div style="display: flex; align-items: center; gap: 0.75rem; max-width: 320px;">
+                            <input 
+                                id="advHoursInput"
+                                type="number" 
+                                min="1" 
+                                max="336"
+                                class="form-input" 
+                                bind:value={settings.advanceBookingHours} 
+                                style="font-size: 1.15rem; font-weight: 700; width: 130px;"
+                            />
+                            <span style="font-weight: 600; color: #334155;">ชั่วโมง (ประมาณ {Math.round((settings.advanceBookingHours || 72) / 24)} วัน)</span>
+                        </div>
+                    </div>
+                {:else}
+                    <!-- ช่องกรอกจำนวนวัน -->
+                    <div style="margin-bottom: 1rem;">
+                        <label class="form-label" for="advDaysInput" style="font-size: 0.85rem; display: block; margin-bottom: 0.35rem;">
+                            สั่งล่วงหน้าได้ไม่เกินกี่วัน (นับจากวันนี้):
+                        </label>
+                        <div style="display: flex; align-items: center; gap: 0.75rem; max-width: 320px;">
+                            <input 
+                                id="advDaysInput"
+                                type="number" 
+                                min="1" 
+                                max="14"
+                                class="form-input" 
+                                bind:value={settings.maxAdvanceDays} 
+                                style="font-size: 1.15rem; font-weight: 700; width: 130px;"
+                            />
+                            <span style="font-weight: 600; color: #334155;">วัน (เช่น 3 วัน = สั่งได้ไม่เกิน 3 วันข้างหน้า)</span>
+                        </div>
+                    </div>
+                {/if}
+
+                <!-- กล่องคำอธิบายกฎการทำงานอัจฉริยะ -->
+                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 0.9rem 1rem; color: #166534; font-size: 0.84rem; line-height: 1.5;">
+                    <div style="font-weight: 700; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.35rem;">
+                        <span>💡 ระบบควบคุมสถานะร้านและการสั่งล่วงหน้าอัตโนมัติ:</span>
+                    </div>
+                    <ul style="margin: 0; padding-left: 1.25rem;">
+                        <li><strong>เมื่อเลยเวลาส่งของทุกรอบในวันนี้:</strong> หน้าแรกจะเปลี่ยนป้ายสถานะเป็น <em>"🟠 ปิดรับรอบวันนี้แล้ว · สั่งล่วงหน้าได้"</em> อัตโนมัติ (และหน้าสั่งจะข้ามไปเลือกวันถัดไปทันที)</li>
+                        <li><strong>หากร้านปิดยาวเกินระยะเวลาที่กำหนดสั่งล่วงหน้า (เช่น ปิดทุกวันใน {settings.advanceBookingMode === 'hours' ? settings.advanceBookingHours + ' ชม.' : (settings.maxAdvanceDays || 3) + ' วัน'}):</strong> หน้าแรกจะขึ้นป้าย <em>"🔴 ขณะนี้ร้านยังไม่เปิดรับออเดอร์"</em> และล็อกปุ่มสั่งอัตโนมัติ</li>
+                    </ul>
                 </div>
             </div>
 

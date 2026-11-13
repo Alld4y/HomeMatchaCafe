@@ -5,7 +5,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
 	server: {
-		allowedHosts: ['alldaygrow.tplinkdns.com'],
+		allowedHosts: ['alldaygrow.tplinkdns.com', 'homematchacafe.store', 'www.homematchacafe.store'],
 		watch: {
 			ignored: ['**/static/uploads/**', '**/data/**']
 		}

@@ -22,6 +22,8 @@ export interface StoreSettings {
     isMasterOpen: boolean;
     closedAlertMessage: string;
     advanceBookingHours: number;
+    maxAdvanceDays: number; // สั่งล่วงหน้าได้ไม่เกินกี่วัน (ค่าเริ่มต้น 3 วัน)
+    advanceBookingMode?: 'days' | 'hours'; // โหมดนับการสั่งล่วงหน้า เป็นวัน หรือ รายชั่วโมง
     fermentedCutoffTime: string; // 'HH:mm' on day before delivery date
     fermentedItemIds: string[];
     deliveryRounds: DeliveryRound[];
@@ -47,8 +49,10 @@ const ALLDAY_ROUND_DEFAULT: DeliveryRound = {
 
 const DEFAULT_SETTINGS: StoreSettings = {
     isMasterOpen: true,
-    closedAlertMessage: 'ขณะนี้ร้านปิดรับออเดอร์ชั่วคราว ขออภัยในความไม่สะดวกนะคะ 🍵',
-    advanceBookingHours: 24,
+    closedAlertMessage: 'ขณะนี้ร้านยังไม่เปิดรับออเดอร์ ขออภัยในความไม่สะดวกนะคะ 🍵',
+    advanceBookingHours: 72,
+    maxAdvanceDays: 3,
+    advanceBookingMode: 'days',
     fermentedCutoffTime: '23:00',
     fermentedItemIds: ['cold-fermented-matcha-oat-latte'],
     loyaltyEnabled: true,
@@ -142,6 +146,9 @@ function normalizeSettings(parsed: any): StoreSettings {
     return {
         ...DEFAULT_SETTINGS,
         ...(parsed || {}),
+        maxAdvanceDays: typeof parsed?.maxAdvanceDays === 'number' && parsed.maxAdvanceDays > 0 ? parsed.maxAdvanceDays : 3,
+        advanceBookingMode: parsed?.advanceBookingMode === 'hours' ? 'hours' : 'days',
+        advanceBookingHours: typeof parsed?.advanceBookingHours === 'number' && parsed.advanceBookingHours > 0 ? parsed.advanceBookingHours : 72,
         loyaltyRedeemableItemIds: Array.isArray(parsed?.loyaltyRedeemableItemIds)
             ? parsed.loyaltyRedeemableItemIds
             : DEFAULT_SETTINGS.loyaltyRedeemableItemIds,
@@ -223,6 +230,18 @@ export interface DayDisplayInfo {
     canOrderNow: boolean;
     orderOpeningTime?: string;
     closeReason?: string;
+    isToday: boolean;
+    isPastAllCutoffs?: boolean;
+}
+
+export interface ScheduleResponse {
+    days: DayDisplayInfo[];
+    settings: StoreSettings;
+    storeStatus: 'open' | 'closed_today_can_preorder' | 'closed_store';
+    storeStatusBadgeText: string;
+    storeStatusDesc: string;
+    isTodayOrderable: boolean;
+    hasAnyOrderableSlot: boolean;
 }
 
 const THAI_DAY_COLORS: Record<number, { nameTh: string; nameEn: string; color: string; bgLight: string }> = {
@@ -240,16 +259,27 @@ const THAI_MONTHS_SHORT = [
     'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
 ];
 
-export async function getNext7DaysSchedule(): Promise<{ days: DayDisplayInfo[]; settings: StoreSettings }> {
+export async function getNext7DaysSchedule(): Promise<ScheduleResponse> {
     const settings = await getStoreSettings();
     const now = new Date();
     const days: DayDisplayInfo[] = [];
 
+    // กำหนดจำนวนวันสั่งล่วงหน้าสูงสุด
+    const effectiveAdvanceDays = settings.advanceBookingMode === 'hours'
+        ? Math.max(1, Math.ceil((settings.advanceBookingHours || 72) / 24))
+        : Math.max(1, settings.maxAdvanceDays || 3);
+
+    const maxAdvanceMs = settings.advanceBookingMode === 'hours'
+        ? (settings.advanceBookingHours || 72) * 3600 * 1000
+        : (settings.maxAdvanceDays || 3) * 24 * 3600 * 1000;
+
+    // แสดงตาราง 7 วันล่วงหน้าเสมอ (1 สัปดาห์)
     for (let i = 0; i < 7; i++) {
         const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
         const dateStr = formatDateKey(d);
         const dayOfWeek = d.getDay();
         const colorInfo = THAI_DAY_COLORS[dayOfWeek];
+        const isToday = i === 0;
 
         const dayConfig = settings.calendar[dateStr] || { isOpen: false };
         const isConfiguredOpen = Boolean(dayConfig.isOpen);
@@ -258,22 +288,44 @@ export async function getNext7DaysSchedule(): Promise<{ days: DayDisplayInfo[]; 
         const activeRounds = settings.deliveryRounds.filter(
             r => r.enabled && customRoundIds.includes(r.id)
         );
-        const hasAllDayRound = activeRounds.some(r => r.isAllDayOpen || r.id === 'allday');
 
-        const dayMidnightMs = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0).getTime();
-        const openOrderMs = dayMidnightMs - (settings.advanceBookingHours * 3600 * 1000);
-
-        const isOpen = isConfiguredOpen && settings.isMasterOpen;
-        const canOrderNow = isOpen && (hasAllDayRound || now.getTime() >= openOrderMs);
-
+        let canOrderNow = isConfiguredOpen && settings.isMasterOpen;
+        let isPastAllCutoffs = false;
         let closeReason = '';
+
         if (!settings.isMasterOpen) {
-            closeReason = 'ร้านปิดรับออเดอร์ชั่วคราว';
+            canOrderNow = false;
+            closeReason = 'ขณะนี้ร้านยังไม่เปิดรับออเดอร์';
         } else if (!isConfiguredOpen) {
+            canOrderNow = false;
             closeReason = 'ร้านปิดบริการในวันนี้';
-        } else if (!hasAllDayRound && now.getTime() < openOrderMs) {
-            const openDate = new Date(openOrderMs);
-            closeReason = `เปิดรับออเดอร์ ${openDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`;
+        } else if (isToday) {
+            // กรณีเป็น "วันนี้": ตรวจสอบเวลาตัดรอบของทุกรอบส่งในวันนี้
+            const availableRoundsToday = activeRounds.filter(round => {
+                const [rCutoffH, rCutoffM] = (round.cutoffTime || '06:00').split(':').map(Number);
+                const roundDeadline = new Date(d.getFullYear(), d.getMonth(), d.getDate(), rCutoffH, rCutoffM, 59, 999);
+                return now.getTime() <= roundDeadline.getTime();
+            });
+
+            if (activeRounds.length === 0 || availableRoundsToday.length === 0) {
+                // เกินเวลาส่งของทุกรอบในวันนี้แล้ว ➡️ ปิดรับออเดอร์ของวันนี้
+                isPastAllCutoffs = true;
+                canOrderNow = false;
+                closeReason = 'เลยเวลาตัดรอบส่งทั้งหมดของวันนี้แล้ว (ปิดรับรอบวันนี้)';
+            }
+        } else {
+            // กรณีวันล่วงหน้า ตรวจสอบว่าเกินจำนวนวัน/ชั่วโมงสั่งล่วงหน้าสูงสุดหรือไม่
+            const dayMidnightMs = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0).getTime();
+            const isExceedingAdvanceLimit = settings.advanceBookingMode === 'hours'
+                ? (dayMidnightMs > now.getTime() + maxAdvanceMs)
+                : (i > effectiveAdvanceDays);
+
+            if (isExceedingAdvanceLimit) {
+                canOrderNow = false;
+                closeReason = settings.advanceBookingMode === 'hours'
+                    ? `เปิดรับสั่งล่วงหน้าไม่เกิน ${settings.advanceBookingHours} ชม.`
+                    : `เปิดรับสั่งล่วงหน้าไม่เกิน ${settings.maxAdvanceDays || 3} วัน`;
+            }
         }
 
         days.push({
@@ -284,14 +336,51 @@ export async function getNext7DaysSchedule(): Promise<{ days: DayDisplayInfo[]; 
             dayNameTh: colorInfo.nameTh,
             dayColor: colorInfo.color,
             dayBgLight: colorInfo.bgLight,
-            isOpen,
+            isOpen: isConfiguredOpen && settings.isMasterOpen,
             availableRounds: activeRounds,
             canOrderNow,
-            closeReason
+            closeReason,
+            isToday,
+            isPastAllCutoffs
         });
     }
 
-    return { days, settings };
+    // คำนวณสถานะรวมของร้าน โดยพิจารณาเฉพาะช่วงสั่งล่วงหน้าที่กำหนด (เช่น 3 วันข้างหน้า)
+    const windowDays = days.filter((_, idx) => idx <= effectiveAdvanceDays);
+    const orderableDaysInWindow = windowDays.filter(d => d.isOpen && d.canOrderNow);
+    const hasAnyOrderableSlot = orderableDaysInWindow.length > 0;
+    const todayInfo = days.find(d => d.isToday);
+    const isTodayOrderable = todayInfo ? Boolean(todayInfo.isOpen && todayInfo.canOrderNow) : false;
+
+    let storeStatus: 'open' | 'closed_today_can_preorder' | 'closed_store' = 'open';
+    let storeStatusBadgeText = '🟢 เปิดรับออเดอร์ตามปกติ';
+    let storeStatusDesc = 'พร้อมรับออเดอร์และจัดส่งตามรอบ';
+
+    if (!settings.isMasterOpen || !hasAnyOrderableSlot) {
+        // หากปิดสวิตช์หลัก หรือในระยะเวลาสั่งล่วงหน้าที่กำหนด (เช่น 3 วัน) ไม่มีวันไหนเปิดให้สั่งได้เลย (ร้านปิด)
+        storeStatus = 'closed_store';
+        storeStatusBadgeText = '🔴 ขณะนี้ร้านยังไม่เปิดรับออเดอร์';
+        storeStatusDesc = settings.closedAlertMessage || 'ขณะนี้ร้านยังไม่เปิดรับออเดอร์ ขออภัยในความไม่สะดวกนะคะ 🍵';
+    } else if (!isTodayOrderable) {
+        // วันนี้เลยเวลาตัดรอบส่งแล้ว แต่ยังมีวันข้างหน้าเปิดให้สั่งล่วงหน้าได้
+        storeStatus = 'closed_today_can_preorder';
+        storeStatusBadgeText = '🟠 ปิดรับรอบวันนี้แล้ว · สั่งล่วงหน้าได้ 🍵';
+        storeStatusDesc = 'รอบจัดส่งวันนี้ปิดรับออเดอร์แล้ว แต่คุณสามารถสั่งล่วงหน้าสำหรับวันถัดไปได้ค่ะ';
+    } else {
+        storeStatus = 'open';
+        storeStatusBadgeText = '🟢 เปิดรับออเดอร์ตามปกติ';
+        storeStatusDesc = 'สั่งเครื่องดื่มและจัดส่งตามรอบส่ง';
+    }
+
+    return {
+        days,
+        settings,
+        storeStatus,
+        storeStatusBadgeText,
+        storeStatusDesc,
+        isTodayOrderable,
+        hasAnyOrderableSlot
+    };
 }
 
 export async function validateDeliverySlot(
@@ -302,7 +391,7 @@ export async function validateDeliverySlot(
     const settings = await getStoreSettings();
 
     if (!settings.isMasterOpen) {
-        return { isValid: false, message: settings.closedAlertMessage || 'ขณะนี้ร้านปิดรับออเดอร์ชั่วคราวค่ะ' };
+        return { isValid: false, message: settings.closedAlertMessage || 'ขณะนี้ร้านยังไม่เปิดรับออเดอร์ค่ะ' };
     }
 
     const dayConfig = settings.calendar[deliveryDateStr];
@@ -322,6 +411,32 @@ export async function validateDeliverySlot(
 
     const now = new Date();
     const [y, m, d] = deliveryDateStr.split('-').map(Number);
+    const targetDateMidnight = new Date(y, m - 1, d, 0, 0, 0);
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+
+    const diffDays = Math.round((targetDateMidnight.getTime() - todayMidnight.getTime()) / (86400 * 1000));
+    if (diffDays < 0) {
+        return { isValid: false, message: 'ไม่สามารถเลือกวันที่ในอดีตได้ค่ะ' };
+    }
+
+    // ตรวจสอบระยะเวลาสั่งล่วงหน้าสูงสุด
+    if (settings.advanceBookingMode === 'hours') {
+        const maxMs = (settings.advanceBookingHours || 72) * 3600 * 1000;
+        if (targetDateMidnight.getTime() > now.getTime() + maxMs) {
+            return {
+                isValid: false,
+                message: `สามารถสั่งล่วงหน้าได้ไม่เกิน ${settings.advanceBookingHours || 72} ชั่วโมงค่ะ กรุณาเลือกวันที่ใหม่อีกครั้ง`
+            };
+        }
+    } else {
+        const maxDays = settings.maxAdvanceDays || 3;
+        if (diffDays > maxDays) {
+            return {
+                isValid: false,
+                message: `สามารถสั่งล่วงหน้าได้ไม่เกิน ${maxDays} วันค่ะ กรุณาเลือกวันที่ใหม่อีกครั้ง`
+            };
+        }
+    }
 
     // 1. ตรวจสอบเงื่อนไขเมนูบ่ม (ต้องสั่งล่วงหน้าก่อนเวลาตัดรอบ เช่น 23:00 น. ของวันก่อนส่ง)
     if (hasFermentedItem) {
@@ -343,7 +458,9 @@ export async function validateDeliverySlot(
     if (now.getTime() > roundDeadline.getTime()) {
         return {
             isValid: false,
-            message: `รอบ ${round.name} (${round.timeSlot}) ของวันที่ ${deliveryDateStr} ปิดรับออเดอร์แล้วเมื่อเวลา ${round.cutoffTime} น. ค่ะ กรุณาเลือกรอบถัดไปหรือวันถัดไปนะคะ`
+            message: diffDays === 0
+                ? `รอบ ${round.name} (${round.timeSlot}) ของวันนี้ปิดรับออเดอร์แล้วเมื่อเวลา ${round.cutoffTime} น. ค่ะ กรุณาเลือกวันถัดไปนะคะ`
+                : `รอบ ${round.name} (${round.timeSlot}) ของวันที่ ${deliveryDateStr} ปิดรับออเดอร์แล้วเมื่อเวลา ${round.cutoffTime} น. ค่ะ กรุณาเลือกรอบถัดไปหรือวันถัดไปนะคะ`
         };
     }
 
