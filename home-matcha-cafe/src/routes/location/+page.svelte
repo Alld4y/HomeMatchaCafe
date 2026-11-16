@@ -40,9 +40,19 @@
         )
     );
 
-    // รายการวันที่เปิดรับออเดอร์และยังมีรอบเปิดให้สั่งได้ (ไม่เลยเวลาตัดรอบทั้งหมด)
-    let orderableDates = $derived(scheduleDays.filter((d) => d.isOpen && !d.isPastAllCutoffs));
-    let allDisplayDates = $derived(scheduleDays.filter((d) => d.isOpen));
+    // รายการวันที่เปิดรับออเดอร์และยังมีรอบเปิดให้สั่งได้ (ไม่เลยเวลาตัดรอบทั้งหมด และอยู่ในช่วงสั่งล่วงหน้าที่กำหนด)
+    let orderableDates = $derived(
+        scheduleDays.filter((d) => d.isOpen && d.canOrderNow && !d.isPastAllCutoffs)
+    );
+
+    // รายการวันที่แสดงในดรอปดาวน์
+    // หากเปิดตัวเลือกจำกัดวัน (limitDropdownToAdvanceWindow): จะแสดงเฉพาะวันที่สั่งได้จริงภายในระยะเวลาที่กำหนดเท่านั้น (ตัดวันเกิน เช่น 21, 22 พ.ย. ออก)
+    // หากปิด: จะแสดงทุกวันที่เปิดในปฏิทิน
+    let allDisplayDates = $derived(
+        storeSettings?.limitDropdownToAdvanceWindow !== false
+            ? scheduleDays.filter((d) => d.isOpen && d.canOrderNow && !d.isPastAllCutoffs)
+            : scheduleDays.filter((d) => d.isOpen)
+    );
 
     // วันที่เลือกในปัจจุบัน
     let selectedDayInfo = $derived(allDisplayDates.find((d) => d.dateStr === selectedDateStr));
@@ -295,7 +305,7 @@
                         ในตะกร้าของคุณมีเมนู "มัทฉะบ่มสกัดเย็น"
                     </h4>
                     <p style="margin: 0.2rem 0 0 0; font-size: 0.78rem; color: #a16207; line-height: 1.4;">
-                        เมนูบ่มต้องสั่งล่วงหน้าก่อน <strong>{storeSettings?.fermentedCutoffTime || '23:00'} น.</strong> ก่อนวันเปิดร้าน (สั่งทันเวลาสามารถเลือกส่งได้<strong>ทั้งรอบเช้า รอบเที่ยง/บ่าย หรือวันถัด ๆ ไป</strong>ค่ะ หากเลย {storeSettings?.fermentedCutoffTime || '23:00'} น. จะสั่งส่งวันถัดไปได้เฉพาะเมนูไม่บ่ม)
+                        เมนูบ่มต้องสั่งล่วงหน้าก่อน {storeSettings?.fermentedCutoffTime || '23:00'} น. ก่อนวันเปิดร้าน (สั่งทันเวลาสามารถเลือกส่งได้ทั้งรอบเช้า รอบเที่ยง/บ่าย หรือวันถัด ๆ ไปค่ะ หากเลย {storeSettings?.fermentedCutoffTime || '23:00'} น. จะสั่งส่งวันถัดไปได้เฉพาะเมนูไม่บ่ม)
                     </p>
                 </div>
             </div>
@@ -377,7 +387,7 @@
                                     </div>
                                 {:else if hasFermentedItem}
                                     <div style="font-size: 0.72rem; color: #16a34a; margin-top: 0.25rem; line-height: 1.35;">
-                                        ✓ สั่งเมนูบ่มล่วงหน้าทันเวลา (ปิดรับ {storeSettings?.fermentedCutoffTime || '23:00'} น. วันก่อนส่ง)
+                                        ✓ สั่งเมนูบ่มล่วงหน้า (ปิดรับ {storeSettings?.fermentedCutoffTime || '23:00'} น. วันก่อนส่ง)
                                     </div>
                                 {:else if isAllDay}
                                     <div style="font-size: 0.72rem; color: #16a34a; margin-top: 0.25rem; line-height: 1.35;">

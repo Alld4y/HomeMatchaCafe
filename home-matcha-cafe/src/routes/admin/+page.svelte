@@ -54,6 +54,7 @@
         advanceBookingHours: number;
         maxAdvanceDays?: number;
         advanceBookingMode?: 'days' | 'hours';
+        limitDropdownToAdvanceWindow?: boolean;
         fermentedCutoffTime: string;
         fermentedItemIds: string[];
         deliveryRounds: DeliveryRoundConfig[];
@@ -90,6 +91,7 @@
         advanceBookingHours: 72,
         maxAdvanceDays: 3,
         advanceBookingMode: 'days',
+        limitDropdownToAdvanceWindow: true,
         fermentedCutoffTime: '23:00',
         fermentedItemIds: ['cold-fermented-matcha-oat-latte'],
         loyaltyEnabled: true,
@@ -2122,6 +2124,21 @@
                         </div>
                     </div>
                 {/if}
+
+                <!-- ตัวเลือกบังคับจำกัดวันในดรอปดาวน์ -->
+                <div style="margin: 1.25rem 0; padding: 0.9rem 1.1rem; background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px;">
+                    <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; font-size: 0.95rem; font-weight: 700; color: #1e293b;">
+                        <input 
+                            type="checkbox" 
+                            bind:checked={settings.limitDropdownToAdvanceWindow}
+                            style="width: 22px; height: 22px; accent-color: var(--matcha-primary); cursor: pointer;"
+                        />
+                        <span>☑️ บังคับจำกัดวันในดรอปดาวน์หน้าสั่งซื้อ ให้เหลือเฉพาะตามจำนวนวัน/ชั่วโมงที่ตั้ง</span>
+                    </label>
+                    <p style="margin: 0.4rem 0 0 2.2rem; font-size: 0.825rem; color: var(--text-muted); line-height: 1.4;">
+                        เมื่อเปิดใช้งาน: ดรอปดาวน์เลือกวันจัดส่งของลูกค้าจะตัดวันที่เกินกำหนด (เช่น เกิน 3 วัน) ออกไปทันที ไม่แสดงให้เลือก
+                    </p>
+                </div>
 
                 <!-- กล่องคำอธิบายกฎการทำงานอัจฉริยะ -->
                 <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 0.9rem 1rem; color: #166534; font-size: 0.84rem; line-height: 1.5;">

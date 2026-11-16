@@ -152,10 +152,17 @@
                     <strong>รอบส่งวันนี้ปิดรับแล้ว</strong> แต่คุณสามารถสั่งล่วงหน้าสำหรับวันถัดไปได้ค่ะ 🍵
                 </p>
             </div>
+        {:else}
+               <div class="store-notice-banner" style="background: #fffbeb; border: 1.5px solid var(--border-matcha); border-radius: 14px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-align: center;">
+                <span class="pulse-dot" style="background: #16a34a; flex-shrink: 0;"></span>
+                <p style="margin: 0; color: var(--matcha-primary); font-size: 0.85rem; font-weight: 600;">
+                    <strong>รอบเช้า</strong> 07:00–08:00 | <strong>รอบเที่ยง</strong> 12:30–13:00 🍵
+                </p>
+            </div>
         {/if}
 
         <!-- ป้ายรอบจัดส่งของทางร้าน -->
-        <div class="hero-badge delivery-info-pill" style="border-color: {storeStatus === 'closed_store' ? '#fca5a5' : storeStatus === 'closed_today_can_preorder' ? '#fde68a' : 'var(--border-matcha)'}; background: {storeStatus === 'closed_store' ? '#fef2f2' : storeStatus === 'closed_today_can_preorder' ? '#fffdf5' : '#ffffff'};">
+        <!-- <div class="hero-badge delivery-info-pill" style="border-color: {storeStatus === 'closed_store' ? '#fca5a5' : storeStatus === 'closed_today_can_preorder' ? '#fde68a' : 'var(--border-matcha)'}; background: {storeStatus === 'closed_store' ? '#fef2f2' : storeStatus === 'closed_today_can_preorder' ? '#fffdf5' : '#ffffff'};">
             <span class="pulse-dot" style="background: {storeStatus === 'closed_store' ? '#ef4444' : storeStatus === 'closed_today_can_preorder' ? '#f59e0b' : '#16a34a'}; flex-shrink: 0;"></span>
             {#if storeStatus === 'closed_store'}
                 <span style="color: #991b1b; font-weight: 700;">🔴 ขณะนี้ร้านยังไม่เปิดรับออเดอร์</span>
@@ -165,7 +172,7 @@
                 <span>🚚 <strong>รอบเช้า</strong> 07:00–08:00 | <strong>รอบเที่ยง</strong> 12:30–13:00</span>
                 <span class="hide-on-xs" style="color: var(--matcha-primary); font-weight: 700;">· สั่งล่วงหน้าได้ 🍵</span>
             {/if}
-        </div>
+        </div> -->
 
         <!-- ชื่อร้านและคำโปรย -->
         <h1 class="hero-title">Home Matcha Cafe</h1>

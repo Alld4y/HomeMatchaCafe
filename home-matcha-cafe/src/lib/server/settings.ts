@@ -24,6 +24,7 @@ export interface StoreSettings {
     advanceBookingHours: number;
     maxAdvanceDays: number; // สั่งล่วงหน้าได้ไม่เกินกี่วัน (ค่าเริ่มต้น 3 วัน)
     advanceBookingMode?: 'days' | 'hours'; // โหมดนับการสั่งล่วงหน้า เป็นวัน หรือ รายชั่วโมง
+    limitDropdownToAdvanceWindow?: boolean; // บังคับจำกัดวันในดรอปดาวน์ให้เหลือเฉพาะวันที่สั่งได้ตามจำนวนวัน/ชั่วโมงที่ตั้ง
     fermentedCutoffTime: string; // 'HH:mm' on day before delivery date
     fermentedItemIds: string[];
     deliveryRounds: DeliveryRound[];
@@ -53,6 +54,7 @@ const DEFAULT_SETTINGS: StoreSettings = {
     advanceBookingHours: 72,
     maxAdvanceDays: 3,
     advanceBookingMode: 'days',
+    limitDropdownToAdvanceWindow: true,
     fermentedCutoffTime: '23:00',
     fermentedItemIds: ['cold-fermented-matcha-oat-latte'],
     loyaltyEnabled: true,
@@ -149,6 +151,7 @@ function normalizeSettings(parsed: any): StoreSettings {
         maxAdvanceDays: typeof parsed?.maxAdvanceDays === 'number' && parsed.maxAdvanceDays > 0 ? parsed.maxAdvanceDays : 3,
         advanceBookingMode: parsed?.advanceBookingMode === 'hours' ? 'hours' : 'days',
         advanceBookingHours: typeof parsed?.advanceBookingHours === 'number' && parsed.advanceBookingHours > 0 ? parsed.advanceBookingHours : 72,
+        limitDropdownToAdvanceWindow: parsed?.limitDropdownToAdvanceWindow !== false,
         loyaltyRedeemableItemIds: Array.isArray(parsed?.loyaltyRedeemableItemIds)
             ? parsed.loyaltyRedeemableItemIds
             : DEFAULT_SETTINGS.loyaltyRedeemableItemIds,
