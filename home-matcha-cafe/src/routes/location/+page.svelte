@@ -224,6 +224,97 @@
             return;
         }
 
+        // ตรวจสอบว่าเป็นการสั่งล่วงหน้า (ไม่ใช่วันนี้) หรือสั่งล่วงหน้าข้ามวัน เพื่อแจ้งเตือนยืนยันรอบจัดส่ง ป้องกันลูกค้าเข้าใจผิดเรื่องวัน
+        const now = new Date();
+        const todayYear = now.getFullYear();
+        const todayMonth = String(now.getMonth() + 1).padStart(2, '0');
+        const todayDate = String(now.getDate()).padStart(2, '0');
+        const todayStr = `${todayYear}-${todayMonth}-${todayDate}`;
+
+        if (selectedDateStr !== todayStr) {
+            const thaiDays = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+            const thaiMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+            const curDayName = thaiDays[now.getDay()];
+            const curDate = now.getDate();
+            const curMonthName = thaiMonths[now.getMonth()];
+            const curYearBE = now.getFullYear() + 543;
+            const curHour = String(now.getHours()).padStart(2, '0');
+            const curMin = String(now.getMinutes()).padStart(2, '0');
+            const currentFormatted = `วัน${curDayName}ที่ ${curDate} ${curMonthName} ${curYearBE} (เวลา ${curHour}:${curMin} น.)`;
+
+            const [targetYear, targetMonth, targetDay] = selectedDateStr.split('-').map(Number);
+            const timeSlotStart = (chosenRound.timeSlot || '08:00').split('-')[0].trim();
+            const [rHour, rMinute] = timeSlotStart.split(':').map(Number);
+            const targetDeliveryTime = new Date(
+                targetYear,
+                targetMonth - 1,
+                targetDay,
+                isNaN(rHour) ? 8 : rHour,
+                isNaN(rMinute) ? 0 : rMinute,
+                0
+            );
+
+            const targetDayName = selectedDayInfo?.dayNameTh || thaiDays[targetDeliveryTime.getDay()];
+            const targetMonthName = selectedDayInfo?.monthNameTh || thaiMonths[targetMonth - 1];
+            const targetYearBE = targetYear + 543;
+            const targetFormatted = `วัน${targetDayName}ที่ ${targetDay} ${targetMonthName} ${targetYearBE}`;
+
+            // คำนวณระยะเวลาคงเหลือจนถึงเวลาเริ่มส่ง
+            const diffMs = targetDeliveryTime.getTime() - now.getTime();
+            const totalDiffHours = Math.max(1, Math.round(diffMs / (1000 * 60 * 60)));
+            const daysPart = Math.floor(totalDiffHours / 24);
+            const hoursPart = totalDiffHours % 24;
+
+            let remainingTimeText = `ประมาณ ${totalDiffHours} ชั่วโมง`;
+            if (daysPart > 0) {
+                remainingTimeText += ` (${daysPart} วัน ${hoursPart > 0 ? `${hoursPart} ชั่วโมง` : ''})`;
+            }
+
+            const confirmResult = await swal.fire({
+                title: '⚠️ ยืนยันรอบจัดส่งล่วงหน้า',
+                html: `
+                    <div style="text-align: left; background: #fffdf5; border: 1.5px solid #fef3c7; border-radius: 14px; padding: 1rem; margin-top: 0.5rem; font-size: 0.88rem; color: #374151; line-height: 1.6;">
+                        <div style="margin-bottom: 0.75rem; padding-bottom: 0.6rem; border-bottom: 1px dashed #e5e7eb;">
+                            <span style="color: #6b7280; font-size: 0.8rem;">🕒 วันและเวลาปัจจุบัน:</span><br/>
+                            <strong style="color: #1f2937; font-size: 0.95rem;">${currentFormatted}</strong>
+                        </div>
+
+                        <div style="margin-bottom: 0.75rem; padding-bottom: 0.6rem; border-bottom: 1px dashed #e5e7eb;">
+                            <span style="color: #6b7280; font-size: 0.8rem;">🚚 คุณกำลังสั่งล่วงหน้าสำหรับ:</span><br/>
+                            <strong style="color: #166534; font-size: 1.05rem;">👉 ${targetFormatted}</strong><br/>
+                            <span style="color: #15803d; font-weight: 700;">⏰ ${chosenRound.name} (${chosenRound.timeSlot})</span>
+                        </div>
+
+                        <div style="background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 10px; padding: 0.65rem 0.85rem; margin-bottom: 0.5rem;">
+                            <div style="color: #991b1b; font-weight: 700; font-size: 0.88rem;">
+                                ⏳ จะเริ่มจัดส่งในอีก:
+                            </div>
+                            <div style="color: #dc2626; font-weight: 800; font-size: 1.05rem; margin-top: 0.15rem;">
+                                ${remainingTimeText}
+                            </div>
+                        </div>
+
+                        <p style="margin: 0.6rem 0 0 0; color: #b45309; font-size: 0.82rem; text-align: center; font-weight: 600; line-height: 1.4;">
+                            *ไม่ใช่รอบจัดส่งของวันนี้ กรุณาตรวจสอบวันที่ต้องการรับเครื่องดื่มให้ถูกต้องก่อนดำเนินการชำระเงินนะคะ*
+                        </p>
+                    </div>
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#456f2f',
+                cancelButtonColor: '#9ca3af',
+                confirmButtonText: '✓ ยืนยันสั่งรอบนี้',
+                cancelButtonText: 'กลับไปเปลี่ยนวัน/รอบ',
+                reverseButtons: true,
+                focusConfirm: false
+            });
+
+            if (!confirmResult.isConfirmed) {
+                return;
+            }
+        }
+
         errorMessage = '';
         isSubmitting = true;
 
