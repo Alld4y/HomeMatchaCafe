@@ -155,7 +155,7 @@
                 </p>
                 
             </div>
-        {:else}
+        {:else if storeStatus === 'open'}
                <div class="store-notice-banner" style="background: #fffbeb; border: 1.5px solid var(--border-matcha); border-radius: 14px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-align: center;">
                 <span class="pulse-dot" style="background: #16a34a; flex-shrink: 0;"></span>
                 <p style="margin: 0; color: var(--matcha-primary); font-size: 0.85rem; font-weight: 600;">
