@@ -141,7 +141,7 @@
                 <div style="display: inline-flex; align-items: center; gap: 0.4rem; color: #b91c1c; font-weight: 800; font-size: 0.95rem; margin-bottom: 0.2rem;">
                     <span>⚠️ ขณะนี้ร้านยังไม่เปิดรับออเดอร์</span>
                 </div>
-                <p style="margin: 0; color: #7f1d1d; font-size: 0.82rem; line-height: 1.4;">
+                <p style="margin: 0; color: #7f1d1d; font-size: 0.75rem; line-height: 1.4;">
                     {storeStatusDesc || 'ขณะนี้ร้านยังไม่เปิดรับออเดอร์ ขออภัยในความไม่สะดวกนะคะ 🍵 คุณยังสามารถดูรายการเครื่องดื่มได้ค่ะ'}
                 </p>
             </div>
@@ -149,14 +149,18 @@
             <div class="store-notice-banner" style="background: #fffbeb; border: 1.5px solid #fef3c7; border-radius: 14px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-align: center;">
                 <span style="font-size: 1.1rem;">⏰</span>
                 <p style="margin: 0; color: #92400e; font-size: 0.85rem; font-weight: 600;">
-                    <strong>รอบส่งวันนี้ปิดแล้ว</strong> แต่คุณสามารถสั่งล่วงหน้าสำหรับวันถัดไปได้ค่ะ 🍵
+                    <strong>รอบส่งวันนี้ปิดแล้ว </strong>
                 </p>
+                <p style="margin: 0; color: #92400e; font-size: 0.85rem; font-weight: 600;">
+                    <strong>แต่คุณสามารถสั่งล่วงหน้าสำหรับวันถัดไปได้ค่ะ </strong>
+                </p>
+                
             </div>
         {:else}
                <div class="store-notice-banner" style="background: #fffbeb; border: 1.5px solid var(--border-matcha); border-radius: 14px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-align: center;">
                 <span class="pulse-dot" style="background: #16a34a; flex-shrink: 0;"></span>
                 <p style="margin: 0; color: var(--matcha-primary); font-size: 0.85rem; font-weight: 600;">
-                    <strong>รอบเช้า</strong> 07:00–08:00 | <strong>รอบเที่ยง</strong> 12:30–13:00 🍵
+                    <strong>รอบเช้า</strong> 07:00–08:00 | <strong>รอบเที่ยง</strong> 12:30–13:00 
                 </p>
             </div>
         {/if}
