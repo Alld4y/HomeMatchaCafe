@@ -146,10 +146,9 @@
                 </p>
             </div>
         {:else if storeStatus === 'closed_today_can_preorder'}
-            <div class="store-notice-banner" style="background: #fffbeb; border: 1.5px solid #fef3c7; border-radius: 14px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; text-align: center;">
-                <span style="font-size: 1.1rem;">⏰</span>
+            <div class="store-notice-banner" style="background: #fffbeb; border: 1.5px solid #fef3c7; border-radius: 14px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; text-align: center;">     
                 <p style="margin: 0; color: #92400e; font-size: 0.85rem; font-weight: 600;">
-                    <strong>รอบส่งวันนี้ปิดแล้ว </strong>
+                    <span style="font-size: 1.1rem;">⏰</span><strong>รอบส่งวันนี้ปิดแล้ว </strong>
                 </p>
                 <p style="margin: 0; color: #92400e; font-size: 0.85rem; font-weight: 600;">
                     <strong>แต่คุณสามารถสั่งล่วงหน้าสำหรับวันถัดไปได้ค่ะ </strong>
