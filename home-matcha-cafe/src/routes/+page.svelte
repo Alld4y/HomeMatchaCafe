@@ -149,7 +149,7 @@
             <div class="store-notice-banner" style="background: #fffbeb; border: 1.5px solid #fef3c7; border-radius: 14px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-align: center;">
                 <span style="font-size: 1.1rem;">⏰</span>
                 <p style="margin: 0; color: #92400e; font-size: 0.85rem; font-weight: 600;">
-                    <strong>รอบส่งวันนี้ปิดรับแล้ว</strong> แต่คุณสามารถสั่งล่วงหน้าสำหรับวันถัดไปได้ค่ะ 🍵
+                    <strong>รอบส่งวันนี้ปิดแล้ว</strong> แต่คุณสามารถสั่งล่วงหน้าสำหรับวันถัดไปได้ค่ะ 🍵
                 </p>
             </div>
         {:else}
