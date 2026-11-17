@@ -627,8 +627,8 @@
     }
 
     async function compressImageIfNeeded(file: File): Promise<File> {
-        // หากไฟล์ขนาดเล็กกว่า 350KB อยู่แล้ว ไม่จำเป็นต้องบีบอัด
-        if (file.size <= 350 * 1024) return file;
+        // หากไฟล์ขนาดเล็กกว่า 300KB อยู่แล้ว ไม่จำเป็นต้องบีบอัด
+        if (file.size <= 300 * 1024) return file;
 
         return new Promise((resolve) => {
             const img = new Image();
@@ -659,21 +659,31 @@
                 }
 
                 ctx.drawImage(img, 0, 0, w, h);
-                canvas.toBlob(
-                    (blob) => {
-                        if (!blob || blob.size >= file.size) {
-                            resolve(file);
-                        } else {
+
+                const tryCompress = (quality: number) => {
+                    canvas.toBlob(
+                        (blob) => {
+                            if (!blob) {
+                                resolve(file);
+                                return;
+                            }
+                            // หากยังเกิน 380KB และคุณภาพยังลดได้ ให้ลดคุณภาพลงเพื่อความรวดเร็วและไม่เกินลิมิต
+                            if (blob.size > 380 * 1024 && quality > 0.45) {
+                                tryCompress(quality - 0.15);
+                                return;
+                            }
                             const compressed = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
                                 type: 'image/jpeg',
                                 lastModified: Date.now()
                             });
                             resolve(compressed);
-                        }
-                    },
-                    'image/jpeg',
-                    0.85
-                );
+                        },
+                        'image/jpeg',
+                        quality
+                    );
+                };
+
+                tryCompress(0.8);
             };
             img.onerror = () => {
                 URL.revokeObjectURL(objectUrl);

@@ -1241,8 +1241,18 @@
         style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 999999; padding: 1.5rem;"
         onclick={() => (selectedSlip = null)}
     >
-        <div style="position: relative; max-width: 90vw; max-height: 90vh;" onclick={(e) => e.stopPropagation()}>
-            <img src={selectedSlip} alt="Slip Full" style="max-width: 100%; max-height: 85vh; border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,0.6);" />
+        <div style="position: relative; max-width: 90vw; max-height: 90vh; display: flex; flex-direction: column; align-items: center; gap: 0.75rem;" onclick={(e) => e.stopPropagation()}>
+            <img src={selectedSlip} alt="Slip Full" style="max-width: 100%; max-height: 80vh; border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,0.6);" />
+            <div style="display: flex; gap: 0.75rem;">
+                <a 
+                    href={selectedSlip} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    style="background: #2563eb; color: #fff; padding: 0.4rem 1rem; border-radius: 20px; font-size: 0.85rem; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;"
+                >
+                    ↗ เปิดในแท็บใหม่
+                </a>
+            </div>
             <button 
                 onclick={() => (selectedSlip = null)}
                 style="position: absolute; top: -14px; right: -14px; width: 38px; height: 38px; border-radius: 50%; background: #d9483b; color: #fff; border: 2px solid #fff; font-weight: bold; font-size: 1.1rem; cursor: pointer;"
@@ -2115,9 +2125,24 @@
                                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                                     <div 
                                         onclick={() => (selectedSlip = order.slipImage || null)}
-                                        style="cursor: pointer; position: relative; border-radius: 8px; overflow: hidden; border: 2px solid var(--border-matcha);"
+                                        style="cursor: pointer; position: relative; border-radius: 8px; overflow: hidden; border: 2px solid var(--border-matcha); background: #f3f4f6; min-width: 100px; min-height: 120px;"
                                     >
-                                        <img src={order.slipImage} alt="Slip" style="width: 100px; height: 120px; object-fit: cover; display: block;" />
+                                        <img 
+                                            src={order.slipImage} 
+                                            alt="Slip" 
+                                            loading="lazy"
+                                            style="width: 100px; height: 120px; object-fit: cover; display: block;" 
+                                            onerror={(e) => {
+                                                const el = e.currentTarget as HTMLElement;
+                                                el.style.display = 'none';
+                                                const fallback = el.parentElement?.querySelector('.slip-err-fallback') as HTMLElement;
+                                                if (fallback) fallback.style.display = 'flex';
+                                            }}
+                                        />
+                                        <div class="slip-err-fallback" style="display: none; width: 100px; height: 120px; flex-direction: column; align-items: center; justify-content: center; font-size: 0.7rem; color: #dc2626; text-align: center; padding: 4px; background: #fef2f2;">
+                                            <span>⚠️ รูปสลิป</span>
+                                            <span style="font-size: 0.65rem; text-decoration: underline; margin-top: 4px;">คลิกเพื่อเปิด</span>
+                                        </div>
                                         <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.75rem; opacity: 0; transition: opacity 0.2s;" onmouseenter={(e) => (e.currentTarget.style.opacity = '1')} onmouseleave={(e) => (e.currentTarget.style.opacity = '0')}>
                                             🔍 ขยาย
                                         </div>
