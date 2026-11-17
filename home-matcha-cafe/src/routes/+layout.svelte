@@ -892,12 +892,11 @@
                         >
                             📲 กดเพื่อติดตั้งลงหน้าจอโฮมทันที
                         </button>
-                        <div class="install-divider">
+                        <!-- <div class="install-divider">
                             <span>หรือติดตั้งผ่านเมนูของ Chrome</span>
-                        </div>
+                        </div> -->
                     {/if}
-
-                    <div class="install-step-list">
+                    <!-- <div class="install-step-list">
                         <div class="install-step-item">
                             <span class="install-step-num">1</span>
                             <div class="install-step-content">
@@ -921,7 +920,7 @@
                                 <p>แตะ <strong style="display: inline;">"ติดตั้ง"</strong> <br>ในหน้าต่างยืนยัน รอ 5-10 วินาที ไอคอนแอปจะไปอยู่ที่หน้าจอโฮมทันที</p>
                             </div>
                         </div>
-                    </div>
+                    </div> -->
                 </div>
             {:else}
                 <!-- เนื้อหาแท็บ iOS (Safari) -->
