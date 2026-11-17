@@ -418,22 +418,15 @@
         }
     }
 
-    // 📲 PWA & In-App Browser (LINE) Detection & Installation
+    // 📲 PWA & In-App Browser Detection & Installation
     const PWA_PROMPT_KEY = 'hmc_pwa_prompt_shown_v1';
     let isLineBrowser = $state(false);
-    let showLineBanner = $state(false);
     let deferredInstallPrompt = $state<any>(null);
     let showInstallBanner = $state(false);
     let showInstallModal = $state(false);
     let activeInstallTab = $state<'android' | 'ios'>('android');
     let isIosDevice = $state(false);
     let isStandalone = $state(false);
-
-    function openExternalBrowserFromLine() {
-        const u = new URL(window.location.href);
-        u.searchParams.set('openExternalBrowser', '1');
-        window.location.href = u.toString();
-    }
 
     function dismissInstallPrompt() {
         showInstallBanner = false;
@@ -482,15 +475,43 @@
             });
         }
 
-        // 🔍 ตรวจสอบเบราว์เซอร์และแพลตฟอร์ม
+        // 🔍 ตรวจสอบและเด้งเปิดเบราว์เซอร์จริงภายนอก (External Browser) อัตโนมัติทันที ไร้ UI กวนใจ
         const ua = navigator.userAgent || '';
-        isLineBrowser = /Line\//i.test(ua);
+        const isLine = /Line\//i.test(ua);
+        isLineBrowser = isLine;
+        const isAndroid = /Android/i.test(ua);
+        const isOtherInApp = /Instagram|FBAN|FBAV|FB_IAB|Messenger|musical_ly|ByteLocale|BytedanceWebview|TikTok|Twitter|Snapchat/i.test(ua);
         isIosDevice = /iPhone|iPad|iPod/i.test(ua) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         isStandalone = window.matchMedia('(display-mode: standalone)').matches || ((window.navigator as any).standalone === true);
 
-        // หากเปิดใน LINE และยังไม่ได้กดปิดแถบแจ้งเตือน ให้แสดงแถบแนะนำเปิดเบราว์เซอร์นอก
-        if (isLineBrowser && !sessionStorage.getItem('hmc_line_dismissed')) {
-            showLineBanner = true;
+        // 1. ถ้าเปิดใน LINE (ทั้ง iOS และ Android): เด้งเปิดเบราว์เซอร์หลักทันที (iOS -> Safari, Android -> Chrome/Default)
+        if (isLine && typeof window !== 'undefined') {
+            try {
+                const currentUrl = new URL(window.location.href);
+                if (!currentUrl.searchParams.has('openExternalBrowser') && !sessionStorage.getItem('hmc_line_bounced')) {
+                    sessionStorage.setItem('hmc_line_bounced', '1');
+                    currentUrl.searchParams.set('openExternalBrowser', '1');
+                    window.location.replace(currentUrl.toString());
+                    return;
+                }
+            } catch (err) {
+                console.warn('Auto redirect from LINE:', err);
+            }
+        }
+
+        // 2. ถ้าเปิดใน IG / FB / TikTok / อื่นๆ บน Android: ใช้ Intent เปิด Chrome / เบราว์เซอร์เริ่มต้นทันที
+        if (isAndroid && isOtherInApp && typeof window !== 'undefined') {
+            try {
+                if (!sessionStorage.getItem('hmc_inapp_intent_tried')) {
+                    sessionStorage.setItem('hmc_inapp_intent_tried', '1');
+                    const cleanUrl = window.location.href.replace(/^https?:\/\//, '');
+                    const intentUrl = `intent://${cleanUrl}#Intent;scheme=https;action=android.intent.action.VIEW;end;`;
+                    window.location.replace(intentUrl);
+                    return;
+                }
+            } catch (err) {
+                console.warn('Auto redirect from In-App browser:', err);
+            }
         }
 
         // 🧪 โหมดทดสอบ: หากมี query param ?testPwa=1 หรือ ?resetPwa=1 ให้ล้างสถานะและบังคับให้แสดงใหม่ได้ตลอดเวลา
@@ -508,7 +529,7 @@
         } catch {}
 
         // หากเป็น iOS และยังไม่เคยแสดงมาก่อน และไม่อยู่ในหน้า Admin
-        if (isIosDevice && !isStandalone && !isLineBrowser && !hasShownPrompt && !window.location.pathname.startsWith('/admin')) {
+        if (isIosDevice && !isStandalone && !isLine && !isOtherInApp && !hasShownPrompt && !window.location.pathname.startsWith('/admin')) {
             showInstallBanner = true;
             try {
                 localStorage.setItem(PWA_PROMPT_KEY, 'true');
@@ -519,7 +540,7 @@
         const handleBeforeInstall = (e: Event) => {
             e.preventDefault();
             deferredInstallPrompt = e;
-            if (!hasShownPrompt && !isStandalone && !isLineBrowser && !window.location.pathname.startsWith('/admin')) {
+            if (!hasShownPrompt && !isStandalone && !isLine && !isOtherInApp && !window.location.pathname.startsWith('/admin')) {
                 showInstallBanner = true;
                 try {
                     localStorage.setItem(PWA_PROMPT_KEY, 'true');
@@ -571,27 +592,6 @@
 </script>
 
 <svelte:window onclick={closeModal} />
-
-<!-- 💡 แจ้งเตือนเมื่อเปิดใน LINE เพื่อแนะนำเปิดเบราว์เซอร์จริง (แบบลอยใต้ Navbar ไม่ทับซ้อน) -->
-{#if isLineBrowser && showLineBanner}
-    <div class="line-browser-floating">
-        <div class="line-banner-content">
-            <span class="line-banner-icon">💡</span>
-            <div class="line-banner-text">
-                <strong>เปิดในแอป LINE อาจบันทึกรูป QR Code หรือติดตั้งแอปไม่ได้</strong>
-                <span>แนะนำกดปุ่มเพื่อเปิดผ่าน Chrome หรือ Safari เพื่อประสบการณ์ใช้งานที่ดีที่สุด</span>
-            </div>
-        </div>
-        <div class="line-banner-actions">
-            <button type="button" class="line-banner-btn" onclick={openExternalBrowserFromLine}>
-                🌐 เปิดในเบราว์เซอร์
-            </button>
-            <button type="button" class="line-banner-close" onclick={() => { showLineBanner = false; sessionStorage.setItem('hmc_line_dismissed', '1'); }} aria-label="ปิดการแจ้งเตือน">
-                ✕
-            </button>
-        </div>
-    </div>
-{/if}
 
 <!-- แถบนำทางด้านบนแบบ Floating Frosted Glass -->
 <div class="nav-bar-wrapper">
@@ -1417,79 +1417,6 @@
         }
     }
 
-    /* 🌐 LINE Floating Notification (อยู่นอก Flow ไม่บัง Navbar) */
-    .line-browser-floating {
-        position: fixed;
-        top: 4.8rem;
-        left: 1rem;
-        right: 1rem;
-        max-width: 520px;
-        margin: 0 auto;
-        z-index: 999;
-        background: #fffbeb;
-        border: 1.5px solid #fde047;
-        border-radius: 16px;
-        padding: 0.65rem 0.95rem;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        font-family: 'Kanit', sans-serif;
-        animation: fadeInDown 0.25s ease-out;
-    }
-    .line-banner-content {
-        display: flex;
-        align-items: center;
-        gap: 0.65rem;
-        font-size: 0.82rem;
-        line-height: 1.35;
-        color: #78350f;
-    }
-    .line-banner-icon {
-        font-size: 1.3rem;
-        flex-shrink: 0;
-    }
-    .line-banner-text {
-        display: flex;
-        flex-direction: column;
-    }
-    .line-banner-actions {
-        display: flex;
-        align-items: center;
-        gap: 0.45rem;
-        flex-shrink: 0;
-    }
-    .line-banner-btn {
-        background: #06c755;
-        color: #ffffff;
-        border: none;
-        border-radius: 999px;
-        padding: 0.35rem 0.8rem;
-        font-size: 0.8rem;
-        font-weight: 700;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.3rem;
-        box-shadow: 0 2px 6px rgba(6, 199, 85, 0.25);
-        transition: all 0.15s ease;
-    }
-    .line-banner-btn:active {
-        transform: scale(0.96);
-    }
-    .line-banner-close {
-        background: transparent;
-        border: none;
-        color: #64748b;
-        font-size: 1rem;
-        font-weight: 800;
-        cursor: pointer;
-        padding: 0.2rem 0.4rem;
-        line-height: 1;
-        border-radius: 50%;
-    }
-
     /* 📲 PWA Floating Bottom Card (แสดงครั้งเดียว ไม่ทับ Navbar และเข้าธีมร้าน) */
     .pwa-install-card {
         position: fixed;
@@ -1647,12 +1574,6 @@
             left: 0.75rem;
             right: 0.75rem;
             padding: 0.75rem 0.85rem;
-        }
-        .line-browser-floating {
-            top: 4.4rem;
-            left: 0.75rem;
-            right: 0.75rem;
-            padding: 0.55rem 0.75rem;
         }
     }
 
