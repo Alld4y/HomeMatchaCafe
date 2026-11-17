@@ -97,7 +97,7 @@ function mapPgRowToOrder(row: any): Order {
             // แต่ราคาต่อแก้วสูงกว่าราคาฐาน (เช่น มัทฉะลาเต้ 65 บาท ขณะที่ราคาปกติ 55 บาท)
             if (!addonName && itemPrice > basePrice) {
                 const diff = itemPrice - basePrice;
-                addonName = `เพิ่มช็อต (+${diff}฿)`;
+                addonName = 'เพิ่มช็อตมัทฉะ';
                 addonPrice = diff;
             }
 
