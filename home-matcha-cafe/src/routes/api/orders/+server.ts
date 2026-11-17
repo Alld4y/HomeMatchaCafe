@@ -145,6 +145,10 @@ export const POST: RequestHandler = async ({ request }) => {
                 englishName: item.englishName || item.id,
                 name: item.thaiName || item.name || item.id,
                 price: Number(item.price) || 0,
+                basePrice: item.basePrice !== undefined ? Number(item.basePrice) : undefined,
+                addonName: item.addonName || undefined,
+                addonPrice: item.addonPrice !== undefined ? Number(item.addonPrice) : undefined,
+                addonId: item.addonId || undefined,
                 quantity: Number(item.quantity) || 1,
                 sweetness: item.sweetness ?? 50,
                 note: item.note || ''

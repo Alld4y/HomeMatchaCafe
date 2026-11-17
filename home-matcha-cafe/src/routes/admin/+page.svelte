@@ -194,12 +194,17 @@
         thaiName: string;
         englishName: string;
         price: number;
+        basePrice?: number;
+        addonName?: string;
+        addonPrice?: number;
+        addonId?: string;
         quantity: number;
         sweetness: number;
         note: string;
     }>>([]);
 
     let currentDrinkMenuId = $state<string>('');
+    let currentDrinkAddonId = $state<string>('');
     let currentDrinkSweetness = $state<number>(50);
     let currentDrinkQuantity = $state<number>(1);
     let currentDrinkNote = $state<string>('');
@@ -243,6 +248,7 @@
         newOrderPaymentNote = 'ชำระแล้ว (เงินสด/แอดมินรับยอด)';
         newOrderCustomTotal = null;
         currentDrinkMenuId = menuItems.length > 0 ? menuItems[0].id : '';
+        currentDrinkAddonId = '';
         currentDrinkSweetness = 50;
         currentDrinkQuantity = 1;
         currentDrinkNote = '';
@@ -274,7 +280,12 @@
             return;
         }
 
-        const price = currentDrinkCustomPrice !== null && currentDrinkCustomPrice >= 0 ? currentDrinkCustomPrice : Number(item.price || 55);
+        const selectedItemAddon = (item.addons || []).find((a: any) => a.id === currentDrinkAddonId);
+        const addonPrice = selectedItemAddon ? Number(selectedItemAddon.price || 0) : 0;
+        const basePrice = Number(item.price || 55);
+        const price = currentDrinkCustomPrice !== null && currentDrinkCustomPrice >= 0
+            ? currentDrinkCustomPrice
+            : (basePrice + addonPrice);
 
         newOrderBasket = [
             ...newOrderBasket,
@@ -283,6 +294,10 @@
                 thaiName: item.thaiName || item.name || 'มัทฉะ',
                 englishName: item.englishName || item.id,
                 price,
+                basePrice,
+                addonName: selectedItemAddon ? selectedItemAddon.name : undefined,
+                addonPrice: selectedItemAddon ? addonPrice : undefined,
+                addonId: selectedItemAddon ? selectedItemAddon.id : undefined,
                 quantity: Math.max(1, currentDrinkQuantity || 1),
                 sweetness: currentDrinkSweetness ?? 50,
                 note: currentDrinkNote.trim()
@@ -292,6 +307,7 @@
         currentDrinkQuantity = 1;
         currentDrinkNote = '';
         currentDrinkCustomPrice = null;
+        currentDrinkAddonId = '';
     }
 
     function removeDrinkFromNewOrder(idx: number) {
@@ -3210,7 +3226,7 @@
                             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.6rem;">
                                 <div>
                                     <label class="form-label" style="font-size: 0.78rem;" for="drinkMenuSelect">เลือกเมนูเครื่องดื่ม:</label>
-                                    <select id="drinkMenuSelect" class="form-input" bind:value={currentDrinkMenuId} style="font-size: 0.85rem;">
+                                    <select id="drinkMenuSelect" class="form-input" bind:value={currentDrinkMenuId} onchange={() => (currentDrinkAddonId = '')} style="font-size: 0.85rem;">
                                         {#each menuItems as item}
                                             <option value={item.id}>
                                                 {item.thaiName} ({item.price}฿) {item.isFermented ? '⏳ เมนูบ่ม' : ''} {!item.isAvailable ? '⛔ (ปิดจำหน่าย)' : ''}
@@ -3225,12 +3241,45 @@
                                         type="number"
                                         min="0"
                                         class="form-input"
-                                        placeholder={String(menuItems.find((m) => m.id === currentDrinkMenuId)?.price || 55)}
+                                        placeholder={String(
+                                            Number(menuItems.find((m) => m.id === currentDrinkMenuId)?.price || 55) +
+                                            Number(menuItems.find((m) => m.id === currentDrinkMenuId)?.addons?.find((a: any) => a.id === currentDrinkAddonId)?.price || 0)
+                                        )}
                                         bind:value={currentDrinkCustomPrice}
                                         style="font-size: 0.85rem;"
                                     />
                                 </div>
                             </div>
+
+                            <!-- ตัวเลือกเสริม / เพิ่มช็อต (ถ้ามี) -->
+                            {#if (menuItems.find((m) => m.id === currentDrinkMenuId)?.addons || []).length > 0}
+                                {@const currentItemAddons = menuItems.find((m) => m.id === currentDrinkMenuId)?.addons || []}
+                                <div style="background: #f0fdf4; border: 1px dashed #86efac; border-radius: 10px; padding: 0.5rem 0.65rem;">
+                                    <label class="form-label" style="font-size: 0.78rem; margin-bottom: 0.35rem; display: block; color: #166534;" for="addonPicker">
+                                        🍵 ตัวเลือกเพิ่มช็อต / เสริม:
+                                    </label>
+                                    <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;" id="addonPicker">
+                                        <button
+                                            type="button"
+                                            onclick={() => (currentDrinkAddonId = '')}
+                                            style="padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: {currentDrinkAddonId === '' ? '800' : '600'}; border-radius: 8px; border: 1px solid {currentDrinkAddonId === '' ? '#166534' : '#cbd5e1'}; background: {currentDrinkAddonId === '' ? '#dcfce7' : '#ffffff'}; color: {currentDrinkAddonId === '' ? '#14532d' : '#475569'}; cursor: pointer;"
+                                        >
+                                            {currentDrinkAddonId === '' ? '●' : '○'} ไม่เพิ่ม (+0฿)
+                                        </button>
+                                        {#each currentItemAddons as addon}
+                                            {@const isSelected = currentDrinkAddonId === addon.id}
+                                            <button
+                                                type="button"
+                                                onclick={() => (currentDrinkAddonId = isSelected ? '' : addon.id)}
+                                                style="padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: {isSelected ? '800' : '600'}; border-radius: 8px; border: 1px solid {isSelected ? '#166534' : '#86efac'}; background: {isSelected ? '#166534' : '#ffffff'}; color: {isSelected ? '#ffffff' : '#166534'}; cursor: pointer; display: flex; align-items: center; gap: 0.3rem;"
+                                            >
+                                                <span>{isSelected ? '●' : '○'} {addon.name}</span>
+                                                <span style="font-size: 0.7rem; font-weight: 800;">(+{addon.price}฿)</span>
+                                            </button>
+                                        {/each}
+                                    </div>
+                                </div>
+                            {/if}
 
                             <!-- ความหวาน & จำนวน -->
                             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.6rem; align-items: center;">
@@ -3325,6 +3374,11 @@
                                                 <div style="font-weight: 800; font-size: 0.88rem; color: #1e293b;">
                                                     {item.thaiName} <span style="font-weight: 600; font-size: 0.76rem; color: #166534;">(หวาน {item.sweetness}%)</span>
                                                 </div>
+                                                {#if item.addonName}
+                                                    <div style="font-size: 0.75rem; color: #166534; font-weight: 700; margin-top: 0.15rem;">
+                                                        🍵 + {item.addonName} (+{item.addonPrice || 0} ฿)
+                                                    </div>
+                                                {/if}
                                                 {#if item.note}
                                                     <div style="font-size: 0.75rem; color: #d97706;">
                                                         📝 {item.note}

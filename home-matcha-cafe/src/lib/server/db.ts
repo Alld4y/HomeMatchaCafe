@@ -9,6 +9,10 @@ export interface OrderItem {
     englishName?: string;
     name?: string;
     price: number;
+    basePrice?: number;
+    addonName?: string;
+    addonPrice?: number;
+    addonId?: string;
     quantity: number;
     sweetness?: number | string;
     note?: string;
@@ -84,12 +88,29 @@ function mapPgRowToOrder(row: any): Order {
                 englishName: item.englishName || item.id || 'MATCHA',
                 price: Number(item.price) || 0
             };
+            const itemPrice = Number(item.price) > 0 ? Number(item.price) : fallback.price;
+            let addonName = item.addonName || '';
+            let addonPrice = item.addonPrice !== undefined && item.addonPrice !== null ? Number(item.addonPrice) : undefined;
+            const basePrice = item.basePrice !== undefined && item.basePrice !== null ? Number(item.basePrice) : fallback.price;
+
+            // 💡 Fallback inference: หากเป็นออเดอร์เก่าที่ไม่ได้บันทึก addonName ไว้
+            // แต่ราคาต่อแก้วสูงกว่าราคาฐาน (เช่น มัทฉะลาเต้ 65 บาท ขณะที่ราคาปกติ 55 บาท)
+            if (!addonName && itemPrice > basePrice) {
+                const diff = itemPrice - basePrice;
+                addonName = `เพิ่มช็อต (+${diff}฿)`;
+                addonPrice = diff;
+            }
+
             return {
                 id: item.id,
                 thaiName: item.thaiName || item.name || fallback.thaiName,
                 englishName: item.englishName || fallback.englishName,
                 name: item.thaiName || item.name || fallback.thaiName,
-                price: Number(item.price) > 0 ? Number(item.price) : fallback.price,
+                price: itemPrice,
+                basePrice,
+                addonName: addonName || undefined,
+                addonPrice,
+                addonId: item.addonId || undefined,
                 quantity: Number(item.quantity) || 1,
                 sweetness: item.sweetness ?? 50,
                 note: item.note || ''
