@@ -418,10 +418,98 @@
         }
     }
 
+    // 📲 PWA & In-App Browser (LINE) Detection & Installation
+    let isLineBrowser = $state(false);
+    let showLineBanner = $state(false);
+    let deferredInstallPrompt = $state<any>(null);
+    let showInstallBanner = $state(false);
+    let isIosDevice = $state(false);
+    let isStandalone = $state(false);
+
+    function openExternalBrowserFromLine() {
+        const u = new URL(window.location.href);
+        u.searchParams.set('openExternalBrowser', '1');
+        window.location.href = u.toString();
+    }
+
+    async function handleInstallPwa() {
+        if (deferredInstallPrompt) {
+            deferredInstallPrompt.prompt();
+            const { outcome } = await deferredInstallPrompt.userChoice;
+            if (outcome === 'accepted') {
+                showInstallBanner = false;
+            }
+            deferredInstallPrompt = null;
+        } else if (isIosDevice) {
+            swal.fire({
+                title: 'วิธีติดตั้งแอปบน iPhone / iPad',
+                html: `
+                    <div style="text-align: left; font-size: 0.92rem; line-height: 1.6; color: #334155;">
+                        <p style="margin-bottom: 0.75rem;">ติดตั้ง <strong>Home Matcha Cafe</strong> ลงบนหน้าจอโฮมได้ง่ายๆ:</p>
+                        <ol style="padding-left: 1.25rem; margin: 0; display: flex; flex-direction: column; gap: 0.5rem;">
+                            <li>แตะปุ่มแชร์ <strong>⎋ (Share)</strong> ที่แถบด้านล่างของ Safari</li>
+                            <li>เลื่อนลงแล้วเลือก <strong>"เพิ่มไปยังหน้าจอโฮม (Add to Home Screen) ＋"</strong></li>
+                            <li>แตะ <strong>"เพิ่ม (Add)"</strong> ที่มุมขวาบน</li>
+                        </ol>
+                        <p style="margin-top: 0.75rem; font-size: 0.8rem; color: #64748b;">ไอคอนแอปจะไปปรากฏบนหน้าจอโฮม เข้าสั่งได้สะดวกรวดเร็วไม่ต้องเข้าผ่านเบราว์เซอร์ค่ะ 🍵</p>
+                    </div>
+                `,
+                icon: 'info',
+                confirmButtonText: 'เข้าใจแล้ว',
+                confirmButtonColor: '#166534'
+            });
+        } else {
+            swal.fire({
+                title: 'ติดตั้งแอป Home Matcha Cafe',
+                html: `
+                    <div style="text-align: left; font-size: 0.92rem; line-height: 1.6; color: #334155;">
+                        <p>สามารถกดเมนู <strong>(⋮) หรือ ไอคอนติดตั้ง</strong> ที่แถบ URL ของเบราว์เซอร์ (Chrome / Edge) แล้วเลือก <strong>"ติดตั้งแอป (Install App)"</strong> เพื่อใช้งานได้เลยค่ะ</p>
+                    </div>
+                `,
+                icon: 'info',
+                confirmButtonText: 'ตกลง',
+                confirmButtonColor: '#166534'
+            });
+        }
+    }
+
     onMount(() => {
         loadCartFromStorage();
         loadMemberFromStorage();
         checkAdminPendingReviews();
+
+        // 📲 ลงทะเบียน Service Worker สำหรับ PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch((err) => {
+                console.warn('PWA Service Worker registration:', err);
+            });
+        }
+
+        // 🔍 ตรวจสอบเบราว์เซอร์และแพลตฟอร์ม
+        const ua = navigator.userAgent || '';
+        isLineBrowser = /Line\//i.test(ua);
+        isIosDevice = /iPhone|iPad|iPod/i.test(ua);
+        isStandalone = window.matchMedia('(display-mode: standalone)').matches || ((window.navigator as any).standalone === true);
+
+        // หากเปิดใน LINE และยังไม่ได้กดปิดแถบแจ้งเตือน ให้แสดงแถบแนะนำเปิดเบราว์เซอร์นอก
+        if (isLineBrowser && !sessionStorage.getItem('hmc_line_dismissed')) {
+            showLineBanner = true;
+        }
+
+        // หากเป็น iOS และยังไม่ได้เปิดเป็น Standalone PWA และยังไม่ได้ปิดแบนเนอร์
+        if (isIosDevice && !isStandalone && !isLineBrowser && !sessionStorage.getItem('hmc_install_dismissed')) {
+            showInstallBanner = true;
+        }
+
+        // ดักจับ Event สำหรับปุ่มติดตั้งแอปบน Chrome/Android
+        const handleBeforeInstall = (e: Event) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            if (!sessionStorage.getItem('hmc_install_dismissed') && !isStandalone) {
+                showInstallBanner = true;
+            }
+        };
+        window.addEventListener('beforeinstallprompt', handleBeforeInstall);
 
         const handleStorageChange = () => {
             loadCartFromStorage();
@@ -444,6 +532,7 @@
         }, 15000);
 
         return () => {
+            window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
             window.removeEventListener('storage', handleStorageChange);
             window.removeEventListener('cart-updated', handleStorageChange);
             window.removeEventListener('orders-updated', handleOrdersUpdated);
@@ -465,6 +554,48 @@
 </script>
 
 <svelte:window onclick={closeModal} />
+
+<!-- 💡 แถบแจ้งเตือนเมื่อเปิดใน LINE เพื่อแนะนำเปิดเบราว์เซอร์จริง -->
+{#if isLineBrowser && showLineBanner}
+    <div class="line-browser-banner">
+        <div class="line-banner-content">
+            <span class="line-banner-icon">💡</span>
+            <div class="line-banner-text">
+                <strong>เปิดในแอป LINE อาจบันทึกรูป QR Code หรือติดตั้งแอปไม่ได้</strong>
+                <span>แนะนำกดปุ่มเพื่อเปิดผ่าน Chrome หรือ Safari เพื่อประสบการณ์ใช้งานที่ดีที่สุด</span>
+            </div>
+        </div>
+        <div class="line-banner-actions">
+            <button class="line-banner-btn" onclick={openExternalBrowserFromLine}>
+                🌐 เปิดในเบราว์เซอร์
+            </button>
+            <button class="line-banner-close" onclick={() => { showLineBanner = false; sessionStorage.setItem('hmc_line_dismissed', '1'); }} aria-label="ปิดการแจ้งเตือน">
+                ✕
+            </button>
+        </div>
+    </div>
+{/if}
+
+<!-- 📲 แถบแนะนำการติดตั้ง PWA App -->
+{#if showInstallBanner && !isStandalone && !isLineBrowser}
+    <div class="pwa-install-banner">
+        <div class="pwa-banner-content">
+            <img src="/image/home-matcha-cafe-logo.png" alt="App Icon" class="pwa-banner-icon" />
+            <div class="pwa-banner-text">
+                <strong>ติดตั้งแอป Home Matcha Cafe</strong>
+                <span>แตะติดตั้งเพื่อใช้งานได้เสมือนแอปจริงบนมือถือ สะดวก รวดเร็ว ไม่ต้องค้นหาลิงก์</span>
+            </div>
+        </div>
+        <div class="pwa-banner-actions">
+            <button class="pwa-install-btn" onclick={handleInstallPwa}>
+                📲 ติดตั้งแอป
+            </button>
+            <button class="pwa-banner-close" onclick={() => { showInstallBanner = false; sessionStorage.setItem('hmc_install_dismissed', '1'); }} aria-label="ปิดการแจ้งเตือน">
+                ✕
+            </button>
+        </div>
+    </div>
+{/if}
 
 <!-- แถบนำทางด้านบนแบบ Floating Frosted Glass -->
 <div class="nav-bar-wrapper">
@@ -496,6 +627,11 @@
                     </span>
                 {/if}
             </a>
+            {#if !isStandalone && !isLineBrowser}
+                <button type="button" class="nav-install-chip" onclick={handleInstallPwa} title="ติดตั้งแอปพลิเคชัน">
+                    📲 ติดตั้งแอป
+                </button>
+            {/if}
         </div>
 
         <div class="nav-actions">
@@ -1118,6 +1254,162 @@
     @media (max-width: 360px) {
         .reg-name-grid {
             grid-template-columns: 1fr;
+        }
+    }
+
+    /* 🌐 LINE & PWA Install Banners */
+    .line-browser-banner {
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        background: linear-gradient(90deg, #fef3c7, #fef9c3);
+        border-bottom: 1.5px solid #fde047;
+        color: #78350f;
+        padding: 0.65rem 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        font-family: 'Kanit', sans-serif;
+    }
+    .line-banner-content {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        font-size: 0.85rem;
+        line-height: 1.35;
+    }
+    .line-banner-icon {
+        font-size: 1.3rem;
+        flex-shrink: 0;
+    }
+    .line-banner-text {
+        display: flex;
+        flex-direction: column;
+    }
+    .line-banner-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+    .line-banner-btn {
+        background: #06c755;
+        color: #ffffff;
+        border: none;
+        border-radius: 999px;
+        padding: 0.35rem 0.85rem;
+        font-size: 0.82rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        box-shadow: 0 2px 6px rgba(6, 199, 85, 0.25);
+        transition: all 0.15s ease;
+    }
+    .line-banner-btn:active {
+        transform: scale(0.96);
+    }
+    .line-banner-close, .pwa-banner-close {
+        background: transparent;
+        border: none;
+        color: #64748b;
+        font-size: 1.1rem;
+        font-weight: 800;
+        cursor: pointer;
+        padding: 0.2rem 0.4rem;
+        line-height: 1;
+        border-radius: 50%;
+    }
+
+    .pwa-install-banner {
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        background: linear-gradient(90deg, #f0fdf4, #e8f5e9);
+        border-bottom: 1.5px solid #86efac;
+        color: #14532d;
+        padding: 0.65rem 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        font-family: 'Kanit', sans-serif;
+    }
+    .pwa-banner-content {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        font-size: 0.85rem;
+        line-height: 1.35;
+    }
+    .pwa-banner-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        object-fit: cover;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+        flex-shrink: 0;
+    }
+    .pwa-banner-text {
+        display: flex;
+        flex-direction: column;
+    }
+    .pwa-banner-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+    .pwa-install-btn {
+        background: #166534;
+        color: #ffffff;
+        border: none;
+        border-radius: 999px;
+        padding: 0.35rem 0.85rem;
+        font-size: 0.82rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        box-shadow: 0 2px 6px rgba(22, 101, 52, 0.25);
+        transition: all 0.15s ease;
+    }
+    .pwa-install-btn:active {
+        transform: scale(0.96);
+    }
+    .nav-install-chip {
+        background: rgba(22, 101, 52, 0.1);
+        color: #166534;
+        border: 1.5px solid #86efac;
+        border-radius: 999px;
+        padding: 0.25rem 0.7rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        transition: all 0.15s ease;
+    }
+    .nav-install-chip:hover {
+        background: #166534;
+        color: #ffffff;
+    }
+
+    @media (max-width: 640px) {
+        .line-browser-banner, .pwa-install-banner {
+            flex-direction: column;
+            align-items: stretch;
+            padding: 0.6rem 0.85rem;
+            gap: 0.5rem;
+        }
+        .line-banner-actions, .pwa-banner-actions {
+            justify-content: flex-end;
         }
     }
 </style>

@@ -429,7 +429,8 @@
     );
 
     // 🍵 ระบบสรุปคิวชงเครื่องดื่มและเช็คลิสต์บาริสต้า (Barista Drink Prep Summary & Checklist)
-    let isBrewSummaryExpanded = $state<boolean>(true);
+    let isBrewSummaryExpanded = $state<boolean>(false);
+    let selectedRoundFilter = $state<string>('all');
     let brewChecklist = $state<Record<string, boolean>>({});
 
     interface SweetnessItemPrep {
@@ -437,6 +438,8 @@
         count: number;
         addonBreakdown: Record<string, number>;
         noteBreakdown: Record<string, number>;
+        roundBreakdown: Record<string, number>;
+        dateBreakdown: Record<string, number>;
         normalAddonCount: number;
     }
 
@@ -448,11 +451,29 @@
         sweetnessList: SweetnessItemPrep[];
         overallAddons: Record<string, number>;
         overallNotes: Record<string, number>;
+        overallRounds: Record<string, number>;
         totalNormalAddon: number;
     }
 
+    // รอบจัดส่งทั้งหมดที่มีอยู่ในคำสั่งซื้อปัจจุบัน
+    let availableDeliveryRounds = $derived.by(() => {
+        const counts: Record<string, number> = {};
+        for (const order of filteredOrders) {
+            const roundName = (order.deliveryRound || 'รอบปกติ').trim();
+            const cups = (order.basket || []).reduce((sum, it) => sum + Math.max(1, Number(it.quantity) || 1), 0);
+            counts[roundName] = (counts[roundName] || 0) + cups;
+        }
+        return counts;
+    });
+
+    let activeSummaryOrders = $derived(
+        selectedRoundFilter === 'all'
+            ? filteredOrders
+            : filteredOrders.filter((o) => (o.deliveryRound || 'รอบปกติ').trim() === selectedRoundFilter)
+    );
+
     let filteredTotalCups = $derived(
-        filteredOrders.reduce((sum, o) => {
+        activeSummaryOrders.reduce((sum, o) => {
             if (!o.basket || !Array.isArray(o.basket)) return sum;
             return sum + o.basket.reduce((bSum, item) => bSum + Math.max(1, Number(item.quantity) || 1), 0);
         }, 0)
@@ -469,15 +490,21 @@
                 count: number;
                 addonBreakdown: Record<string, number>;
                 noteBreakdown: Record<string, number>;
+                roundBreakdown: Record<string, number>;
+                dateBreakdown: Record<string, number>;
                 normalAddonCount: number;
             }>;
             overallAddons: Record<string, number>;
             overallNotes: Record<string, number>;
+            overallRounds: Record<string, number>;
             totalNormalAddon: number;
         }>();
 
-        for (const order of filteredOrders) {
+        for (const order of activeSummaryOrders) {
             if (!order.basket || !Array.isArray(order.basket)) continue;
+            const roundName = (order.deliveryRound || 'รอบปกติ').trim();
+            const dateStr = (order.deliveryDate || '').trim();
+
             for (const item of order.basket) {
                 const qty = Math.max(1, Number(item.quantity) || 1);
                 const name = (item.thaiName || item.name || 'เครื่องดื่ม').trim();
@@ -504,6 +531,7 @@
                         sweetnessMap: new Map(),
                         overallAddons: {},
                         overallNotes: {},
+                        overallRounds: {},
                         totalNormalAddon: 0
                     };
                     menuMap.set(name, group);
@@ -523,6 +551,11 @@
                     group.overallNotes[note] = (group.overallNotes[note] || 0) + qty;
                 }
 
+                // สรุป Rounds ภาพรวมของเมนูนี้
+                if (roundName) {
+                    group.overallRounds[roundName] = (group.overallRounds[roundName] || 0) + qty;
+                }
+
                 // สรุปจำแนกตามความหวาน
                 let sweetItem = group.sweetnessMap.get(sweetness);
                 if (!sweetItem) {
@@ -531,6 +564,8 @@
                         count: 0,
                         addonBreakdown: {},
                         noteBreakdown: {},
+                        roundBreakdown: {},
+                        dateBreakdown: {},
                         normalAddonCount: 0
                     };
                     group.sweetnessMap.set(sweetness, sweetItem);
@@ -545,6 +580,12 @@
                 if (note) {
                     sweetItem.noteBreakdown[note] = (sweetItem.noteBreakdown[note] || 0) + qty;
                 }
+                if (roundName) {
+                    sweetItem.roundBreakdown[roundName] = (sweetItem.roundBreakdown[roundName] || 0) + qty;
+                }
+                if (dateStr) {
+                    sweetItem.dateBreakdown[dateStr] = (sweetItem.dateBreakdown[dateStr] || 0) + qty;
+                }
             }
         }
 
@@ -557,17 +598,22 @@
                 totalCups: g.totalCups,
                 overallAddons: g.overallAddons,
                 overallNotes: g.overallNotes,
+                overallRounds: g.overallRounds,
                 totalNormalAddon: g.totalNormalAddon,
                 sweetnessList: Array.from(g.sweetnessMap.values()).sort((a, b) => a.sweetness - b.sweetness)
             }))
             .sort((a, b) => b.totalCups - a.totalCups);
     });
 
+    function getBrewItemKey(menuName: string, sweetness: number) {
+        return `${menuName}__sweet_${sweetness}__round_${selectedRoundFilter}`;
+    }
+
     let checkedCupsCount = $derived.by(() => {
         let count = 0;
         for (const menu of brewSummaryList) {
             for (const sweet of menu.sweetnessList) {
-                const key = `${menu.menuName}__sweet_${sweet.sweetness}`;
+                const key = getBrewItemKey(menu.menuName, sweet.sweetness);
                 if (brewChecklist[key]) {
                     count += sweet.count;
                 }
@@ -590,7 +636,7 @@
     function isMenuAllChecked(menu: MenuPrepGroup): boolean {
         if (!menu.sweetnessList || menu.sweetnessList.length === 0) return false;
         return menu.sweetnessList.every(
-            (s) => !!brewChecklist[`${menu.menuName}__sweet_${s.sweetness}`]
+            (s) => !!brewChecklist[getBrewItemKey(menu.menuName, s.sweetness)]
         );
     }
 
@@ -599,23 +645,29 @@
         const nextState = !allChecked;
         const updated = { ...brewChecklist };
         for (const s of menu.sweetnessList) {
-            updated[`${menu.menuName}__sweet_${s.sweetness}`] = nextState;
+            updated[getBrewItemKey(menu.menuName, s.sweetness)] = nextState;
         }
         brewChecklist = updated;
     }
 
     function checkAllBrewItems() {
-        const updated: Record<string, boolean> = {};
+        const updated = { ...brewChecklist };
         for (const menu of brewSummaryList) {
             for (const s of menu.sweetnessList) {
-                updated[`${menu.menuName}__sweet_${s.sweetness}`] = true;
+                updated[getBrewItemKey(menu.menuName, s.sweetness)] = true;
             }
         }
         brewChecklist = updated;
     }
 
     function resetBrewChecklist() {
-        brewChecklist = {};
+        const updated = { ...brewChecklist };
+        for (const menu of brewSummaryList) {
+            for (const s of menu.sweetnessList) {
+                delete updated[getBrewItemKey(menu.menuName, s.sweetness)];
+            }
+        }
+        brewChecklist = updated;
     }
 
     // ในแท็บ "ทั้งหมด" ปุ่มเลือกทั้งหมดจะเลือกเฉพาะรายการที่ "รับยอดแล้ว (รอชง)" (status === 'paid') เท่านั้น ไม่เลือกรายการที่ยกเลิกหรือเสร็จสิ้นแล้ว
@@ -2134,17 +2186,47 @@
             <!-- เนื้อหาการ์ดสรุปคิวชง (แสดงเมื่อขยาย) -->
             {#if isBrewSummaryExpanded}
                 <div style="padding: 1rem 1.15rem; background: #ffffff;">
+                    <!-- ตัวกรองเลือกรอบส่ง (Filter by Delivery Round) -->
+                    {#if Object.keys(availableDeliveryRounds).length > 1}
+                        <div style="display: flex; gap: 0.35rem; overflow-x: auto; padding-bottom: 0.4rem; margin-bottom: 0.75rem; align-items: center;">
+                            <span style="font-size: 0.76rem; font-weight: 800; color: #475569; white-space: nowrap; margin-right: 0.2rem;">
+                                🚚 แยกรอบส่ง:
+                            </span>
+                            <button
+                                type="button"
+                                onclick={() => (selectedRoundFilter = 'all')}
+                                style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700; border-radius: 999px; border: 1.5px solid {selectedRoundFilter === 'all' ? '#0284c7' : '#cbd5e1'}; background: {selectedRoundFilter === 'all' ? '#0284c7' : '#ffffff'}; color: {selectedRoundFilter === 'all' ? '#ffffff' : '#475569'}; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;"
+                            >
+                                ทุกรอบส่ง ({filteredOrders.reduce((sum, o) => sum + (o.basket || []).reduce((bS, it) => bS + Math.max(1, Number(it.quantity) || 1), 0), 0)} แก้ว)
+                            </button>
+                            {#each Object.entries(availableDeliveryRounds) as [round, count]}
+                                <button
+                                    type="button"
+                                    onclick={() => (selectedRoundFilter = round)}
+                                    style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700; border-radius: 999px; border: 1.5px solid {selectedRoundFilter === round ? '#0284c7' : '#cbd5e1'}; background: {selectedRoundFilter === round ? '#0284c7' : '#ffffff'}; color: {selectedRoundFilter === round ? '#ffffff' : '#475569'}; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;"
+                                >
+                                    🚚 {round} ({count} แก้ว)
+                                </button>
+                            {/each}
+                        </div>
+                    {/if}
+
                     <!-- แถบ Progress Bar & ปุ่ม Action ของ Checklist -->
                     {#if filteredTotalCups > 0}
                         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0.75rem 0.95rem; margin-bottom: 1rem;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
-                                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
                                     <span style="font-weight: 800; font-size: 0.86rem; color: #1e293b;">
                                         ความคืบหน้าการชง:
                                     </span>
                                     <span style="font-weight: 800; font-size: 0.88rem; color: {checkedCupsCount === filteredTotalCups ? '#16a34a' : '#166534'};">
                                         {checkedCupsCount} / {filteredTotalCups} แก้ว ({brewProgressPercent}%)
                                     </span>
+                                    {#if selectedRoundFilter !== 'all'}
+                                        <span style="background: #e0f2fe; color: #0369a1; font-size: 0.72rem; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 999px;">
+                                            (เฉพาะ: {selectedRoundFilter})
+                                        </span>
+                                    {/if}
                                 </div>
                                 <div style="display: flex; gap: 0.35rem;">
                                     <button
@@ -2185,7 +2267,7 @@
                             <p style="font-size: 2rem; margin: 0 0 0.35rem 0;">🍵</p>
                             <h4 style="margin: 0; color: #334155; font-size: 0.95rem;">ไม่มีเครื่องดื่มที่ต้องชงในหมวดนี้</h4>
                             <p style="font-size: 0.78rem; margin: 0.25rem 0 0 0; color: #94a3b8;">
-                                สลับแท็บตัวกรองด้านบนเพื่อดูหมวดอื่นได้เลยนะคะ
+                                สลับแท็บตัวกรองหรือรอบส่งด้านบนเพื่อดูหมวดอื่นได้เลยนะคะ
                             </p>
                         </div>
                     {:else}
@@ -2222,7 +2304,7 @@
                                     <!-- รายการระดับความหวาน & ช็อต & โน้ต (Checklist Items) -->
                                     <div style="display: flex; flex-direction: column; gap: 0.45rem;">
                                         {#each menu.sweetnessList as sweet}
-                                            {@const itemKey = `${menu.menuName}__sweet_${sweet.sweetness}`}
+                                            {@const itemKey = getBrewItemKey(menu.menuName, sweet.sweetness)}
                                             {@const isChecked = !!brewChecklist[itemKey]}
                                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                                             <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -2265,6 +2347,24 @@
                                                             </div>
                                                         {/if}
 
+                                                        <!-- รอบจัดส่ง / วันจัดส่ง ของความหวานนี้ -->
+                                                        {#if Object.keys(sweet.roundBreakdown).length > 0}
+                                                            <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.25rem;">
+                                                                {#each Object.entries(sweet.roundBreakdown) as [round, count]}
+                                                                    <span style="display: inline-block; background: #e0f2fe; color: #0369a1; font-size: 0.72rem; font-weight: 700; padding: 0.08rem 0.45rem; border-radius: 999px; border: 1px solid #bae6fd;">
+                                                                        🚚 {round} ({count} แก้ว)
+                                                                    </span>
+                                                                {/each}
+                                                                {#if Object.keys(sweet.dateBreakdown).length > 0}
+                                                                    {#each Object.entries(sweet.dateBreakdown) as [date, count]}
+                                                                        <span style="display: inline-block; background: #f8fafc; color: #475569; font-size: 0.7rem; font-weight: 600; padding: 0.08rem 0.4rem; border-radius: 999px; border: 1px solid #e2e8f0;">
+                                                                            📅 {date}
+                                                                        </span>
+                                                                    {/each}
+                                                                {/if}
+                                                            </div>
+                                                        {/if}
+
                                                         <!-- หมายเหตุ / โน้ต ของความหวานนี้ -->
                                                         {#if Object.keys(sweet.noteBreakdown).length > 0}
                                                             <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.25rem;">
@@ -2288,8 +2388,16 @@
                                     </div>
 
                                     <!-- สรุปรวมช็อตและโน้ตของทั้งเมนู (ถ้ามีมากกว่า 1 ระดับความหวาน) -->
-                                    {#if menu.sweetnessList.length > 1 && (Object.keys(menu.overallAddons).length > 0 || Object.keys(menu.overallNotes).length > 0)}
+                                    {#if menu.sweetnessList.length > 1 && (Object.keys(menu.overallAddons).length > 0 || Object.keys(menu.overallNotes).length > 0 || Object.keys(menu.overallRounds).length > 0)}
                                         <div style="margin-top: 0.65rem; padding-top: 0.5rem; border-top: 1px solid #f1f5f9; font-size: 0.76rem; color: #64748b; display: flex; flex-direction: column; gap: 0.2rem;">
+                                            {#if Object.keys(menu.overallRounds).length > 0}
+                                                <div style="display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;">
+                                                    <strong style="color: #334155;">รอบจัดส่งในเมนูนี้:</strong>
+                                                    {#each Object.entries(menu.overallRounds) as [round, count]}
+                                                        <span style="color: #0369a1; font-weight: 700;">🚚 {round} ({count} แก้ว)</span>
+                                                    {/each}
+                                                </div>
+                                            {/if}
                                             {#if Object.keys(menu.overallAddons).length > 0}
                                                 <div style="display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;">
                                                     <strong style="color: #334155;">รวมช็อตทั้งหมดในเมนูนี้:</strong>
