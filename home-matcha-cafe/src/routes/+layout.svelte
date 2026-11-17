@@ -50,6 +50,18 @@
 
     // Modal สมัครสมาชิก / ล็อกอิน / PIN Numpad / เมนูสมาชิก
     let showMemberAuthModal = $state(false);
+    let authModalCloseCallback: (() => void) | null = null;
+
+    function closeAuthModal() {
+        showMemberAuthModal = false;
+        if (authModalCloseCallback) {
+            const cb = authModalCloseCallback;
+            authModalCloseCallback = null;
+            setTimeout(() => {
+                cb();
+            }, 150);
+        }
+    }
     let showMemberQuickModal = $state(false);
     let authMode = $state<'login' | 'register'>('login');
     let authStep = $state<'form' | 'pin'>('form');
@@ -133,13 +145,15 @@
         get member() { return currentMember; },
         get loyaltySettings() { return loyaltySettings; },
         refreshMember: refreshCurrentMemberFromServer,
-        openAuthModal: (mode: 'login' | 'register' = 'login') => {
+        openAuthModal: (mode: 'login' | 'register' = 'login', onClose?: () => void) => {
             authMode = mode;
             authStep = 'form';
             authPin = '';
             authError = '';
+            authModalCloseCallback = onClose || null;
             showMemberAuthModal = true;
         },
+        closeAuthModal,
         logout: handleMemberLogout
     };
 
@@ -354,7 +368,7 @@
 
             currentMember = data.member;
             localStorage.setItem('hmc_member', JSON.stringify(data.member));
-            showMemberAuthModal = false;
+            closeAuthModal();
             authPin = '';
 
             swal.fire({
@@ -668,9 +682,9 @@
 <!-- Modal สมัครสมาชิก / เข้าสู่ระบบ + หน้าปุ่มกด PIN Numpad -->
 {#if showMemberAuthModal}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="member-modal-backdrop" onclick={() => (showMemberAuthModal = false)} onkeydown={() => {}}>
+    <div class="member-modal-backdrop" onclick={closeAuthModal} onkeydown={() => {}}>
         <div class="member-modal-card" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
-            <button class="member-modal-close" onclick={() => (showMemberAuthModal = false)} aria-label="ปิด">✕</button>
+            <button class="member-modal-close" onclick={closeAuthModal} aria-label="ปิด">✕</button>
 
             {#if authStep === 'form'}
                 <div style="text-align: center; margin-bottom: 1rem;">

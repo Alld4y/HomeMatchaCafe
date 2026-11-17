@@ -1,7 +1,9 @@
 <script lang="ts">
     import { goto } from '$app/navigation';
-    import { onMount } from 'svelte';
+    import { onMount, getContext } from 'svelte';
     import swal from 'sweetalert2';
+
+    const memberCtx = getContext<any>('memberData');
 
     interface DayInfo {
         dateStr: string;
@@ -108,15 +110,32 @@
                     selectedPreviewDate = scheduleDays[0].dateStr;
                 }
 
-                // หากร้านปิดรับออเดอร์ (สวิตช์ปิด หรือไม่มีรอบเปิดเลยในช่วงที่กำหนด) ให้ขึ้น Alert แจ้งเตือนทันที
-                if (storeStatus === 'closed_store') {
-                    swal.fire({
-                        icon: 'info',
-                        title: 'ขณะนี้ร้านยังไม่เปิดรับออเดอร์',
-                        text: storeStatusDesc || storeSettings?.closedAlertMessage || 'ขณะนี้ร้านยังไม่เปิดรับออเดอร์ ขออภัยในความไม่สะดวกนะคะ 🍵',
-                        confirmButtonColor: '#456f2f',
-                        confirmButtonText: 'รับทราบ'
+                // ฟังก์ชันสำหรับแจ้งเตือนสถานะร้านปิดรับออเดอร์
+                const showClosedStoreAlert = () => {
+                    if (storeStatus === 'closed_store') {
+                        swal.fire({
+                            icon: 'info',
+                            title: 'ขณะนี้ร้านยังไม่เปิดรับออเดอร์',
+                            text: storeStatusDesc || storeSettings?.closedAlertMessage || 'ขณะนี้ร้านยังไม่เปิดรับออเดอร์ ขออภัยในความไม่สะดวกนะคะ 🍵',
+                            confirmButtonColor: '#456f2f',
+                            confirmButtonText: 'รับทราบ'
+                        });
+                    }
+                };
+
+                // ตรวจสอบว่าผู้ใช้ล็อกอินสมาชิกอยู่แล้วหรือไม่
+                const isMemberLoggedIn = Boolean(
+                    memberCtx?.member || (typeof window !== 'undefined' && localStorage.getItem('hmc_member'))
+                );
+
+                if (!isMemberLoggedIn) {
+                    // หากยังไม่ได้ล็อกอิน ให้เด้ง Modal สมาชิกขึ้นมาก่อนเป็นอันดับแรก และเมื่อปิดค่อยเด้ง Alert
+                    memberCtx?.openAuthModal('login', () => {
+                        showClosedStoreAlert();
                     });
+                } else {
+                    // หากล็อกอินแล้ว ให้เด้ง Alert ตามปกติ
+                    showClosedStoreAlert();
                 }
             }
         } catch (e) {
