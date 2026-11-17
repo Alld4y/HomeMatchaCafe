@@ -1075,7 +1075,7 @@
                         บันทึกรูป QR Code
                     </button>
 
-                    <button
+                    <!-- <button
                         type="button"
                         onclick={copyCheckoutLinkForLine}
                         class="btn-matcha-outline"
@@ -1083,7 +1083,7 @@
                         title="คัดลอกลิงก์ชำระเงินสำหรับส่งให้ลูกค้าหรือเปิดใน LINE (เปิดเบราว์เซอร์ภายนอกอัตโนมัติ)"
                     >
                         🔗 คัดลอกลิงก์ชำระเงิน (LINE)
-                    </button>
+                    </button> -->
                 </div>
             {/if}
 
