@@ -424,6 +424,8 @@
     let showLineBanner = $state(false);
     let deferredInstallPrompt = $state<any>(null);
     let showInstallBanner = $state(false);
+    let showInstallModal = $state(false);
+    let activeInstallTab = $state<'android' | 'ios'>('android');
     let isIosDevice = $state(false);
     let isStandalone = $state(false);
 
@@ -440,6 +442,15 @@
         } catch {}
     }
 
+    function openInstallModal() {
+        if (isIosDevice) {
+            activeInstallTab = 'ios';
+        } else {
+            activeInstallTab = 'android';
+        }
+        showInstallModal = true;
+    }
+
     async function handleInstallPwa() {
         try {
             localStorage.setItem(PWA_PROMPT_KEY, 'true');
@@ -451,46 +462,11 @@
             const { outcome } = await deferredInstallPrompt.userChoice;
             if (outcome === 'accepted') {
                 console.log('User accepted PWA installation');
+                showInstallModal = false;
             }
             deferredInstallPrompt = null;
-        } else if (isIosDevice) {
-            swal.fire({
-                title: 'วิธีติดตั้งแอปบน iPhone / iPad',
-                html: `
-                    <div style="text-align: left; font-size: 0.92rem; line-height: 1.6; color: #334155;">
-                        <p style="margin-bottom: 0.75rem;">ติดตั้ง <strong>Home Matcha Cafe</strong> ลงบนหน้าจอโฮมได้ง่ายๆ:</p>
-                        <ol style="padding-left: 1.25rem; margin: 0; display: flex; flex-direction: column; gap: 0.5rem;">
-                            <li>แตะปุ่มแชร์ <strong>⎋ (Share)</strong> ที่แถบด้านล่างของ Safari</li>
-                            <li>เลื่อนลงแล้วเลือก <strong>"เพิ่มไปยังหน้าจอโฮม (Add to Home Screen) ＋"</strong></li>
-                            <li>แตะ <strong>"เพิ่ม (Add)"</strong> ที่มุมขวาบน</li>
-                        </ol>
-                        <p style="margin-top: 0.75rem; font-size: 0.8rem; color: #64748b;">ไอคอนแอปจะไปปรากฏบนหน้าจอโฮม เข้าสั่งได้สะดวกรวดเร็วไม่ต้องเข้าผ่านเบราว์เซอร์ค่ะ 🍵</p>
-                    </div>
-                `,
-                icon: 'info',
-                confirmButtonText: 'เข้าใจแล้ว',
-                confirmButtonColor: '#184a23'
-            });
         } else {
-            swal.fire({
-                title: 'ติดตั้งแอป Home Matcha Cafe',
-                html: `
-                    <div style="text-align: left; font-size: 0.92rem; line-height: 1.6; color: #334155;">
-                        <p style="margin-bottom: 0.6rem;">สำหรับมือถือ Android (Google Chrome):</p>
-                        <ol style="padding-left: 1.25rem; margin: 0; display: flex; flex-direction: column; gap: 0.45rem;">
-                            <li>แตะปุ่มเมนู <strong>(⋮) สามจุด</strong> ที่มุมบนขวาของ Chrome</li>
-                            <li>แตะเลือก <strong>"ติดตั้งแอปพลิเคชัน (Install app)"</strong> 📲</li>
-                            <li>กด <strong>"ติดตั้ง"</strong> ในหน้าต่างยืนยันของระบบ</li>
-                        </ol>
-                        <p style="margin-top: 0.75rem; font-size: 0.82rem; color: #166534; background: #f0fdf4; padding: 0.5rem; border-radius: 8px; border: 1px solid #bbf7d0;">
-                            💡 <strong>ข้อสำคัญ:</strong> หลีกเลี่ยงการเลือก "เพิ่มลงในหน้าจอหลัก (Add to Home screen)" เพราะจะได้เพียงปุ่มลัดที่มีตรา Chrome ติดที่มุม ให้เลือก <strong>"ติดตั้งแอปพลิเคชัน"</strong> จะได้ไอคอนร้านเพียวๆ สวยงามครับ 🍵
-                        </p>
-                    </div>
-                `,
-                icon: 'info',
-                confirmButtonText: 'เข้าใจแล้ว',
-                confirmButtonColor: '#184a23'
-            });
+            openInstallModal();
         }
     }
 
@@ -844,6 +820,19 @@
                     🎫 เปิดดูบัตรสะสมแต้ม ({currentMember.points}/{loyaltySettings.stampsRequired})
                 </button>
 
+                {#if !isStandalone}
+                    <button
+                        type="button"
+                        class="btn-install-member"
+                        onclick={() => {
+                            showMemberQuickModal = false;
+                            openInstallModal();
+                        }}
+                    >
+                        📲 ติดตั้งแอป Home Matcha Cafe
+                    </button>
+                {/if}
+
                 <button
                     type="button"
                     class="btn-danger"
@@ -853,6 +842,131 @@
                     🚪 ออกจากระบบ (Logout)
                 </button>
             </div>
+        </div>
+    </div>
+{/if}
+
+<!-- 📲 Modal แนะนำการติดตั้งแอป (สวยงาม รองรับมือถือ จัดวรรคตอนอ่านง่าย) -->
+{#if showInstallModal}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="install-modal-backdrop" onclick={() => (showInstallModal = false)} onkeydown={() => {}}>
+        <div class="install-modal-card" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
+            <button class="install-modal-close" onclick={() => (showInstallModal = false)} aria-label="ปิด">✕</button>
+
+            <!-- หัวข้อและโลโก้ -->
+            <div class="install-modal-header">
+                <img src="/image/home-matcha-cafe-logo.png" alt="Home Matcha Cafe" class="install-modal-logo" />
+                <h3 class="install-modal-title">ติดตั้งแอป Home Matcha Cafe</h3>
+                <p class="install-modal-subtitle">เปิดสั่งเครื่องดื่มได้ไว เสมือนแอปแท้บนมือถือ</p>
+            </div>
+
+            <!-- แท็บเลือกระบบปฏิบัติการ (Android / iOS) -->
+            <div class="install-modal-tabs">
+                <button
+                    type="button"
+                    class="install-tab-btn {activeInstallTab === 'android' ? 'active' : ''}"
+                    onclick={() => (activeInstallTab = 'android')}
+                >
+                    🤖 Android (Chrome)
+                </button>
+                <button
+                    type="button"
+                    class="install-tab-btn {activeInstallTab === 'ios' ? 'active' : ''}"
+                    onclick={() => (activeInstallTab = 'ios')}
+                >
+                    🍎 iPhone / iPad (Safari)
+                </button>
+            </div>
+
+            <!-- เนื้อหาแท็บ Android -->
+            {#if activeInstallTab === 'android'}
+                <div class="install-guide-body">
+                    {#if deferredInstallPrompt}
+                        <button
+                            type="button"
+                            class="install-direct-action-btn"
+                            onclick={() => {
+                                showInstallModal = false;
+                                handleInstallPwa();
+                            }}
+                        >
+                            📲 กดเพื่อติดตั้งลงหน้าจอโฮมทันที
+                        </button>
+                        <div class="install-divider">
+                            <span>หรือติดตั้งผ่านเมนูของ Chrome</span>
+                        </div>
+                    {/if}
+
+                    <div class="install-step-list">
+                        <div class="install-step-item">
+                            <span class="install-step-num">1</span>
+                            <div class="install-step-content">
+                                <strong>เปิดผ่าน Google Chrome</strong>
+                                <p>แตะปุ่มเมนู <strong>(⋮) จุดสามจุด</strong> ที่มุมบนขวาของเบราว์เซอร์</p>
+                            </div>
+                        </div>
+
+                        <div class="install-step-item highlight">
+                            <span class="install-step-num">2</span>
+                            <div class="install-step-content">
+                                <strong>เลือก "ติดตั้งแอปพลิเคชัน" (Install app)</strong>
+                                <p>แตะเมนู <strong>"ติดตั้งแอปพลิเคชัน"</strong> 📲</p>
+                                <span class="install-tip-badge">
+                                    💡 หลีกเลี่ยง "เพิ่มลงในหน้าจอหลัก" เพื่อให้ได้ไอคอนร้านเดี่ยวๆ ไร้ตรา Chrome
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="install-step-item">
+                            <span class="install-step-num">3</span>
+                            <div class="install-step-content">
+                                <strong>กดยืนยันการติดตั้ง</strong>
+                                <p>แตะ <strong>"ติดตั้ง"</strong> ในหน้าต่างยืนยัน รอ 5-10 วินาที ไอคอนแอปจะไปอยู่ที่หน้าจอโฮมทันที</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {:else}
+                <!-- เนื้อหาแท็บ iOS (Safari) -->
+                <div class="install-guide-body">
+                    <div class="install-step-list">
+                        <div class="install-step-item">
+                            <span class="install-step-num">1</span>
+                            <div class="install-step-content">
+                                <strong>เปิดผ่าน Safari บน iPhone</strong>
+                                <p>แตะปุ่มแชร์ <strong>⎋ (Share)</strong> ที่แถบด้านล่างของหน้าจอ</p>
+                            </div>
+                        </div>
+
+                        <div class="install-step-item highlight">
+                            <span class="install-step-num">2</span>
+                            <div class="install-step-content">
+                                <strong>เลือก "เพิ่มไปยังหน้าจอโฮม"</strong>
+                                <p>เลื่อนลงมาด้านล่าง แล้วแตะ <strong>"เพิ่มไปยังหน้าจอโฮม" ＋</strong></p>
+                            </div>
+                        </div>
+
+                        <div class="install-step-item">
+                            <span class="install-step-num">3</span>
+                            <div class="install-step-content">
+                                <strong>แตะ "เพิ่ม" (Add)</strong>
+                                <p>แตะปุ่ม <strong>"เพิ่ม (Add)"</strong> ที่มุมบนขวาของหน้าจอ</p>
+                                <span class="install-tip-badge">
+                                    ✨ บน iOS จะได้ไอคอนร้านเต็มวงกลมคมชัด ไร้ตราเบราว์เซอร์ 100%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {/if}
+
+            <button
+                type="button"
+                class="install-modal-dismiss-btn"
+                onclick={() => (showInstallModal = false)}
+            >
+                เข้าใจแล้ว / ปิดหน้าต่าง
+            </button>
         </div>
     </div>
 {/if}
@@ -1536,5 +1650,252 @@
             right: 0.75rem;
             padding: 0.55rem 0.75rem;
         }
+    }
+
+    /* 📲 Custom PWA Installation Guide Modal */
+    .btn-install-member {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border-radius: 12px;
+        font-size: 0.88rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        background: #f0fdf4;
+        color: #166534;
+        border: 1.5px solid #86efac;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        box-shadow: 0 2px 6px rgba(22, 101, 52, 0.08);
+    }
+    .btn-install-member:hover, .btn-install-member:active {
+        background: #dcfce7;
+        border-color: #4ade80;
+        transform: translateY(-1px);
+    }
+
+    .install-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        z-index: 2100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        animation: fadeInDown 0.2s ease-out;
+    }
+    .install-modal-card {
+        background: #ffffff;
+        border-radius: 24px;
+        padding: 1.5rem 1.25rem 1.25rem 1.25rem;
+        width: 100%;
+        max-width: 440px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 45px rgba(24, 74, 35, 0.25);
+        position: relative;
+        font-family: 'Kanit', sans-serif;
+    }
+    .install-modal-close {
+        position: absolute;
+        top: 0.85rem;
+        right: 0.85rem;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: none;
+        background: #f1f5f9;
+        color: #64748b;
+        font-size: 1rem;
+        font-weight: 800;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.12s ease;
+    }
+    .install-modal-close:hover {
+        background: #e2e8f0;
+        color: #334155;
+    }
+    .install-modal-header {
+        text-align: center;
+        margin-bottom: 1.15rem;
+    }
+    .install-modal-logo {
+        width: 60px;
+        height: 60px;
+        border-radius: 16px;
+        object-fit: cover;
+        box-shadow: 0 4px 14px rgba(24, 74, 35, 0.2);
+        margin: 0 auto 0.5rem auto;
+        display: block;
+    }
+    .install-modal-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #14532d;
+        margin: 0 0 0.2rem 0;
+        line-height: 1.3;
+    }
+    .install-modal-subtitle {
+        font-size: 0.82rem;
+        color: #64748b;
+        margin: 0;
+        line-height: 1.4;
+    }
+    .install-modal-tabs {
+        display: flex;
+        gap: 0.4rem;
+        background: #f1f5f9;
+        padding: 0.3rem;
+        border-radius: 14px;
+        margin-bottom: 1.15rem;
+    }
+    .install-tab-btn {
+        flex: 1;
+        padding: 0.55rem 0.4rem;
+        border: none;
+        border-radius: 10px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #64748b;
+        background: transparent;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.3rem;
+    }
+    .install-tab-btn.active {
+        background: #ffffff;
+        color: #166534;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+    .install-guide-body {
+        margin-bottom: 1.15rem;
+    }
+    .install-direct-action-btn {
+        width: 100%;
+        padding: 0.85rem 1rem;
+        border-radius: 14px;
+        background: #184a23;
+        color: #ffffff;
+        border: none;
+        font-size: 0.92rem;
+        font-weight: 800;
+        cursor: pointer;
+        box-shadow: 0 4px 14px rgba(24, 74, 35, 0.35);
+        margin-bottom: 0.85rem;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+    }
+    .install-direct-action-btn:active {
+        transform: scale(0.97);
+    }
+    .install-divider {
+        text-align: center;
+        margin: 0.6rem 0 0.85rem 0;
+        position: relative;
+    }
+    .install-divider::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: #e2e8f0;
+    }
+    .install-divider span {
+        position: relative;
+        font-size: 0.72rem;
+        color: #94a3b8;
+        background: #ffffff;
+        padding: 0 0.5rem;
+    }
+    .install-step-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .install-step-item {
+        display: flex;
+        gap: 0.85rem;
+        align-items: flex-start;
+        padding: 0.8rem 0.95rem;
+        border-radius: 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+    .install-step-item.highlight {
+        background: #f0fdf4;
+        border-color: #86efac;
+    }
+    .install-step-num {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #184a23;
+        color: #ffffff;
+        font-size: 0.82rem;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        margin-top: 0.1rem;
+    }
+    .install-step-content {
+        font-size: 0.84rem;
+        line-height: 1.5;
+        color: #334155;
+    }
+    .install-step-content strong {
+        display: block;
+        font-size: 0.9rem;
+        color: #0f172a;
+        margin-bottom: 0.2rem;
+    }
+    .install-step-content p {
+        margin: 0;
+        font-size: 0.82rem;
+        color: #475569;
+        line-height: 1.45;
+    }
+    .install-tip-badge {
+        display: inline-block;
+        margin-top: 0.45rem;
+        font-size: 0.75rem;
+        color: #166534;
+        background: rgba(22, 101, 52, 0.1);
+        padding: 0.25rem 0.55rem;
+        border-radius: 6px;
+        font-weight: 600;
+        line-height: 1.35;
+    }
+    .install-modal-dismiss-btn {
+        width: 100%;
+        padding: 0.75rem;
+        border-radius: 12px;
+        background: #f1f5f9;
+        color: #475569;
+        border: none;
+        font-size: 0.88rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .install-modal-dismiss-btn:hover {
+        background: #e2e8f0;
     }
 </style>
