@@ -419,6 +419,7 @@
     }
 
     // 📲 PWA & In-App Browser (LINE) Detection & Installation
+    const PWA_PROMPT_KEY = 'hmc_pwa_prompt_shown_v1';
     let isLineBrowser = $state(false);
     let showLineBanner = $state(false);
     let deferredInstallPrompt = $state<any>(null);
@@ -432,12 +433,24 @@
         window.location.href = u.toString();
     }
 
+    function dismissInstallPrompt() {
+        showInstallBanner = false;
+        try {
+            localStorage.setItem(PWA_PROMPT_KEY, 'true');
+        } catch {}
+    }
+
     async function handleInstallPwa() {
+        try {
+            localStorage.setItem(PWA_PROMPT_KEY, 'true');
+        } catch {}
+        showInstallBanner = false;
+
         if (deferredInstallPrompt) {
             deferredInstallPrompt.prompt();
             const { outcome } = await deferredInstallPrompt.userChoice;
             if (outcome === 'accepted') {
-                showInstallBanner = false;
+                console.log('User accepted PWA installation');
             }
             deferredInstallPrompt = null;
         } else if (isIosDevice) {
@@ -456,7 +469,7 @@
                 `,
                 icon: 'info',
                 confirmButtonText: 'เข้าใจแล้ว',
-                confirmButtonColor: '#166534'
+                confirmButtonColor: '#184a23'
             });
         } else {
             swal.fire({
@@ -468,7 +481,7 @@
                 `,
                 icon: 'info',
                 confirmButtonText: 'ตกลง',
-                confirmButtonColor: '#166534'
+                confirmButtonColor: '#184a23'
             });
         }
     }
@@ -480,7 +493,7 @@
 
         // 📲 ลงทะเบียน Service Worker สำหรับ PWA
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').catch((err) => {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch((err) => {
                 console.warn('PWA Service Worker registration:', err);
             });
         }
@@ -496,17 +509,29 @@
             showLineBanner = true;
         }
 
-        // หากเป็น iOS และยังไม่ได้เปิดเป็น Standalone PWA และยังไม่ได้ปิดแบนเนอร์
-        if (isIosDevice && !isStandalone && !isLineBrowser && !sessionStorage.getItem('hmc_install_dismissed')) {
+        // ตรวจสอบว่าเคยแสดงป๊อปอัปติดตั้งแอปแล้วหรือยัง (ขึ้นแค่ครั้งเดียวเท่านั้น ถ้าเคยขึ้นแล้วไม่ต้องขึ้นอีก)
+        let hasShownPrompt = false;
+        try {
+            hasShownPrompt = localStorage.getItem(PWA_PROMPT_KEY) === 'true';
+        } catch {}
+
+        // หากเป็น iOS และยังไม่เคยแสดงมาก่อน และไม่อยู่ในหน้า Admin
+        if (isIosDevice && !isStandalone && !isLineBrowser && !hasShownPrompt && !window.location.pathname.startsWith('/admin')) {
             showInstallBanner = true;
+            try {
+                localStorage.setItem(PWA_PROMPT_KEY, 'true');
+            } catch {}
         }
 
-        // ดักจับ Event สำหรับปุ่มติดตั้งแอปบน Chrome/Android
+        // ดักจับ Event สำหรับปุ่มติดตั้งแอปบน Chrome/Android (ขึ้นแค่ครั้งเดียวเท่านั้น)
         const handleBeforeInstall = (e: Event) => {
             e.preventDefault();
             deferredInstallPrompt = e;
-            if (!sessionStorage.getItem('hmc_install_dismissed') && !isStandalone) {
+            if (!hasShownPrompt && !isStandalone && !isLineBrowser && !window.location.pathname.startsWith('/admin')) {
                 showInstallBanner = true;
+                try {
+                    localStorage.setItem(PWA_PROMPT_KEY, 'true');
+                } catch {}
             }
         };
         window.addEventListener('beforeinstallprompt', handleBeforeInstall);
@@ -555,9 +580,9 @@
 
 <svelte:window onclick={closeModal} />
 
-<!-- 💡 แถบแจ้งเตือนเมื่อเปิดใน LINE เพื่อแนะนำเปิดเบราว์เซอร์จริง -->
+<!-- 💡 แจ้งเตือนเมื่อเปิดใน LINE เพื่อแนะนำเปิดเบราว์เซอร์จริง (แบบลอยใต้ Navbar ไม่ทับซ้อน) -->
 {#if isLineBrowser && showLineBanner}
-    <div class="line-browser-banner">
+    <div class="line-browser-floating">
         <div class="line-banner-content">
             <span class="line-banner-icon">💡</span>
             <div class="line-banner-text">
@@ -566,31 +591,10 @@
             </div>
         </div>
         <div class="line-banner-actions">
-            <button class="line-banner-btn" onclick={openExternalBrowserFromLine}>
+            <button type="button" class="line-banner-btn" onclick={openExternalBrowserFromLine}>
                 🌐 เปิดในเบราว์เซอร์
             </button>
-            <button class="line-banner-close" onclick={() => { showLineBanner = false; sessionStorage.setItem('hmc_line_dismissed', '1'); }} aria-label="ปิดการแจ้งเตือน">
-                ✕
-            </button>
-        </div>
-    </div>
-{/if}
-
-<!-- 📲 แถบแนะนำการติดตั้ง PWA App -->
-{#if showInstallBanner && !isStandalone && !isLineBrowser}
-    <div class="pwa-install-banner">
-        <div class="pwa-banner-content">
-            <img src="/image/home-matcha-cafe-logo.png" alt="App Icon" class="pwa-banner-icon" />
-            <div class="pwa-banner-text">
-                <strong>ติดตั้งแอป Home Matcha Cafe</strong>
-                <span>แตะติดตั้งเพื่อใช้งานได้เสมือนแอปจริงบนมือถือ สะดวก รวดเร็ว ไม่ต้องค้นหาลิงก์</span>
-            </div>
-        </div>
-        <div class="pwa-banner-actions">
-            <button class="pwa-install-btn" onclick={handleInstallPwa}>
-                📲 ติดตั้งแอป
-            </button>
-            <button class="pwa-banner-close" onclick={() => { showInstallBanner = false; sessionStorage.setItem('hmc_install_dismissed', '1'); }} aria-label="ปิดการแจ้งเตือน">
+            <button type="button" class="line-banner-close" onclick={() => { showLineBanner = false; sessionStorage.setItem('hmc_line_dismissed', '1'); }} aria-label="ปิดการแจ้งเตือน">
                 ✕
             </button>
         </div>
@@ -728,6 +732,28 @@
 
 <!-- ส่วนเนื้อหาของหน้าเว็บ -->
 {@render children()}
+
+<!-- 📲 การ์ดแนะนำการติดตั้ง PWA App (Floating Bottom Card แสดงเพียงครั้งเดียวเท่านั้น ไม่ทับซ้อน Navbar) -->
+{#if showInstallBanner && !isStandalone && !isLineBrowser && !page.url.pathname.startsWith('/admin')}
+    <div class="pwa-install-card {shouldElevateFloatingBtn ? 'elevated-above-cart' : ''}">
+        <div class="pwa-card-left">
+            <img src="/image/home-matcha-cafe-logo.png" alt="Home Matcha Cafe" class="pwa-card-icon" />
+            <div class="pwa-card-text">
+                <span class="pwa-card-badge">🍵 ติดตั้งแอป Home Matcha Cafe</span>
+                <strong class="pwa-card-title">โฮมมัทฉะคาเฟ่ @ รพ.ทองผาภูมิ</strong>
+                <span class="pwa-card-desc">เข้าสั่งจากหน้าจอโฮมได้สะดวก รวดเร็ว เสมือนแอปมือถือ</span>
+            </div>
+        </div>
+        <div class="pwa-card-actions">
+            <button type="button" class="pwa-card-install-btn" onclick={handleInstallPwa}>
+                ติดตั้ง
+            </button>
+            <button type="button" class="pwa-card-close-btn" onclick={dismissInstallPrompt} aria-label="ปิด">
+                ✕
+            </button>
+        </div>
+    </div>
+{/if}
 
 <!-- ปุ่มวงกลมลอยมุมขวาล่างสำหรับระบบสมาชิก & สะสมแต้ม (เลื่อนขึ้นอัตโนมัติในหน้าเมนูที่มีแถบตะกร้าด้านล่าง) -->
 {#if !page.url.pathname.startsWith('/admin') && loyaltySettings.enabled !== false}
@@ -1257,28 +1283,34 @@
         }
     }
 
-    /* 🌐 LINE & PWA Install Banners */
-    .line-browser-banner {
-        position: sticky;
-        top: 0;
-        z-index: 1000;
-        background: linear-gradient(90deg, #fef3c7, #fef9c3);
-        border-bottom: 1.5px solid #fde047;
-        color: #78350f;
-        padding: 0.65rem 1rem;
+    /* 🌐 LINE Floating Notification (อยู่นอก Flow ไม่บัง Navbar) */
+    .line-browser-floating {
+        position: fixed;
+        top: 4.8rem;
+        left: 1rem;
+        right: 1rem;
+        max-width: 520px;
+        margin: 0 auto;
+        z-index: 999;
+        background: #fffbeb;
+        border: 1.5px solid #fde047;
+        border-radius: 16px;
+        padding: 0.65rem 0.95rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 0.75rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         font-family: 'Kanit', sans-serif;
+        animation: fadeInDown 0.25s ease-out;
     }
     .line-banner-content {
         display: flex;
         align-items: center;
         gap: 0.65rem;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         line-height: 1.35;
+        color: #78350f;
     }
     .line-banner-icon {
         font-size: 1.3rem;
@@ -1291,7 +1323,7 @@
     .line-banner-actions {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.45rem;
         flex-shrink: 0;
     }
     .line-banner-btn {
@@ -1299,8 +1331,8 @@
         color: #ffffff;
         border: none;
         border-radius: 999px;
-        padding: 0.35rem 0.85rem;
-        font-size: 0.82rem;
+        padding: 0.35rem 0.8rem;
+        font-size: 0.8rem;
         font-weight: 700;
         cursor: pointer;
         display: inline-flex;
@@ -1312,11 +1344,11 @@
     .line-banner-btn:active {
         transform: scale(0.96);
     }
-    .line-banner-close, .pwa-banner-close {
+    .line-banner-close {
         background: transparent;
         border: none;
         color: #64748b;
-        font-size: 1.1rem;
+        font-size: 1rem;
         font-weight: 800;
         cursor: pointer;
         padding: 0.2rem 0.4rem;
@@ -1324,67 +1356,119 @@
         border-radius: 50%;
     }
 
-    .pwa-install-banner {
-        position: sticky;
-        top: 0;
-        z-index: 999;
-        background: linear-gradient(90deg, #f0fdf4, #e8f5e9);
-        border-bottom: 1.5px solid #86efac;
-        color: #14532d;
-        padding: 0.65rem 1rem;
+    /* 📲 PWA Floating Bottom Card (แสดงครั้งเดียว ไม่ทับ Navbar และเข้าธีมร้าน) */
+    .pwa-install-card {
+        position: fixed;
+        bottom: 1.5rem;
+        left: 1rem;
+        right: 1rem;
+        max-width: 440px;
+        margin: 0 auto;
+        z-index: 1050;
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1.5px solid #86efac;
+        border-radius: 20px;
+        padding: 0.85rem 1rem;
+        box-shadow: 0 14px 36px rgba(24, 74, 35, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06);
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 0.75rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        gap: 0.85rem;
         font-family: 'Kanit', sans-serif;
+        animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        transition: bottom 0.25s ease;
     }
-    .pwa-banner-content {
+    .pwa-install-card.elevated-above-cart {
+        bottom: 6.8rem;
+    }
+    .pwa-card-left {
         display: flex;
         align-items: center;
-        gap: 0.65rem;
-        font-size: 0.85rem;
-        line-height: 1.35;
+        gap: 0.75rem;
+        min-width: 0;
     }
-    .pwa-banner-icon {
-        width: 38px;
-        height: 38px;
-        border-radius: 10px;
+    .pwa-card-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
         object-fit: cover;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+        box-shadow: 0 3px 10px rgba(24, 74, 35, 0.22);
         flex-shrink: 0;
     }
-    .pwa-banner-text {
+    .pwa-card-text {
         display: flex;
         flex-direction: column;
+        min-width: 0;
     }
-    .pwa-banner-actions {
+    .pwa-card-badge {
+        font-size: 0.68rem;
+        font-weight: 800;
+        color: #166534;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+    .pwa-card-title {
+        font-size: 0.92rem;
+        font-weight: 800;
+        color: #14532d;
+        line-height: 1.25;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .pwa-card-desc {
+        font-size: 0.74rem;
+        color: #4b6354;
+        line-height: 1.25;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .pwa-card-actions {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.45rem;
         flex-shrink: 0;
     }
-    .pwa-install-btn {
-        background: #166534;
+    .pwa-card-install-btn {
+        background: #184a23;
         color: #ffffff;
         border: none;
         border-radius: 999px;
-        padding: 0.35rem 0.85rem;
-        font-size: 0.82rem;
-        font-weight: 700;
+        padding: 0.45rem 0.95rem;
+        font-size: 0.84rem;
+        font-weight: 800;
         cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.3rem;
-        box-shadow: 0 2px 6px rgba(22, 101, 52, 0.25);
+        box-shadow: 0 4px 12px rgba(24, 74, 35, 0.3);
         transition: all 0.15s ease;
+        white-space: nowrap;
     }
-    .pwa-install-btn:active {
-        transform: scale(0.96);
+    .pwa-card-install-btn:active {
+        transform: scale(0.95);
+    }
+    .pwa-card-close-btn {
+        background: #f1f5f9;
+        border: none;
+        color: #64748b;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.12s ease;
+    }
+    .pwa-card-close-btn:active {
+        background: #e2e8f0;
     }
     .nav-install-chip {
-        background: rgba(22, 101, 52, 0.1);
-        color: #166534;
+        background: rgba(24, 74, 35, 0.1);
+        color: #184a23;
         border: 1.5px solid #86efac;
         border-radius: 999px;
         padding: 0.25rem 0.7rem;
@@ -1397,19 +1481,44 @@
         transition: all 0.15s ease;
     }
     .nav-install-chip:hover {
-        background: #166534;
+        background: #184a23;
         color: #ffffff;
     }
 
-    @media (max-width: 640px) {
-        .line-browser-banner, .pwa-install-banner {
-            flex-direction: column;
-            align-items: stretch;
-            padding: 0.6rem 0.85rem;
-            gap: 0.5rem;
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
         }
-        .line-banner-actions, .pwa-banner-actions {
-            justify-content: flex-end;
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes fadeInDown {
+        from {
+            opacity: 0;
+            transform: translateY(-15px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @media (max-width: 640px) {
+        .pwa-install-card {
+            bottom: 1rem;
+            left: 0.75rem;
+            right: 0.75rem;
+            padding: 0.75rem 0.85rem;
+        }
+        .line-browser-floating {
+            top: 4.4rem;
+            left: 0.75rem;
+            right: 0.75rem;
+            padding: 0.55rem 0.75rem;
         }
     }
 </style>
