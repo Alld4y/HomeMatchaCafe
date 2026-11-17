@@ -526,12 +526,74 @@
         }
     }
 
-    function handleFileChange(event: Event) {
+    async function compressImageIfNeeded(file: File): Promise<File> {
+        // หากไฟล์ขนาดเล็กกว่า 350KB อยู่แล้ว ไม่จำเป็นต้องบีบอัด
+        if (file.size <= 350 * 1024) return file;
+
+        return new Promise((resolve) => {
+            const img = new Image();
+            const objectUrl = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(objectUrl);
+                const maxDim = 1200;
+                let w = img.width;
+                let h = img.height;
+
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) {
+                        h = Math.round((h * maxDim) / w);
+                        w = maxDim;
+                    } else {
+                        w = Math.round((w * maxDim) / h);
+                        h = maxDim;
+                    }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    resolve(file);
+                    return;
+                }
+
+                ctx.drawImage(img, 0, 0, w, h);
+                canvas.toBlob(
+                    (blob) => {
+                        if (!blob || blob.size >= file.size) {
+                            resolve(file);
+                        } else {
+                            const compressed = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
+                                type: 'image/jpeg',
+                                lastModified: Date.now()
+                            });
+                            resolve(compressed);
+                        }
+                    },
+                    'image/jpeg',
+                    0.85
+                );
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(objectUrl);
+                resolve(file);
+            };
+            img.src = objectUrl;
+        });
+    }
+
+    async function handleFileChange(event: Event) {
         const target = event.target as HTMLInputElement;
         if (target.files && target.files.length > 0) {
-            selectedFile = target.files[0];
-            previewUrl = URL.createObjectURL(selectedFile);
+            const original = target.files[0];
+            previewUrl = URL.createObjectURL(original);
             errorMessage = '';
+            try {
+                selectedFile = await compressImageIfNeeded(original);
+            } catch {
+                selectedFile = original;
+            }
         }
     }
 
