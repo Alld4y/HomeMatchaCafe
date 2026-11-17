@@ -155,8 +155,23 @@ export async function ensurePgSchema(): Promise<void> {
                     ADD COLUMN IF NOT EXISTS addons JSONB DEFAULT '[]'::jsonb;
             `);
 
+            // 6. สร้างตาราง public.push_subscriptions สำหรับระบบ Web Push Notifications
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+                    id SERIAL PRIMARY KEY,
+                    phone TEXT NOT NULL,
+                    endpoint TEXT UNIQUE NOT NULL,
+                    p256dh TEXT NOT NULL,
+                    auth TEXT NOT NULL,
+                    user_agent TEXT,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                );
+                CREATE INDEX IF NOT EXISTS idx_push_subs_phone ON public.push_subscriptions(phone);
+            `);
+
             schemaInitialized = true;
-            console.log('✅ PostgreSQL connected & all tables verified (order, store_settings, members, menu_categories, menu_items)');
+            console.log('✅ PostgreSQL connected & all tables verified (order, store_settings, members, menu_categories, menu_items, push_subscriptions)');
         } catch (err) {
             schemaInitPromise = null;
             console.error('❌ Error initializing PostgreSQL schema:', err);

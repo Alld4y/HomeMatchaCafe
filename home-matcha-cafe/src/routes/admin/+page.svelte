@@ -63,6 +63,16 @@
         loyaltyStampsRequired?: number;
         loyaltyExpireDays?: number;
         loyaltyRedeemableItemIds?: string[];
+        notifications: {
+            enabled: boolean;
+            notifyOnSlipApproved: boolean;
+            notifyOnDelivering: boolean;
+            notifyOnCompleted: boolean;
+            enableWebPush: boolean;
+            enableLineOA: boolean;
+            lineOaChannelAccessToken?: string;
+            lineOaChannelSecret?: string;
+        };
     }
 
     // 🔐 ระบบล็อกรหัสผ่านหน้า Admin (ตรวจสอบกับ ADMIN_PASSWORD ใน .env)
@@ -71,8 +81,8 @@
     let adminAuthError = $state('');
     let isVerifyingAdmin = $state(false);
 
-    // แท็บหน้า Admin: 'orders' | 'settings' | 'members' | 'menus'
-    let activeTab = $state<'orders' | 'settings' | 'members' | 'menus'>('orders');
+    // แท็บหน้า Admin: 'orders' | 'delivery' | 'settings' | 'members' | 'menus'
+    let activeTab = $state<'orders' | 'delivery' | 'settings' | 'members' | 'menus'>('orders');
 
     // ข้อมูลคำสั่งซื้อ
     let orders = $state<AdminOrder[]>([]);
@@ -104,6 +114,16 @@
             'matcha-latte-oat',
             'cold-fermented-matcha-oat-latte'
         ],
+        notifications: {
+            enabled: true,
+            notifyOnSlipApproved: true,
+            notifyOnDelivering: true,
+            notifyOnCompleted: true,
+            enableWebPush: true,
+            enableLineOA: false,
+            lineOaChannelAccessToken: '',
+            lineOaChannelSecret: ''
+        },
         deliveryRounds: [
             { id: 'morning', name: 'รอบเช้า', timeSlot: '07:00–08:00 น.', cutoffTime: '06:00', allowFermented: true, isAllDayOpen: false, enabled: true },
             { id: 'noon', name: 'รอบเที่ยง', timeSlot: '12:30–13:00 น.', cutoffTime: '11:30', allowFermented: true, isAllDayOpen: false, enabled: true },
@@ -702,7 +722,14 @@
             if (res.ok) {
                 const data = await res.json();
                 if (data.settings) {
-                    settings = data.settings;
+                    settings = {
+                        ...settings,
+                        ...data.settings,
+                        notifications: {
+                            ...settings.notifications,
+                            ...(data.settings.notifications || {})
+                        }
+                    };
                 }
             }
         } catch (e) {
@@ -852,6 +879,165 @@
             selectedOrderIds = selectedOrderIds.filter((item) => item !== id);
         } else {
             selectedOrderIds = [...selectedOrderIds, id];
+        }
+    }
+
+    // ========================================================
+    // 🛵 ระบบตัวช่วยในการจัดส่ง (Delivery Runner Assistant)
+    // ========================================================
+    let selectedDeliveryRoundFilter = $state<string>('auto'); // 'auto' | roundId | 'all'
+
+    // คำนวณวันที่ของวันนี้ในรูปแบบ YYYY-MM-DD (UTC+7)
+    let todayDateStr = $derived.by(() => {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    });
+
+    // ตรวจจับรอบส่งปัจจุบันตามเวลาจริง
+    function detectCurrentDeliveryRoundId(): string {
+        const now = new Date();
+        const currentMins = now.getHours() * 60 + now.getMinutes();
+        const rounds = settings.deliveryRounds || [];
+
+        for (const r of rounds) {
+            if (!r.enabled) continue;
+            const match = r.timeSlot.match(/(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})/);
+            if (match) {
+                const sMins = parseInt(match[1]) * 60 + parseInt(match[2]);
+                const eMins = parseInt(match[3]) * 60 + parseInt(match[4]);
+                // ให้เวลาเผื่อล่วงหน้า 45 นาที และหลังปิดรอบ 60 นาที
+                if (currentMins >= sMins - 45 && currentMins <= eMins + 60) {
+                    return r.id;
+                }
+            }
+        }
+
+        // ค่าเริ่มต้นตามช่วงเวลาทั่วไป (ก่อน 11:30 ให้รอบเช้า, หลัง 11:30 ให้รอบเที่ยง)
+        if (currentMins < 11 * 60 + 30) {
+            return rounds.find((r) => r.id === 'morning')?.id || rounds[0]?.id || 'morning';
+        } else {
+            return rounds.find((r) => r.id === 'noon')?.id || rounds[1]?.id || 'noon';
+        }
+    }
+
+    let activeDeliveryRoundId = $derived(
+        selectedDeliveryRoundFilter === 'auto' ? detectCurrentDeliveryRoundId() : selectedDeliveryRoundFilter
+    );
+
+    // รายการออเดอร์ทั้งหมดในรอบนี้ (ของวันนี้)
+    let deliveryAssistantOrders = $derived.by(() => {
+        return orders.filter((o) => {
+            if (o.status === 'cancelled') return false;
+
+            // ตรวจสอบวันจัดส่ง: ตรงกับวันนี้ (หรือถ้าไม่ได้ระบุ ให้อิงวันที่สร้าง)
+            const isToday = o.deliveryDate ? o.deliveryDate === todayDateStr : o.createdAt.startsWith(todayDateStr);
+            if (!isToday) return false;
+
+            // ตรวจสอบรอบจัดส่ง
+            if (activeDeliveryRoundId !== 'all') {
+                const targetRound = settings.deliveryRounds.find((r) => r.id === activeDeliveryRoundId);
+                const matchesId = o.deliveryRoundId === activeDeliveryRoundId;
+                const matchesName = targetRound && (o.deliveryRound || '').includes(targetRound.name);
+                if (!matchesId && !matchesName) return false;
+            }
+
+            return true;
+        });
+    });
+
+    // ออเดอร์ที่ค้างส่ง (รอชง / กำลังชง / พร้อมส่ง / กำลังนำส่ง)
+    let pendingDeliveryOrders = $derived(
+        deliveryAssistantOrders.filter((o) => o.status !== 'completed')
+    );
+
+    // ออเดอร์ที่ส่งเสร็จแล้วในรอบนี้
+    let completedDeliveryOrders = $derived(
+        deliveryAssistantOrders.filter((o) => o.status === 'completed')
+    );
+
+    let showCompletedDeliveryList = $state(false);
+
+    // ฟังก์ชันกดยืนยันการจัดส่งเมื่อแตะการ์ด
+    async function handleConfirmDelivery(order: AdminOrder) {
+        const result = await swal.fire({
+            title: 'ยืนยันการจัดส่งสำเร็จ? 🛵',
+            html: `
+                <div style="text-align: left; font-size: 0.92rem; line-height: 1.55; color: #334155;">
+                    <p style="margin: 0 0 0.5rem 0;">ส่งมอบเครื่องดื่มให้:</p>
+                    <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px; padding: 0.75rem 0.9rem; margin-bottom: 0.65rem;">
+                        <strong style="color: #14532d; font-size: 1.05rem;">คุณ ${order.name}</strong><br/>
+                        <span style="color: #166534; font-weight: 700;">📍 ${order.address}</span>
+                    </div>
+                    <div style="background: #f8fafc; border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.82rem; color: #64748b;">
+                        🔔 ระบบจะอัปเดตสถานะเป็น "ส่งสำเร็จ" พร้อมส่งการแจ้งเตือนไปยังลูกค้าอัตโนมัติค่ะ
+                    </div>
+                </div>
+            `,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#16a34a',
+            cancelButtonColor: '#94a3b8',
+            confirmButtonText: '✅ ยืนยันส่งสำเร็จ',
+            cancelButtonText: 'ยกเลิก',
+            reverseButtons: true
+        });
+
+        if (result.isConfirmed) {
+            await updateStatus(order.id, 'completed');
+            swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: `จัดส่งออเดอร์ ${order.order_id} สำเร็จแล้ว 🛵`,
+                text: 'แจ้งเตือนลูกค้าและบันทึกแต้มเรียบร้อยแล้วค่ะ',
+                showConfirmButton: false,
+                timer: 2500
+            });
+        }
+    }
+
+    // 🔔 ทดสอบส่งการแจ้งเตือน (Admin Notification Test)
+    let testNotifPhone = $state('');
+    let isSendingTestNotif = $state(false);
+
+    async function sendTestNotification() {
+        if (!testNotifPhone.trim()) {
+            swal.fire({
+                icon: 'warning',
+                title: 'กรุณาระบุเบอร์โทร',
+                text: 'กรอกเบอร์โทรลูกค้าหรือสมาชิกที่ต้องการทดสอบส่งนะคะ'
+            });
+            return;
+        }
+
+        isSendingTestNotif = true;
+        try {
+            const res = await fetch('/api/notifications/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: testNotifPhone.trim() })
+            });
+            const data = await res.json();
+            if (data.success) {
+                swal.fire({
+                    icon: 'success',
+                    title: 'ส่งแจ้งเตือนสำเร็จ! 🔔',
+                    text: data.message
+                });
+            } else {
+                swal.fire({
+                    icon: 'info',
+                    title: 'ส่งไม่สำเร็จ',
+                    text: data.message || 'ยังไม่มีอุปกรณ์ที่เปิดรับการแจ้งเตือนสำหรับเบอร์นี้ค่ะ'
+                });
+            }
+        } catch {
+            swal.fire('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์แจ้งเตือนได้', 'error');
+        } finally {
+            isSendingTestNotif = false;
         }
     }
 
@@ -1994,6 +2180,19 @@
 
         <button 
             type="button"
+            onclick={() => (activeTab = 'delivery')}
+            class="admin-main-tab-btn {activeTab === 'delivery' ? 'active' : ''}"
+        >
+            <span>🛵 ตัวช่วยจัดส่ง</span>
+            {#if pendingDeliveryOrders.length > 0}
+                <span style="background: #0284c7; color: #fff; font-size: 0.72rem; padding: 0.08rem 0.45rem; border-radius: 999px;">
+                    {pendingDeliveryOrders.length}
+                </span>
+            {/if}
+        </button>
+
+        <button 
+            type="button"
             onclick={() => (activeTab = 'settings')}
             class="admin-main-tab-btn {activeTab === 'settings' ? 'active' : ''}"
         >
@@ -2704,6 +2903,226 @@
     {/if}
 
     <!-- ======================================================== -->
+    <!-- แท็บ: ตัวช่วยในการจัดส่ง (Delivery Assistant)            -->
+    <!-- ======================================================== -->
+    {#if activeTab === 'delivery'}
+        <div style="display: flex; flex-direction: column; gap: 1.25rem; width: 100%;">
+            <!-- Header ส่วนหัวตัวช่วยจัดส่ง -->
+            <div class="form-card" style="padding: 1.25rem 1.5rem; text-align: left; background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 1.5px solid #86efac;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                            <span style="font-size: 1.5rem;">🛵</span>
+                            <h2 style="margin: 0; font-size: 1.35rem; color: #14532d; font-weight: 800;">
+                                ตัวช่วยในการจัดส่ง (Delivery Assistant)
+                            </h2>
+                        </div>
+                        <p style="margin: 0; font-size: 0.88rem; color: #166534;">
+                            แสดงออเดอร์ที่ต้องส่งมอบในแต่ละรอบ แตะที่การ์ดเพื่อยืนยันการจัดส่งสำเร็จและแจ้งเตือนลูกค้าอัตโนมัติ
+                        </p>
+                    </div>
+
+                    <!-- สรุปตัวเลขสถานะ -->
+                    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                        <div style="background: #ffffff; border: 1.5px solid #bbf7d0; padding: 0.5rem 0.9rem; border-radius: 12px; display: flex; align-items: center; gap: 0.4rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <span style="font-size: 1.2rem;">⏳</span>
+                            <div>
+                                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600;">รอจัดส่ง</div>
+                                <div style="font-size: 1.15rem; font-weight: 800; color: #d97706;">{pendingDeliveryOrders.length}</div>
+                            </div>
+                        </div>
+                        <div style="background: #ffffff; border: 1.5px solid #bbf7d0; padding: 0.5rem 0.9rem; border-radius: 12px; display: flex; align-items: center; gap: 0.4rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <span style="font-size: 1.2rem;">✅</span>
+                            <div>
+                                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600;">ส่งแล้ว</div>
+                                <div style="font-size: 1.15rem; font-weight: 800; color: #16a34a;">{completedDeliveryOrders.length}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- แถบเลือกรอบส่ง (Round Filter Pills) -->
+                <div style="margin-top: 1.2rem; padding-top: 1rem; border-top: 1px dashed #86efac; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                    <span style="font-size: 0.82rem; font-weight: 700; color: #166534; margin-right: 0.25rem;">
+                        📍 เลือกรอบจัดส่ง:
+                    </span>
+                    <button
+                        type="button"
+                        onclick={() => (selectedDeliveryRoundFilter = 'auto')}
+                        style="padding: 0.4rem 0.85rem; border-radius: 999px; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: all 0.2s; border: 1.5px solid {selectedDeliveryRoundFilter === 'auto' ? '#15803d' : '#bbf7d0'}; background: {selectedDeliveryRoundFilter === 'auto' ? '#15803d' : '#ffffff'}; color: {selectedDeliveryRoundFilter === 'auto' ? '#ffffff' : '#166534'};"
+                    >
+                        ⏰ ตรวจจับอัตโนมัติตามเวลา ({settings.deliveryRounds.find(r => r.id === detectCurrentDeliveryRoundId())?.name || 'รอบปัจจุบัน'})
+                    </button>
+                    {#each settings.deliveryRounds as round}
+                        <button
+                            type="button"
+                            onclick={() => (selectedDeliveryRoundFilter = round.id)}
+                            style="padding: 0.4rem 0.85rem; border-radius: 999px; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: all 0.2s; border: 1.5px solid {selectedDeliveryRoundFilter === round.id ? '#15803d' : '#bbf7d0'}; background: {selectedDeliveryRoundFilter === round.id ? '#15803d' : '#ffffff'}; color: {selectedDeliveryRoundFilter === round.id ? '#ffffff' : '#166534'};"
+                        >
+                            {round.name} ({round.timeSlot})
+                        </button>
+                    {/each}
+                    <button
+                        type="button"
+                        onclick={() => (selectedDeliveryRoundFilter = 'all')}
+                        style="padding: 0.4rem 0.85rem; border-radius: 999px; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: all 0.2s; border: 1.5px solid {selectedDeliveryRoundFilter === 'all' ? '#15803d' : '#bbf7d0'}; background: {selectedDeliveryRoundFilter === 'all' ? '#15803d' : '#ffffff'}; color: {selectedDeliveryRoundFilter === 'all' ? '#ffffff' : '#166534'};"
+                    >
+                        📦 ทุกรอบวันนี้ ({orders.filter(o => (o.deliveryDate ? o.deliveryDate === todayDateStr : o.createdAt.startsWith(todayDateStr)) && o.status !== 'cancelled').length})
+                    </button>
+                </div>
+            </div>
+
+            <!-- รายการออเดอร์ที่ต้องจัดส่ง (Pending Orders Grid) -->
+            {#if pendingDeliveryOrders.length === 0}
+                <div class="form-card" style="padding: 3rem 1.5rem; text-align: center; background: #ffffff;">
+                    <div style="font-size: 3rem; margin-bottom: 0.75rem;">🎉</div>
+                    <h3 style="font-size: 1.2rem; color: #15803d; margin: 0 0 0.5rem 0; font-weight: 800;">
+                        ไม่มีออเดอร์ค้างส่งในรอบนี้!
+                    </h3>
+                    <p style="font-size: 0.88rem; color: var(--text-muted); margin: 0;">
+                        ออเดอร์ทั้งหมดในรอบนี้จัดส่งเรียบร้อยแล้ว หรือยังไม่มีออเดอร์สั่งเข้ามาในช่วงเวลานี้
+                    </p>
+                </div>
+            {:else}
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 1rem; align-items: start;">
+                    {#each pendingDeliveryOrders as order (order.id)}
+                        <!-- การ์ดออเดอร์สำหรับจัดส่ง (แตะเพื่อกดยืนยันส่ง) -->
+                        <div 
+                            role="button"
+                            tabindex="0"
+                            onclick={() => handleConfirmDelivery(order)}
+                            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleConfirmDelivery(order); }}
+                            style="background: #ffffff; border: 2px solid #bbf7d0; border-radius: 16px; overflow: hidden; box-shadow: 0 3px 12px rgba(0,0,0,0.06); cursor: pointer; transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s; text-align: left; position: relative;"
+                            onmouseenter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#22c55e'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(34, 197, 94, 0.15)'; }}
+                            onmouseleave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = '#bbf7d0'; e.currentTarget.style.boxShadow = '0 3px 12px rgba(0,0,0,0.06)'; }}
+                        >
+                            <!-- หัวการ์ด: คิว + ชื่อผู้รับ + รอบส่ง -->
+                            <div style="background: #f0fdf4; padding: 0.85rem 1rem; border-bottom: 1.5px solid #dcfce7; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="background: #15803d; color: #ffffff; font-weight: 800; font-size: 0.85rem; padding: 0.2rem 0.55rem; border-radius: 8px;">
+                                        #{order.order_id || order.id.slice(-6)}
+                                    </span>
+                                    <strong style="font-size: 1.05rem; color: #14532d;">
+                                        คุณ {order.name}
+                                    </strong>
+                                </div>
+                                <span style="font-size: 0.75rem; background: #dcfce7; color: #166534; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 6px;">
+                                    {order.deliveryRound || 'รอบปกติ'}
+                                </span>
+                            </div>
+
+                            <!-- เนื้อหาการ์ด: ที่อยู่ + เบอร์โทร + รายการเมนูและรายละเอียด -->
+                            <div style="padding: 1rem;">
+                                <!-- สถานที่จัดส่ง -->
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.65rem 0.8rem; margin-bottom: 0.85rem;">
+                                    <div style="display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.92rem; color: #1e293b; font-weight: 700; line-height: 1.4;">
+                                        <span>📍</span>
+                                        <span>{order.address}</span>
+                                    </div>
+                                    {#if order.phone}
+                                        <div style="margin-top: 0.35rem; display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; color: #64748b;">
+                                            <span>📞</span>
+                                            <a 
+                                                href="tel:{order.phone}" 
+                                                onclick={(e) => e.stopPropagation()}
+                                                style="color: #0284c7; font-weight: 700; text-decoration: underline;"
+                                            >
+                                                {order.phone} (กดโทรออก)
+                                            </a>
+                                        </div>
+                                    {/if}
+                                </div>
+
+                                <!-- รายการเมนู + รายละเอียด (ความหวาน/ท็อปปิ้ง/โน้ต) -->
+                                <div style="margin-bottom: 0.85rem;">
+                                    <div style="font-size: 0.78rem; font-weight: 800; color: #475569; text-transform: uppercase; margin-bottom: 0.4rem; letter-spacing: 0.03em;">
+                                        🍵 รายการเครื่องดื่ม ({(order.basket || []).reduce((acc: number, i: any) => acc + (i.quantity || 1), 0)} แก้ว):
+                                    </div>
+                                    <div style="display: flex; flex-direction: column; gap: 0.45rem;">
+                                        {#each order.basket || [] as item}
+                                            <div style="background: #fafaf9; border-left: 3px solid #15803d; padding: 0.45rem 0.65rem; border-radius: 4px;">
+                                                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                                                    <span style="font-weight: 700; font-size: 0.9rem; color: #1c1917;">
+                                                        {item.thaiName || item.name || 'เครื่องดื่ม'}
+                                                    </span>
+                                                    <span style="font-weight: 800; font-size: 0.88rem; color: #15803d; background: #dcfce7; padding: 0.05rem 0.4rem; border-radius: 4px;">
+                                                        x{item.quantity || 1}
+                                                    </span>
+                                                </div>
+                                                <!-- รายละเอียดตัวเลือก -->
+                                                <div style="font-size: 0.78rem; color: #57534e; margin-top: 0.15rem; line-height: 1.35;">
+                                                    <span style="color: #d97706; font-weight: 600;">
+                                                        หวาน: {item.sweetness !== undefined ? `${item.sweetness}%` : 'ปกติ'}
+                                                    </span>
+                                                    {#if item.addonName}
+                                                        <span style="color: #7c3aed; font-weight: 600;"> • {item.addonName}</span>
+                                                    {/if}
+                                                    {#if item.note}
+                                                        <div style="margin-top: 0.15rem; color: #b91c1c; font-style: italic;">
+                                                            📝 {item.note}
+                                                        </div>
+                                                    {/if}
+                                                </div>
+                                            </div>
+                                        {/each}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- ปุ่มแถบล่างแตะเพื่อยืนยันส่งสำเร็จ -->
+                            <div style="background: #15803d; color: #ffffff; padding: 0.65rem 1rem; text-align: center; font-size: 0.88rem; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 0.4rem; letter-spacing: 0.02em;">
+                                <span>🛵</span>
+                                <span>แตะที่นี่เพื่อยืนยันส่งสำเร็จ</span>
+                                <span>→</span>
+                            </div>
+                        </div>
+                    {/each}
+                </div>
+            {/if}
+
+            <!-- ส่วนออเดอร์ที่ส่งเสร็จแล้วในรอบนี้ (พับเก็บได้) -->
+            {#if completedDeliveryOrders.length > 0}
+                <div style="margin-top: 1rem;">
+                    <button
+                        type="button"
+                        onclick={() => (showCompletedDeliveryList = !showCompletedDeliveryList)}
+                        style="width: 100%; padding: 0.75rem 1rem; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 12px; font-size: 0.88rem; font-weight: 700; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: background 0.2s;"
+                        onmouseenter={(e) => (e.currentTarget.style.background = '#f1f5f9')}
+                        onmouseleave={(e) => (e.currentTarget.style.background = '#f8fafc')}
+                    >
+                        <span>✅ รายการที่จัดส่งสำเร็จแล้วในรอบนี้ ({completedDeliveryOrders.length} ออเดอร์)</span>
+                        <span>{showCompletedDeliveryList ? '▲ ซ่อน' : '▼ ดูรายการ'}</span>
+                    </button>
+
+                    {#if showCompletedDeliveryList}
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0.75rem; margin-top: 0.75rem;">
+                            {#each completedDeliveryOrders as order (order.id)}
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0.8rem; text-align: left; opacity: 0.85;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                                        <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                            <span style="font-size: 0.75rem; background: #cbd5e1; color: #334155; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 4px;">
+                                                #{order.order_id || order.id.slice(-6)}
+                                            </span>
+                                            <strong style="color: #334155; font-size: 0.95rem;">คุณ {order.name}</strong>
+                                        </div>
+                                        <span style="color: #16a34a; font-size: 0.75rem; font-weight: 700; background: #dcfce7; padding: 0.15rem 0.45rem; border-radius: 999px;">
+                                            ✓ ส่งสำเร็จแล้ว
+                                        </span>
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: #64748b;">📍 {order.address}</div>
+                                    <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">
+                                        {(order.basket || []).map((i: any) => `${i.thaiName || i.name || 'เครื่องดื่ม'} (${i.quantity || 1})`).join(', ')}
+                                    </div>
+                                </div>
+                            {/each}
+                        </div>
+                    {/if}
+                </div>
+            {/if}
+        </div>
+    {/if}
+
+    <!-- ======================================================== -->
     <!-- แท็บที่ 2: ปฏิทินร้าน & รอบจัดส่ง (Calendar & Settings) -->
     <!-- ======================================================== -->
     {#if activeTab === 'settings'}
@@ -3054,6 +3473,187 @@
                         {/each}
                     </div>
                 </div>
+            </div>
+
+            <!-- 7. ระบบแจ้งเตือนลูกค้า (Customer Notification Settings) -->
+            <div class="form-card" style="padding: 1.5rem; text-align: left; border: 1.5px solid #86efac; background: #f0fdf4;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 1.35rem;">🔔</span>
+                            <h3 style="margin: 0; font-size: 1.2rem; color: #14532d; font-weight: 800;">
+                                ระบบแจ้งเตือนสถานะลูกค้า (Customer Notifications)
+                            </h3>
+                        </div>
+                        <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #166534;">
+                            เลือกเหตุการณ์และช่องทางที่ต้องการแจ้งเตือนลูกค้าเมื่อสถานะออเดอร์มีการเปลี่ยนแปลง
+                        </p>
+                    </div>
+
+                    <!-- สวิตช์หลักเปิด/ปิดระบบแจ้งเตือน -->
+                    <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; background: #ffffff; padding: 0.4rem 0.85rem; border-radius: 999px; border: 1.5px solid #86efac; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.notifications.enabled}
+                            style="width: 20px; height: 20px; accent-color: #15803d; cursor: pointer;"
+                        />
+                        <span style="font-size: 0.88rem; font-weight: 800; color: {settings.notifications.enabled ? '#15803d' : '#64748b'};">
+                            {settings.notifications.enabled ? '🟢 เปิดใช้งานระบบแจ้งเตือน' : '⚪ ปิดระบบแจ้งเตือน'}
+                        </span>
+                    </label>
+                </div>
+
+                {#if settings.notifications.enabled}
+                    <!-- กล่องเลือกเหตุการณ์ที่จะส่งแจ้งเตือน -->
+                    <div style="background: #ffffff; border: 1px solid #bbf7d0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem;">
+                        <h4 style="margin: 0 0 0.75rem 0; font-size: 0.95rem; color: #14532d; font-weight: 800;">
+                            📢 1. เลือกเหตุการณ์ที่ต้องการส่งแจ้งเตือนลูกค้า:
+                        </h4>
+                        <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+                            <label style="display: flex; align-items: flex-start; gap: 0.6rem; cursor: pointer;">
+                                <input
+                                    type="checkbox"
+                                    bind:checked={settings.notifications.notifyOnSlipApproved}
+                                    style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #15803d;"
+                                />
+                                <div>
+                                    <strong style="font-size: 0.9rem; color: #1e293b;">
+                                        ตรวจสลิปเรียบร้อย / ได้รับยอดชำระแล้ว (เมื่อกดยืนยันตรวจสลิป)
+                                    </strong>
+                                    <div style="font-size: 0.8rem; color: #64748b;">
+                                        แจ้งเตือนเมื่อแอดมินกดยืนยันรับยอดเงิน หลังลูกค้ากดขอให้แอดมินตรวจสอบสลิปด้วยตนเอง
+                                    </div>
+                                </div>
+                            </label>
+
+                            <label style="display: flex; align-items: flex-start; gap: 0.6rem; cursor: pointer;">
+                                <input
+                                    type="checkbox"
+                                    bind:checked={settings.notifications.notifyOnDelivering}
+                                    style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #15803d;"
+                                />
+                                <div>
+                                    <strong style="font-size: 0.9rem; color: #1e293b;">
+                                        กำลังออกจัดส่ง 🛵 (เมื่อเปลี่ยนสถานะเป็น 'delivering')
+                                    </strong>
+                                    <div style="font-size: 0.8rem; color: #64748b;">
+                                        แจ้งเตือนลูกค้าให้เตรียมรับเครื่องดื่มมัทฉะสดชงใหม่
+                                    </div>
+                                </div>
+                            </label>
+
+                            <label style="display: flex; align-items: flex-start; gap: 0.6rem; cursor: pointer;">
+                                <input
+                                    type="checkbox"
+                                    bind:checked={settings.notifications.notifyOnCompleted}
+                                    style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #15803d;"
+                                />
+                                <div>
+                                    <strong style="font-size: 0.9rem; color: #1e293b;">
+                                        จัดส่งสำเร็จเรียบร้อย ✨ (เมื่อกดส่งมอบสำเร็จจากการ์ดส่ง)
+                                    </strong>
+                                    <div style="font-size: 0.8rem; color: #64748b;">
+                                        แจ้งเตือนลูกค้าว่านำเครื่องดื่มไปส่งมอบถึงที่หมายเรียบร้อยแล้ว
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- กล่องเลือกช่องทางจัดส่งแจ้งเตือน -->
+                    <div style="background: #ffffff; border: 1px solid #bbf7d0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem;">
+                        <h4 style="margin: 0 0 0.75rem 0; font-size: 0.95rem; color: #14532d; font-weight: 800;">
+                            📡 2. ช่องทางการส่งข้อความแจ้งเตือน:
+                        </h4>
+                        <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+                            <!-- Web Push -->
+                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.85rem 1rem;">
+                                <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer;">
+                                    <input
+                                        type="checkbox"
+                                        bind:checked={settings.notifications.enableWebPush}
+                                        style="width: 18px; height: 18px; accent-color: #15803d;"
+                                    />
+                                    <div>
+                                        <strong style="font-size: 0.9rem; color: #0f172a;">
+                                            🌐 Web Push Notifications (เปิดใช้งานฟรี 100%)
+                                        </strong>
+                                        <div style="font-size: 0.8rem; color: #15803d; font-weight: 600;">
+                                            ✓ รองรับ Chrome, Safari (iOS 16.4+ / macOS), Edge, Firefox, Android
+                                        </div>
+                                    </div>
+                                </label>
+                                <div style="font-size: 0.78rem; color: #64748b; margin-top: 0.35rem; margin-left: 1.7rem;">
+                                    ส่งแจ้งเตือนตรงไปยังหน้าจอหรือโทรศัพท์ของลูกค้าที่ล็อกอินสมาชิกและกดเปิดรับการแจ้งเตือน
+                                </div>
+                            </div>
+
+                            <!-- LINE OA (สำรอง) -->
+                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.85rem 1rem;">
+                                <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer;">
+                                    <input
+                                        type="checkbox"
+                                        bind:checked={settings.notifications.enableLineOA}
+                                        style="width: 18px; height: 18px; accent-color: #06c755;"
+                                    />
+                                    <div>
+                                        <strong style="font-size: 0.9rem; color: #0f172a;">
+                                            💬 LINE OA Messaging API (ระบบสำรองเผื่อสร้าง LINE OA ในอนาคต)
+                                        </strong>
+                                        <div style="font-size: 0.8rem; color: #64748b;">
+                                            ระบบเตรียมโค้ดและ Flex Message สำรองไว้เรียบร้อย เมื่อเปิดใช้งานให้กรอก Token ด้านล่าง
+                                        </div>
+                                    </div>
+                                </label>
+                                {#if settings.notifications.enableLineOA}
+                                    <div style="margin-top: 0.75rem; margin-left: 1.7rem;">
+                                        <label for="lineOaChannelAccessToken" style="display: block; font-size: 0.82rem; font-weight: 700; color: #334155; margin-bottom: 0.3rem;">
+                                            LINE Channel Access Token (Long-lived):
+                                        </label>
+                                        <input
+                                            id="lineOaChannelAccessToken"
+                                            type="password"
+                                            bind:value={settings.notifications.lineOaChannelAccessToken}
+                                            placeholder="ใส่ Channel Access Token จาก LINE Developers Console"
+                                            style="width: 100%; padding: 0.5rem 0.75rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem;"
+                                        />
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- กล่องทดสอบส่งการแจ้งเตือน (Test Box) -->
+                    <div style="background: #ffffff; border: 1.5px dashed #86efac; border-radius: 12px; padding: 1.25rem;">
+                        <h4 style="margin: 0 0 0.5rem 0; font-size: 0.95rem; color: #14532d; font-weight: 800;">
+                            🧪 3. ทดสอบส่งข้อความแจ้งเตือน:
+                        </h4>
+                        <p style="margin: 0 0 0.75rem 0; font-size: 0.82rem; color: #64748b;">
+                            ระบุเบอร์โทรศัพท์ของเครื่องที่ได้กดเปิดรับการแจ้งเตือนไว้ เพื่อทดสอบยิง Push Notification ทันที
+                        </p>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <input
+                                type="tel"
+                                bind:value={testNotifPhone}
+                                placeholder="เช่น 0812345678"
+                                maxlength={12}
+                                style="flex: 1; min-width: 200px; padding: 0.5rem 0.75rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.88rem;"
+                            />
+                            <button
+                                type="button"
+                                onclick={sendTestNotification}
+                                disabled={isSendingTestNotif}
+                                style="padding: 0.5rem 1.1rem; background: #0284c7; color: #ffffff; border: none; border-radius: 8px; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;"
+                            >
+                                {#if isSendingTestNotif}
+                                    <span>⏳ กำลังทดสอบส่ง...</span>
+                                {:else}
+                                    <span>🚀 ทดสอบส่งแจ้งเตือน</span>
+                                {/if}
+                            </button>
+                        </div>
+                    </div>
+                {/if}
             </div>
 
             <!-- ปุ่มบันทึกการตั้งค่าทั้งหมด -->
@@ -4135,7 +4735,7 @@
 
     .admin-main-tabs {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
         gap: 0.45rem;
         background: #f1f6ee;
         padding: 0.4rem;

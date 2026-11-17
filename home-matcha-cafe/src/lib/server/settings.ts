@@ -18,6 +18,17 @@ export interface DaySchedule {
     note?: string;
 }
 
+export interface NotificationSettings {
+    enabled: boolean;
+    notifyOnSlipApproved: boolean;
+    notifyOnDelivering: boolean;
+    notifyOnCompleted: boolean;
+    enableWebPush: boolean;
+    enableLineOA: boolean;
+    lineOaChannelAccessToken?: string;
+    lineOaChannelSecret?: string;
+}
+
 export interface StoreSettings {
     isMasterOpen: boolean;
     closedAlertMessage: string;
@@ -33,6 +44,7 @@ export interface StoreSettings {
     loyaltyStampsRequired: number;
     loyaltyExpireDays: number;
     loyaltyRedeemableItemIds: string[];
+    notifications?: NotificationSettings;
 }
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
@@ -67,6 +79,16 @@ const DEFAULT_SETTINGS: StoreSettings = {
         'matcha-latte-oat',
         'cold-fermented-matcha-oat-latte'
     ],
+    notifications: {
+        enabled: true,
+        notifyOnSlipApproved: true,
+        notifyOnDelivering: true,
+        notifyOnCompleted: true,
+        enableWebPush: true,
+        enableLineOA: false,
+        lineOaChannelAccessToken: '',
+        lineOaChannelSecret: ''
+    },
     deliveryRounds: [
         {
             id: 'morning',
@@ -155,6 +177,16 @@ function normalizeSettings(parsed: any): StoreSettings {
         loyaltyRedeemableItemIds: Array.isArray(parsed?.loyaltyRedeemableItemIds)
             ? parsed.loyaltyRedeemableItemIds
             : DEFAULT_SETTINGS.loyaltyRedeemableItemIds,
+        notifications: {
+            enabled: parsed?.notifications?.enabled !== false,
+            notifyOnSlipApproved: parsed?.notifications?.notifyOnSlipApproved !== false,
+            notifyOnDelivering: parsed?.notifications?.notifyOnDelivering !== false,
+            notifyOnCompleted: parsed?.notifications?.notifyOnCompleted !== false,
+            enableWebPush: parsed?.notifications?.enableWebPush !== false,
+            enableLineOA: Boolean(parsed?.notifications?.enableLineOA),
+            lineOaChannelAccessToken: String(parsed?.notifications?.lineOaChannelAccessToken || '').trim(),
+            lineOaChannelSecret: String(parsed?.notifications?.lineOaChannelSecret || '').trim()
+        },
         deliveryRounds: rounds,
         calendar: parsed?.calendar || {}
     };

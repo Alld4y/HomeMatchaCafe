@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { pool, ensurePgSchema } from './pgPool';
 import { awardStampsForCompletedOrder } from './members';
+import { sendCustomerNotification } from './notifications';
 
 export interface OrderItem {
     id: string;
@@ -337,6 +338,49 @@ async function processCompletedOrderLoyalty(order: Order, wasAlreadyAwarded: boo
     return order;
 }
 
+function triggerOrderNotification(order: Order, prevStatus: string) {
+    if (!order.phone) return;
+
+    // 1. อนุมัติสลิป / รับยอด (กรณีที่เคยรอตรวจสลิป)
+    if (order.status === 'paid' && (prevStatus === 'pending' || order.needsManualReview)) {
+        sendCustomerNotification({
+            phone: order.phone,
+            orderId: order.id,
+            orderCode: order.order_id,
+            title: '🍵 ยืนยันรับยอดออเดอร์แล้ว',
+            body: `แอดมินตรวจสอบสลิปและรับยอดออเดอร์ ${order.order_id} เรียบร้อยแล้วค่ะ กำลังเตรียมคิวชงให้นะคะ`,
+            url: `/success?phone=${encodeURIComponent(order.phone)}`,
+            eventType: 'slip_approved'
+        }).catch((e) => console.warn('Notification error:', e));
+    }
+
+    // 2. กำลังนำส่ง
+    if (order.status === 'delivering' && prevStatus !== 'delivering') {
+        sendCustomerNotification({
+            phone: order.phone,
+            orderId: order.id,
+            orderCode: order.order_id,
+            title: '🛵 เครื่องดื่มของคุณกำลังนำส่ง',
+            body: `ออเดอร์ ${order.order_id} กำลังนำส่งไปที่ ${order.address} แล้วค่ะ เตรียมรับความสดชื่นได้เลย!`,
+            url: `/success?phone=${encodeURIComponent(order.phone)}`,
+            eventType: 'delivering'
+        }).catch((e) => console.warn('Notification error:', e));
+    }
+
+    // 3. จัดส่งสำเร็จแล้ว
+    if (order.status === 'completed' && prevStatus !== 'completed') {
+        sendCustomerNotification({
+            phone: order.phone,
+            orderId: order.id,
+            orderCode: order.order_id,
+            title: '✅ จัดส่งสำเร็จเรียบร้อยแล้ว',
+            body: `ออเดอร์ ${order.order_id} จัดส่งถึง ${order.address} เรียบร้อยแล้วค่ะ ขอบคุณที่อุดหนุน Home Matcha Cafe นะคะ 🍵`,
+            url: `/success?phone=${encodeURIComponent(order.phone)}`,
+            eventType: 'completed'
+        }).catch((e) => console.warn('Notification error:', e));
+    }
+}
+
 export async function updateOrderStatus(id: string, status: Order['status']): Promise<Order | null> {
     await ensurePgSchema();
     const prevRes = await pool.query(
@@ -365,7 +409,9 @@ export async function updateOrderStatus(id: string, status: Order['status']): Pr
 
     if (res.rows.length === 0) return null;
     const mapped = mapPgRowToOrder(res.rows[0]);
-    return await processCompletedOrderLoyalty(mapped, wasAlreadyAwarded);
+    const finalOrder = await processCompletedOrderLoyalty(mapped, wasAlreadyAwarded);
+    triggerOrderNotification(finalOrder, prevStatus);
+    return finalOrder;
 }
 
 export async function updateBulkOrderStatus(ids: string[], status: Order['status']): Promise<Order[]> {
@@ -383,8 +429,10 @@ export async function updateBulkOrderStatus(ids: string[], status: Order['status
         [stringIds]
     );
     const awardedMap = new Map<string, boolean>();
+    const prevStatusMap = new Map<string, string>();
     for (const r of prevRes.rows) {
         awardedMap.set(String(r.order_id), Boolean(r.points_awarded));
+        prevStatusMap.set(String(r.order_id), String(r.status || ''));
     }
 
     const res = await pool.query(
@@ -403,7 +451,9 @@ export async function updateBulkOrderStatus(ids: string[], status: Order['status
     for (const row of res.rows) {
         const mapped = mapPgRowToOrder(row);
         const wasAwarded = awardedMap.get(String(row.order_id)) || false;
+        const prevStatus = prevStatusMap.get(String(row.order_id)) || '';
         const processed = await processCompletedOrderLoyalty(mapped, wasAwarded);
+        triggerOrderNotification(processed, prevStatus);
         results.push(processed);
     }
 

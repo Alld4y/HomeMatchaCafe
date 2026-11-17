@@ -1,7 +1,90 @@
 <script lang="ts">
     import { goto } from '$app/navigation';
-    import { onMount } from 'svelte';
+    import { onMount, getContext } from 'svelte';
     import swal from 'sweetalert2';
+    import {
+        isPushNotificationSupported,
+        subscribeToPush,
+        unsubscribeFromPush,
+        checkServerSubscription
+    } from '$lib/pushClient';
+
+    const memberCtx = getContext<any>('memberData');
+    let member = $derived(memberCtx?.member || null);
+
+    let isSubscribedToPush = $state(false);
+    let isPushLoading = $state(false);
+
+    async function checkPushStatus() {
+        if (typeof window === 'undefined') return;
+        const phone = member?.phone || searchPhone.trim();
+        if (phone && isPushNotificationSupported()) {
+            isSubscribedToPush = await checkServerSubscription(phone);
+        }
+    }
+
+    $effect(() => {
+        const phone = member?.phone || searchPhone.trim();
+        if (phone) {
+            checkPushStatus();
+        }
+    });
+
+    async function handleTogglePush() {
+        const activePhone = member?.phone || searchPhone.trim();
+        if (!activePhone) {
+            swal.fire({
+                icon: 'info',
+                title: 'กรุณาระบุเบอร์โทรศัพท์',
+                text: 'กรุณาระบุเบอร์โทรศัพท์ในช่องค้นหา หรือเข้าสู่ระบบสมาชิกเพื่อเปิดรับการแจ้งเตือนค่ะ'
+            });
+            return;
+        }
+
+        if (!member) {
+            const res = await swal.fire({
+                icon: 'info',
+                title: 'เข้าสู่ระบบสมาชิกเพื่อเปิดแจ้งเตือน',
+                text: 'ระบบแจ้งเตือนผูกกับบัญชีสมาชิกเพื่อความปลอดภัย กรุณาเข้าสู่ระบบก่อนนะคะ',
+                showCancelButton: true,
+                confirmButtonText: 'เข้าสู่ระบบสมาชิก',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#15803d'
+            });
+            if (res.isConfirmed) {
+                memberCtx?.openAuthModal('login');
+            }
+            return;
+        }
+
+        isPushLoading = true;
+        try {
+            if (isSubscribedToPush) {
+                const res = await unsubscribeFromPush(activePhone);
+                if (res.success) {
+                    isSubscribedToPush = false;
+                    swal.fire({ icon: 'success', title: 'ปิดแจ้งเตือนแล้ว', confirmButtonColor: '#15803d' });
+                }
+            } else {
+                const res = await subscribeToPush(activePhone);
+                if (res.success) {
+                    isSubscribedToPush = true;
+                    swal.fire({
+                        icon: 'success',
+                        title: 'เปิดรับการแจ้งเตือนสำเร็จ! 🔔',
+                        text: 'เมื่อร้านกำลังออกจัดส่ง และเมื่อส่งมอบเรียบร้อย ระบบจะส่งการแจ้งเตือนมายังอุปกรณ์นี้ค่ะ',
+                        confirmButtonColor: '#15803d'
+                    });
+                } else {
+                    swal.fire({ icon: 'warning', title: 'ไม่สามารถเปิดแจ้งเตือนได้', text: res.message });
+                }
+            }
+        } catch (e: any) {
+            swal.fire({ icon: 'error', title: 'ขัดข้อง', text: e.message || 'ตั้งค่าไม่สำเร็จ' });
+        } finally {
+            isPushLoading = false;
+        }
+    }
 
     interface OrderRecord {
         id: string;
@@ -147,6 +230,35 @@
         <p class="menu-subtitle">
             ดูสถานะเครื่องดื่มของคุณแบบเรียลไทม์ หรือค้นหาตามเบอร์โทรศัพท์
         </p>
+    </div>
+
+    <!-- แถบเปิดรับการแจ้งเตือนออเดอร์ (Web Push) -->
+    <div style="width: 100%; max-width: 680px; margin-bottom: 1.25rem; background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 1.5px solid #86efac; border-radius: 14px; padding: 0.85rem 1.15rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; box-sizing: border-box;">
+        <div style="display: flex; align-items: center; gap: 0.65rem;">
+            <span style="font-size: 1.45rem;">🔔</span>
+            <div style="text-align: left;">
+                <div style="font-size: 0.92rem; font-weight: 800; color: #14532d;">
+                    {isSubscribedToPush ? '✓ เปิดรับการแจ้งเตือนสถานะออเดอร์แล้ว' : 'เปิดรับการแจ้งเตือนเมื่อกำลังจัดส่ง (Web Push)'}
+                </div>
+                <div style="font-size: 0.78rem; color: #166534;">
+                    {isSubscribedToPush ? 'ระบบจะส่งเสียงแจ้งเตือนตรงถึงอุปกรณ์นี้ทันทีเมื่อเริ่มนำส่งและส่งมอบสำเร็จ' : 'รับการแจ้งเตือนทันทีเมื่อบาริสต้ากำลังนำส่งถึงตึกของคุณ'}
+                </div>
+            </div>
+        </div>
+        <button
+            type="button"
+            onclick={handleTogglePush}
+            disabled={isPushLoading}
+            style="padding: 0.45rem 1rem; border-radius: 999px; font-size: 0.82rem; font-weight: 800; cursor: pointer; border: 1.5px solid {isSubscribedToPush ? '#86efac' : '#15803d'}; background: {isSubscribedToPush ? '#ffffff' : '#15803d'}; color: {isSubscribedToPush ? '#15803d' : '#ffffff'}; white-space: nowrap; transition: all 0.2s;"
+        >
+            {#if isPushLoading}
+                <span>กำลังประมวลผล...</span>
+            {:else if isSubscribedToPush}
+                <span>✓ เปิดรับอยู่ (แตะเพื่อปิด)</span>
+            {:else}
+                <span>🔔 เปิดรับแจ้งเตือน</span>
+            {/if}
+        </button>
     </div>
 
     <!-- Search Phone Box -->
