@@ -857,7 +857,7 @@
             <div class="install-modal-header">
                 <img src="/image/home-matcha-cafe-logo.png" alt="Home Matcha Cafe" class="install-modal-logo" />
                 <h3 class="install-modal-title">ติดตั้งแอป Home Matcha Cafe</h3>
-                <p class="install-modal-subtitle">เปิดสั่งเครื่องดื่มได้ไว เสมือนแอปแท้บนมือถือ</p>
+                <p class="install-modal-subtitle">เปิดสั่งเครื่องดื่มได้ไว</p>
             </div>
 
             <!-- แท็บเลือกระบบปฏิบัติการ (Android / iOS) -->
@@ -902,15 +902,15 @@
                             <span class="install-step-num">1</span>
                             <div class="install-step-content">
                                 <strong>เปิดผ่าน Google Chrome</strong>
-                                <p>แตะปุ่มเมนู <strong style="display: inline;">(⋮) จุดสามจุด</strong> ที่มุมบนขวาของเบราว์เซอร์</p>
+                                <p>แตะปุ่มเมนู <strong style="display: inline;">⋮ "จุดสามจุด"</strong> ที่มุมบนขวาของเบราว์เซอร์</p>
                             </div>
                         </div>
 
-                        <div class="install-step-item highlight">
+                        <div class="install-step-item">
                             <span class="install-step-num">2</span>
                             <div class="install-step-content">
                                 <strong>เลือก "ติดตั้งแอปพลิเคชัน" (Install app)</strong>
-                                <p>แตะเมนู <strong style="display: inline;">"ติดตั้งแอปพลิเคชัน"</strong> 📲</p>
+                                <p>แตะเมนู <strong style="display: inline;">"ติดตั้งแอปพลิเคชัน"</strong></p>
                             </div>
                         </div>
 
@@ -931,11 +931,11 @@
                             <span class="install-step-num">1</span>
                             <div class="install-step-content">
                                 <strong>เปิดผ่าน Safari บน iPhone</strong>
-                                <p>แตะปุ่มแชร์ <strong style="display: inline;"> Share</strong> ที่แถบด้านล่างของหน้าจอ</p>
+                                <p>แตะปุ่มแชร์ <strong style="display: inline;"> "Share"</strong> ที่แถบด้านล่างของหน้าจอ</p>
                             </div>
                         </div>
 
-                        <div class="install-step-item highlight">
+                        <div class="install-step-item">
                             <span class="install-step-num">2</span>
                             <div class="install-step-content">
                                 <strong>เลือก "เพิ่มไปยังหน้าจอโฮม"</strong>
@@ -947,7 +947,7 @@
                             <span class="install-step-num">3</span>
                             <div class="install-step-content">
                                 <strong>แตะ "เพิ่ม" (Add)</strong>
-                                <p>แตะปุ่ม <strong>"เพิ่ม (Add)"</strong> ที่มุมบนขวาของหน้าจอ</p>
+                                <p>แตะปุ่ม <strong style="display: inline;">"เพิ่ม (Add)"</strong> ที่มุมบนขวาของหน้าจอ</p>
                                 <!-- <span class="install-tip-badge">
                                     ✨ บน iOS จะได้ไอคอนร้านเต็มวงกลมคมชัด ไร้ตราเบราว์เซอร์ 100%
                                 </span> -->
