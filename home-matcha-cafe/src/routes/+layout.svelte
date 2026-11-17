@@ -476,11 +476,19 @@
                 title: 'ติดตั้งแอป Home Matcha Cafe',
                 html: `
                     <div style="text-align: left; font-size: 0.92rem; line-height: 1.6; color: #334155;">
-                        <p>สามารถกดเมนู <strong>(⋮) หรือ ไอคอนติดตั้ง</strong> ที่แถบ URL ของเบราว์เซอร์ (Chrome / Edge) แล้วเลือก <strong>"ติดตั้งแอป (Install App)"</strong> เพื่อใช้งานได้เลยค่ะ</p>
+                        <p style="margin-bottom: 0.6rem;">สำหรับมือถือ Android (Google Chrome):</p>
+                        <ol style="padding-left: 1.25rem; margin: 0; display: flex; flex-direction: column; gap: 0.45rem;">
+                            <li>แตะปุ่มเมนู <strong>(⋮) สามจุด</strong> ที่มุมบนขวาของ Chrome</li>
+                            <li>แตะเลือก <strong>"ติดตั้งแอปพลิเคชัน (Install app)"</strong> 📲</li>
+                            <li>กด <strong>"ติดตั้ง"</strong> ในหน้าต่างยืนยันของระบบ</li>
+                        </ol>
+                        <p style="margin-top: 0.75rem; font-size: 0.82rem; color: #166534; background: #f0fdf4; padding: 0.5rem; border-radius: 8px; border: 1px solid #bbf7d0;">
+                            💡 <strong>ข้อสำคัญ:</strong> หลีกเลี่ยงการเลือก "เพิ่มลงในหน้าจอหลัก (Add to Home screen)" เพราะจะได้เพียงปุ่มลัดที่มีตรา Chrome ติดที่มุม ให้เลือก <strong>"ติดตั้งแอปพลิเคชัน"</strong> จะได้ไอคอนร้านเพียวๆ สวยงามครับ 🍵
+                        </p>
                     </div>
                 `,
                 icon: 'info',
-                confirmButtonText: 'ตกลง',
+                confirmButtonText: 'เข้าใจแล้ว',
                 confirmButtonColor: '#184a23'
             });
         }

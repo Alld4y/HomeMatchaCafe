@@ -1,11 +1,9 @@
 // Home Matcha Cafe - Progressive Web App Service Worker
-const CACHE_NAME = 'hmc-pwa-v2';
+const CACHE_NAME = 'hmc-pwa-v3';
 const PRECACHE_URLS = [
   '/',
   '/manifest.json',
   '/favicon.png',
-  '/favicon-32x32.png',
-  '/apple-touch-icon.png',
   '/icon-192.png',
   '/icon-512.png',
   '/icon-maskable-192.png',
