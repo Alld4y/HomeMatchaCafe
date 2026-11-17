@@ -285,18 +285,6 @@
         return url.toString();
     }
 
-    function copyCheckoutLinkForLine() {
-        if (typeof window === 'undefined') return;
-        const link = getLineExternalUrl();
-        navigator.clipboard.writeText(link);
-        swal.fire({
-            icon: 'success',
-            title: 'คัดลอกลิงก์ชำระเงินเรียบร้อยแล้ว 🍵',
-            text: 'ลิงก์นี้มีพารามิเตอร์ openExternalBrowser=1 สำหรับเปิดใน Safari/Chrome เมื่อเปิดจาก LINE ค่ะ',
-            confirmButtonColor: '#456f2f'
-        });
-    }
-
     async function fallbackDownloadRawQR() {
         if (!qrImageUrl) return;
         const fileName = `payment-qr-${totalPrice}baht.png`;
@@ -1074,16 +1062,6 @@
                         </svg>
                         บันทึกรูป QR Code
                     </button>
-
-                    <!-- <button
-                        type="button"
-                        onclick={copyCheckoutLinkForLine}
-                        class="btn-matcha-outline"
-                        style="padding: 0.45rem 0.9rem; font-size: 0.825rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;"
-                        title="คัดลอกลิงก์ชำระเงินสำหรับส่งให้ลูกค้าหรือเปิดใน LINE (เปิดเบราว์เซอร์ภายนอกอัตโนมัติ)"
-                    >
-                        🔗 คัดลอกลิงก์ชำระเงิน (LINE)
-                    </button> -->
                 </div>
             {/if}
 
