@@ -509,6 +509,14 @@
             showLineBanner = true;
         }
 
+        // 🧪 โหมดทดสอบ: หากมี query param ?testPwa=1 หรือ ?resetPwa=1 ให้ล้างสถานะและบังคับให้แสดงใหม่ได้ตลอดเวลา
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('testPwa') || urlParams.has('resetPwa')) {
+            try {
+                localStorage.removeItem(PWA_PROMPT_KEY);
+            } catch {}
+        }
+
         // ตรวจสอบว่าเคยแสดงป๊อปอัปติดตั้งแอปแล้วหรือยัง (ขึ้นแค่ครั้งเดียวเท่านั้น ถ้าเคยขึ้นแล้วไม่ต้องขึ้นอีก)
         let hasShownPrompt = false;
         try {
