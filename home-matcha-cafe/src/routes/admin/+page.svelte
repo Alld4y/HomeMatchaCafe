@@ -429,7 +429,7 @@
     );
 
     // 🍵 ระบบสรุปคิวชงเครื่องดื่มและเช็คลิสต์บาริสต้า (Barista Drink Prep Summary & Checklist)
-    let showBrewSummaryModal = $state<boolean>(false);
+    let isBrewSummaryExpanded = $state<boolean>(true);
     let brewChecklist = $state<Record<string, boolean>>({});
 
     interface SweetnessItemPrep {
@@ -2047,12 +2047,12 @@
             <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                 <button 
                     type="button"
-                    onclick={() => (showBrewSummaryModal = true)} 
+                    onclick={() => (isBrewSummaryExpanded = !isBrewSummaryExpanded)} 
                     class="btn-matcha-primary" 
-                    style="padding: 0.45rem 1.15rem; font-size: 0.85rem; font-weight: 800; background: #047857; box-shadow: 0 3px 10px rgba(4, 120, 87, 0.25); display: inline-flex; align-items: center; gap: 0.4rem;"
-                    title="คลิกเพื่อดูสรุปยอดแก้วที่ต้องชงแยกตามเมนู ความหวาน ช็อต และเช็คลิสต์"
+                    style="padding: 0.45rem 1.15rem; font-size: 0.85rem; font-weight: 800; background: {isBrewSummaryExpanded ? '#15803d' : '#047857'}; box-shadow: 0 3px 10px rgba(4, 120, 87, 0.25); display: inline-flex; align-items: center; gap: 0.4rem;"
+                    title="คลิกเพื่อยุบหรือขยายการ์ดสรุปคิวชงเครื่องดื่ม"
                 >
-                    🍵 ดูสรุปคิวชง ({filteredTotalCups} แก้ว)
+                    🍵 สรุปคิวชง ({filteredTotalCups} แก้ว) {isBrewSummaryExpanded ? '▲' : '▼'}
                 </button>
                 <button 
                     type="button"
@@ -2092,6 +2092,245 @@
             <button class="category-tab-btn {selectedFilter === 'completed' ? 'active' : ''}" onclick={() => { selectedFilter = 'completed'; selectedOrderIds = []; }}>
                 สำเร็จ ({completedCount})
             </button>
+        </div>
+
+        <!-- 🍵 การ์ดพับเก็บได้: สรุปคิวชงเครื่องดื่มและเช็คลิสต์บาริสต้า (Collapsible Drink Prep Summary Card) -->
+        <div style="background: #ffffff; border: 1.5px solid #bbf7d0; border-radius: 16px; margin-bottom: 1.25rem; overflow: hidden; box-shadow: 0 3px 12px rgba(22, 101, 52, 0.06); transition: all 0.2s ease;">
+            <!-- Header แถบหัวการ์ด (กดเพื่อยุบ/ขยายได้ตลอดเวลา) -->
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+                onclick={() => (isBrewSummaryExpanded = !isBrewSummaryExpanded)}
+                style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.15rem; background: #f0fdf4; cursor: pointer; user-select: none; border-bottom: {isBrewSummaryExpanded ? '1px solid #dcfce7' : 'none'}; gap: 0.75rem; flex-wrap: wrap;"
+            >
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                    <span style="font-size: 1rem; font-weight: 800; color: #14532d; display: flex; align-items: center; gap: 0.4rem;">
+                        🍵 สรุปคิวชงเครื่องดื่ม
+                    </span>
+                    <span style="background: #166534; color: #ffffff; font-size: 0.8rem; font-weight: 800; padding: 0.15rem 0.6rem; border-radius: 999px;">
+                        {filteredTotalCups} แก้ว
+                    </span>
+                    {#if filteredTotalCups > 0}
+                        <span style="font-size: 0.8rem; font-weight: 700; color: {checkedCupsCount === filteredTotalCups ? '#16a34a' : '#15803d'};">
+                            · ชงแล้ว {checkedCupsCount}/{filteredTotalCups} แก้ว ({brewProgressPercent}%)
+                        </span>
+                    {/if}
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                    <span style="font-size: 0.8rem; font-weight: 800; color: #166534; background: #dcfce7; padding: 0.25rem 0.65rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.3rem;">
+                        {isBrewSummaryExpanded ? '▲ ยุบเก็บ' : '▼ ขยายดูสรุป'}
+                    </span>
+                </div>
+            </div>
+
+            <!-- แถบ Progress บางๆ เมื่อยุบการ์ดไว้ (ให้บาริสต้าเห็นความคืบหน้าได้แม้พับเก็บ) -->
+            {#if !isBrewSummaryExpanded && filteredTotalCups > 0}
+                <div style="width: 100%; height: 4px; background: #e2e8f0;">
+                    <div style="width: {brewProgressPercent}%; height: 100%; background: #16a34a; transition: width 0.25s ease;"></div>
+                </div>
+            {/if}
+
+            <!-- เนื้อหาการ์ดสรุปคิวชง (แสดงเมื่อขยาย) -->
+            {#if isBrewSummaryExpanded}
+                <div style="padding: 1rem 1.15rem; background: #ffffff;">
+                    <!-- แถบ Progress Bar & ปุ่ม Action ของ Checklist -->
+                    {#if filteredTotalCups > 0}
+                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0.75rem 0.95rem; margin-bottom: 1rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                    <span style="font-weight: 800; font-size: 0.86rem; color: #1e293b;">
+                                        ความคืบหน้าการชง:
+                                    </span>
+                                    <span style="font-weight: 800; font-size: 0.88rem; color: {checkedCupsCount === filteredTotalCups ? '#16a34a' : '#166534'};">
+                                        {checkedCupsCount} / {filteredTotalCups} แก้ว ({brewProgressPercent}%)
+                                    </span>
+                                </div>
+                                <div style="display: flex; gap: 0.35rem;">
+                                    <button
+                                        type="button"
+                                        onclick={checkAllBrewItems}
+                                        style="padding: 0.25rem 0.6rem; font-size: 0.74rem; font-weight: 700; background: #f0fdf4; border: 1px solid #86efac; color: #166534; border-radius: 6px; cursor: pointer;"
+                                    >
+                                        ☑️ ติ๊กทั้งหมด
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onclick={resetBrewChecklist}
+                                        style="padding: 0.25rem 0.6rem; font-size: 0.74rem; font-weight: 700; background: #ffffff; border: 1px solid #cbd5e1; color: #64748b; border-radius: 6px; cursor: pointer;"
+                                    >
+                                        🔄 ล้างที่ติ๊ก
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Progress Bar Fill -->
+                            <div style="width: 100%; height: 7px; background: #e2e8f0; border-radius: 999px; overflow: hidden;">
+                                <div
+                                    style="width: {brewProgressPercent}%; height: 100%; background: linear-gradient(90deg, #16a34a, #15803d); transition: width 0.25s ease;"
+                                ></div>
+                            </div>
+
+                            {#if checkedCupsCount === filteredTotalCups && filteredTotalCups > 0}
+                                <div style="margin-top: 0.5rem; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 0.35rem 0.65rem; text-align: center; color: #166534; font-size: 0.8rem; font-weight: 800;">
+                                    🎉 ชงเครื่องดื่มครบทุกแก้วในหมวดนี้แล้ว!
+                                </div>
+                            {/if}
+                        </div>
+                    {/if}
+
+                    <!-- รายการเมนูที่ต้องชง -->
+                    {#if brewSummaryList.length === 0}
+                        <div style="text-align: center; padding: 2rem 1rem; color: #64748b;">
+                            <p style="font-size: 2rem; margin: 0 0 0.35rem 0;">🍵</p>
+                            <h4 style="margin: 0; color: #334155; font-size: 0.95rem;">ไม่มีเครื่องดื่มที่ต้องชงในหมวดนี้</h4>
+                            <p style="font-size: 0.78rem; margin: 0.25rem 0 0 0; color: #94a3b8;">
+                                สลับแท็บตัวกรองด้านบนเพื่อดูหมวดอื่นได้เลยนะคะ
+                            </p>
+                        </div>
+                    {:else}
+                        <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+                            {#each brewSummaryList as menu, menuIdx}
+                                {@const menuAllChecked = isMenuAllChecked(menu)}
+                                <div
+                                    style="background: {menuAllChecked ? '#f8fafc' : '#ffffff'}; border: 1.5px solid {menuAllChecked ? '#bbf7d0' : '#e2e8f0'}; border-radius: 14px; padding: 0.85rem 1rem; box-shadow: 0 1px 4px rgba(0,0,0,0.02); transition: all 0.15s ease;"
+                                >
+                                    <!-- หัวการ์ดเมนู -->
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.4rem; border-bottom: 1px dashed #e2e8f0; padding-bottom: 0.5rem;">
+                                        <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                                            <span style="font-size: 0.92rem; font-weight: 800; color: #1e293b;">
+                                                {menuIdx + 1}. {menu.menuName}
+                                            </span>
+                                            {#if menu.isFermented}
+                                                <span style="background: #fef08a; color: #854d0e; font-size: 0.68rem; font-weight: 800; padding: 0.1rem 0.35rem; border-radius: 4px;">
+                                                    เมนูบ่ม
+                                                </span>
+                                            {/if}
+                                            <span style="background: #e0f2fe; color: #0369a1; font-size: 0.76rem; font-weight: 800; padding: 0.1rem 0.5rem; border-radius: 999px;">
+                                                รวม {menu.totalCups} แก้ว
+                                            </span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onclick={() => toggleMenuAll(menu)}
+                                            style="background: {menuAllChecked ? '#dcfce7' : '#f1f5f9'}; border: 1px solid {menuAllChecked ? '#86efac' : '#cbd5e1'}; color: {menuAllChecked ? '#166534' : '#475569'}; font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;"
+                                        >
+                                            {menuAllChecked ? '✓ เสร็จแล้วทั้งเมนู' : '✓ ติ๊กทั้งเมนู'}
+                                        </button>
+                                    </div>
+
+                                    <!-- รายการระดับความหวาน & ช็อต & โน้ต (Checklist Items) -->
+                                    <div style="display: flex; flex-direction: column; gap: 0.45rem;">
+                                        {#each menu.sweetnessList as sweet}
+                                            {@const itemKey = `${menu.menuName}__sweet_${sweet.sweetness}`}
+                                            {@const isChecked = !!brewChecklist[itemKey]}
+                                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                            <div
+                                                onclick={() => toggleChecklistItem(itemKey)}
+                                                style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; padding: 0.55rem 0.75rem; border-radius: 8px; border: 1.5px solid {isChecked ? '#86efac' : '#f1f5f9'}; background: {isChecked ? '#f0fdf4' : '#f8fafc'}; cursor: pointer; transition: all 0.15s ease;"
+                                            >
+                                                <div style="display: flex; align-items: flex-start; gap: 0.55rem;">
+                                                    <!-- Custom styled checkbox -->
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onclick={(e) => e.stopPropagation()}
+                                                        onchange={() => toggleChecklistItem(itemKey)}
+                                                        style="width: 19px; height: 19px; accent-color: #16a34a; cursor: pointer; margin-top: 2px; flex-shrink: 0;"
+                                                    />
+                                                    <div>
+                                                        <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                                                            <span style="font-weight: 800; font-size: 0.88rem; color: {isChecked ? '#166534' : '#1e293b'}; text-decoration: {isChecked ? 'line-through' : 'none'};">
+                                                                หวาน {sweet.sweetness}%
+                                                            </span>
+                                                            <span style="font-size: 0.82rem; font-weight: 800; color: {isChecked ? '#166534' : '#047857'};">
+                                                                : {sweet.count} แก้ว
+                                                            </span>
+                                                        </div>
+
+                                                        <!-- ท็อปปิ้ง / ช็อต ของความหวานนี้ -->
+                                                        {#if Object.keys(sweet.addonBreakdown).length > 0}
+                                                            <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.25rem;">
+                                                                {#each Object.entries(sweet.addonBreakdown) as [addon, count]}
+                                                                    <span style="display: inline-block; background: #dcfce7; color: #166534; font-size: 0.72rem; font-weight: 800; padding: 0.08rem 0.45rem; border-radius: 999px; border: 1px solid #86efac;">
+                                                                        🍵 +{addon} ({count} แก้ว)
+                                                                    </span>
+                                                                {/each}
+                                                                {#if sweet.normalAddonCount > 0}
+                                                                    <span style="display: inline-block; background: #e2e8f0; color: #475569; font-size: 0.7rem; font-weight: 600; padding: 0.08rem 0.4rem; border-radius: 999px;">
+                                                                        ปกติ ({sweet.normalAddonCount} แก้ว)
+                                                                    </span>
+                                                                {/if}
+                                                            </div>
+                                                        {/if}
+
+                                                        <!-- หมายเหตุ / โน้ต ของความหวานนี้ -->
+                                                        {#if Object.keys(sweet.noteBreakdown).length > 0}
+                                                            <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.25rem;">
+                                                                {#each Object.entries(sweet.noteBreakdown) as [note, count]}
+                                                                    <span style="display: inline-block; background: #fef3c7; color: #92400e; font-size: 0.72rem; font-weight: 700; padding: 0.08rem 0.45rem; border-radius: 999px; border: 1px solid #fde68a;">
+                                                                        📝 {note} ({count} แก้ว)
+                                                                    </span>
+                                                                {/each}
+                                                            </div>
+                                                        {/if}
+                                                    </div>
+                                                </div>
+
+                                                <div style="flex-shrink: 0; text-align: right;">
+                                                    <span style="font-size: 1.05rem; font-weight: 900; color: {isChecked ? '#16a34a' : '#1e293b'};">
+                                                        x{sweet.count}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        {/each}
+                                    </div>
+
+                                    <!-- สรุปรวมช็อตและโน้ตของทั้งเมนู (ถ้ามีมากกว่า 1 ระดับความหวาน) -->
+                                    {#if menu.sweetnessList.length > 1 && (Object.keys(menu.overallAddons).length > 0 || Object.keys(menu.overallNotes).length > 0)}
+                                        <div style="margin-top: 0.65rem; padding-top: 0.5rem; border-top: 1px solid #f1f5f9; font-size: 0.76rem; color: #64748b; display: flex; flex-direction: column; gap: 0.2rem;">
+                                            {#if Object.keys(menu.overallAddons).length > 0}
+                                                <div style="display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;">
+                                                    <strong style="color: #334155;">รวมช็อตทั้งหมดในเมนูนี้:</strong>
+                                                    {#each Object.entries(menu.overallAddons) as [addon, count]}
+                                                        <span style="color: #166534; font-weight: 700;">+{addon} ({count} แก้ว)</span>
+                                                    {/each}
+                                                    {#if menu.totalNormalAddon > 0}
+                                                        <span style="color: #64748b;">| ปกติ ({menu.totalNormalAddon} แก้ว)</span>
+                                                    {/if}
+                                                </div>
+                                            {/if}
+                                            {#if Object.keys(menu.overallNotes).length > 0}
+                                                <div style="display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;">
+                                                    <strong style="color: #334155;">รวมโน้ตพิเศษทั้งหมด:</strong>
+                                                    {#each Object.entries(menu.overallNotes) as [note, count]}
+                                                        <span style="color: #b45309; font-weight: 700;">• {note} ({count} แก้ว)</span>
+                                                    {/each}
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/if}
+                                </div>
+                            {/each}
+                        </div>
+                    {/if}
+
+                    <!-- ปุ่มยุบเก็บด้านล่าง เพื่อความสะดวกบนมือถือไม่ต้องเลื่อนขึ้นบนสุด -->
+                    <div style="margin-top: 0.85rem; padding-top: 0.65rem; border-top: 1px dashed #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                        <span style="font-size: 0.76rem; color: #64748b;">
+                            💡 ติ๊กที่รายการเพื่อมาร์กชงเสร็จ (ระบบนับความคืบหน้าเรียลไทม์)
+                        </span>
+                        <button
+                            type="button"
+                            onclick={() => (isBrewSummaryExpanded = false)}
+                            style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 6px; cursor: pointer;"
+                        >
+                            ▲ ยุบเก็บการ์ดสรุป
+                        </button>
+                    </div>
+                </div>
+            {/if}
         </div>
 
         <!-- กล่องเลือกทั้งหมด & คำสั่ง Bulk Action -->
@@ -3744,265 +3983,7 @@
         </div>
     {/if}
 
-    <!-- 🍵 Modal สรุปคิวชงเครื่องดื่มและเช็คลิสต์บาริสต้า (Barista Drink Prep Summary & Checklist) -->
-    {#if showBrewSummaryModal}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div
-            style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 1rem; overflow-y: auto;"
-            onclick={() => (showBrewSummaryModal = false)}
-        >
-            <div
-                style="background: #ffffff; border-radius: 24px; max-width: 680px; width: 100%; padding: 1.5rem 1.75rem; text-align: left; box-shadow: 0 25px 60px rgba(0,0,0,0.3); max-height: 92vh; overflow-y: auto; display: flex; flex-direction: column;"
-                onclick={(e) => e.stopPropagation()}
-            >
-                <!-- Header -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.85rem; margin-bottom: 1rem;">
-                    <div>
-                        <h3 style="margin: 0; font-size: 1.3rem; color: #14532d; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                            <span>🍵 สรุปคิวชงเครื่องดื่ม</span>
-                            <span style="font-size: 0.85rem; background: #dcfce7; color: #166534; padding: 0.15rem 0.6rem; border-radius: 999px; font-weight: 800;">
-                                {filteredTotalCups} แก้ว
-                            </span>
-                        </h3>
-                        <p style="margin: 0.25rem 0 0 0; font-size: 0.82rem; color: #64748b;">
-                            สรุปยอดแก้วที่ต้องชงแยกตามเมนู ระดับความหวาน เพิ่มช็อต และโน้ตพิเศษ (พร้อมช่องติ๊กเช็คลิสต์)
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        onclick={() => (showBrewSummaryModal = false)}
-                        style="background: #f1f5f9; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 1.1rem; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"
-                    >
-                        ✕
-                    </button>
-                </div>
 
-                <!-- แท็บเลือกสถานะแบบด่วน (Quick Status Filter Pills) -->
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 0.65rem 0.85rem; margin-bottom: 1rem;">
-                    <div style="font-size: 0.76rem; font-weight: 700; color: #475569; margin-bottom: 0.4rem; display: flex; justify-content: space-between; align-items: center;">
-                        <span>หมวดที่กำลังสรุป:</span>
-                        <span style="color: #047857; font-weight: 800;">{filteredOrders.length} คำสั่งซื้อ</span>
-                    </div>
-                    <div style="display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.2rem;">
-                        {#each [
-                            { id: 'all', label: 'ทั้งหมด', count: orders.length },
-                            { id: 'paid', label: 'รับยอดแล้ว', count: orders.filter((o) => o.status === 'paid').length },
-                            { id: 'brewing', label: 'กำลังชง', count: orders.filter((o) => o.status === 'brewing').length },
-                            { id: 'ready_to_ship', label: 'ชงเสร็จแล้ว', count: readyToShipCount },
-                            { id: 'pending', label: 'รอตรวจสลิป', count: manualReviewOrders.length },
-                            { id: 'completed', label: 'สำเร็จ', count: completedCount }
-                        ] as tab}
-                            <button
-                                type="button"
-                                onclick={() => { selectedFilter = tab.id; selectedOrderIds = []; }}
-                                style="padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 700; border-radius: 999px; border: 1.5px solid {selectedFilter === tab.id ? '#166534' : '#cbd5e1'}; background: {selectedFilter === tab.id ? '#166534' : '#ffffff'}; color: {selectedFilter === tab.id ? '#ffffff' : '#475569'}; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;"
-                            >
-                                {tab.label} ({tab.count})
-                            </button>
-                        {/each}
-                    </div>
-                </div>
-
-                <!-- แถบ Progress Bar & ปุ่ม Action ของ Checklist -->
-                {#if filteredTotalCups > 0}
-                    <div style="background: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 0.85rem 1rem; margin-bottom: 1.15rem; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <span style="font-weight: 800; font-size: 0.9rem; color: #1e293b;">
-                                    ความคืบหน้าการชง:
-                                </span>
-                                <span style="font-weight: 800; font-size: 0.95rem; color: {checkedCupsCount === filteredTotalCups ? '#16a34a' : '#166534'};">
-                                    {checkedCupsCount} / {filteredTotalCups} แก้ว ({brewProgressPercent}%)
-                                </span>
-                            </div>
-                            <div style="display: flex; gap: 0.4rem;">
-                                <button
-                                    type="button"
-                                    onclick={checkAllBrewItems}
-                                    style="padding: 0.3rem 0.65rem; font-size: 0.76rem; font-weight: 700; background: #f0fdf4; border: 1px solid #86efac; color: #166534; border-radius: 8px; cursor: pointer;"
-                                >
-                                    ☑️ ติ๊กเสร็จทั้งหมด
-                                </button>
-                                <button
-                                    type="button"
-                                    onclick={resetBrewChecklist}
-                                    style="padding: 0.3rem 0.65rem; font-size: 0.76rem; font-weight: 700; background: #f8fafc; border: 1px solid #cbd5e1; color: #64748b; border-radius: 8px; cursor: pointer;"
-                                >
-                                    🔄 ล้างที่ติ๊ก
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Progress Bar Fill -->
-                        <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden;">
-                            <div
-                                style="width: {brewProgressPercent}%; height: 100%; background: linear-gradient(90deg, #16a34a, #15803d); transition: width 0.25s ease;"
-                            ></div>
-                        </div>
-
-                        {#if checkedCupsCount === filteredTotalCups && filteredTotalCups > 0}
-                            <div style="margin-top: 0.6rem; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 0.4rem 0.75rem; text-align: center; color: #166534; font-size: 0.82rem; font-weight: 800;">
-                                🎉 ยอดเยี่ยมมาก! ชงเครื่องดื่มครบทุกแก้วในหมวดนี้แล้ว
-                            </div>
-                        {/if}
-                    </div>
-                {/if}
-
-                <!-- รายการเมนูที่ต้องชง -->
-                {#if brewSummaryList.length === 0}
-                    <div style="text-align: center; padding: 3rem 1rem; color: #64748b;">
-                        <p style="font-size: 2.5rem; margin: 0 0 0.5rem 0;">🍵</p>
-                        <h4 style="margin: 0; color: #334155; font-size: 1.05rem;">ไม่มีเครื่องดื่มที่ต้องชงในหมวดนี้</h4>
-                        <p style="font-size: 0.82rem; margin: 0.3rem 0 0 0; color: #94a3b8;">
-                            ลองสลับไปดูหมวดอื่น เช่น "รับยอดแล้ว" หรือ "ทั้งหมด" ด้านบนนะคะ
-                        </p>
-                    </div>
-                {:else}
-                    <div style="display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; padding-right: 0.2rem;">
-                        {#each brewSummaryList as menu, menuIdx}
-                            {@const menuAllChecked = isMenuAllChecked(menu)}
-                            <div
-                                style="background: {menuAllChecked ? '#f8fafc' : '#ffffff'}; border: 1.5px solid {menuAllChecked ? '#bbf7d0' : '#e2e8f0'}; border-radius: 16px; padding: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03); transition: all 0.2s ease;"
-                            >
-                                <!-- หัวการ์ดเมนู -->
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; border-bottom: 1px dashed #e2e8f0; padding-bottom: 0.6rem;">
-                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <span style="font-size: 0.95rem; font-weight: 800; color: #1e293b;">
-                                            {menuIdx + 1}. {menu.menuName}
-                                        </span>
-                                        {#if menu.isFermented}
-                                            <span style="background: #fef08a; color: #854d0e; font-size: 0.7rem; font-weight: 800; padding: 0.1rem 0.4rem; border-radius: 4px;">
-                                                เมนูบ่ม
-                                            </span>
-                                        {/if}
-                                        <span style="background: #e0f2fe; color: #0369a1; font-size: 0.8rem; font-weight: 800; padding: 0.15rem 0.55rem; border-radius: 999px;">
-                                            รวม {menu.totalCups} แก้ว
-                                        </span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onclick={() => toggleMenuAll(menu)}
-                                        style="background: {menuAllChecked ? '#dcfce7' : '#f1f5f9'}; border: 1px solid {menuAllChecked ? '#86efac' : '#cbd5e1'}; color: {menuAllChecked ? '#166534' : '#475569'}; font-size: 0.76rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;"
-                                    >
-                                        {menuAllChecked ? '✓ เสร็จแล้วทั้งเมนู' : '✓ ติ๊กทั้งเมนู'}
-                                    </button>
-                                </div>
-
-                                <!-- รายการระดับความหวาน & ช็อต & โน้ต (Checklist Items) -->
-                                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                                    {#each menu.sweetnessList as sweet}
-                                        {@const itemKey = `${menu.menuName}__sweet_${sweet.sweetness}`}
-                                        {@const isChecked = !!brewChecklist[itemKey]}
-                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                        <div
-                                            onclick={() => toggleChecklistItem(itemKey)}
-                                            style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; padding: 0.65rem 0.85rem; border-radius: 10px; border: 1.5px solid {isChecked ? '#86efac' : '#f1f5f9'}; background: {isChecked ? '#f0fdf4' : '#f8fafc'}; cursor: pointer; transition: all 0.15s ease;"
-                                        >
-                                            <div style="display: flex; align-items: flex-start; gap: 0.65rem;">
-                                                <!-- Custom styled checkbox -->
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isChecked}
-                                                    onclick={(e) => e.stopPropagation()}
-                                                    onchange={() => toggleChecklistItem(itemKey)}
-                                                    style="width: 20px; height: 20px; accent-color: #16a34a; cursor: pointer; margin-top: 2px; flex-shrink: 0;"
-                                                />
-                                                <div>
-                                                    <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-                                                        <span style="font-weight: 800; font-size: 0.92rem; color: {isChecked ? '#166534' : '#1e293b'}; text-decoration: {isChecked ? 'line-through' : 'none'};">
-                                                            หวาน {sweet.sweetness}%
-                                                        </span>
-                                                        <span style="font-size: 0.85rem; font-weight: 800; color: {isChecked ? '#166534' : '#047857'};">
-                                                            : {sweet.count} แก้ว
-                                                        </span>
-                                                    </div>
-
-                                                    <!-- ท็อปปิ้ง / ช็อต ของความหวานนี้ -->
-                                                    {#if Object.keys(sweet.addonBreakdown).length > 0}
-                                                        <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.3rem;">
-                                                            {#each Object.entries(sweet.addonBreakdown) as [addon, count]}
-                                                                <span style="display: inline-block; background: #dcfce7; color: #166534; font-size: 0.75rem; font-weight: 800; padding: 0.1rem 0.5rem; border-radius: 999px; border: 1px solid #86efac;">
-                                                                    🍵 +{addon} ({count} แก้ว)
-                                                                </span>
-                                                            {/each}
-                                                            {#if sweet.normalAddonCount > 0}
-                                                                <span style="display: inline-block; background: #e2e8f0; color: #475569; font-size: 0.73rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: 999px;">
-                                                                    ปกติ ไม่เพิ่มช็อต ({sweet.normalAddonCount} แก้ว)
-                                                                </span>
-                                                            {/if}
-                                                        </div>
-                                                    {/if}
-
-                                                    <!-- หมายเหตุ / โน้ต ของความหวานนี้ -->
-                                                    {#if Object.keys(sweet.noteBreakdown).length > 0}
-                                                        <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.3rem;">
-                                                            {#each Object.entries(sweet.noteBreakdown) as [note, count]}
-                                                                <span style="display: inline-block; background: #fef3c7; color: #92400e; font-size: 0.75rem; font-weight: 700; padding: 0.1rem 0.5rem; border-radius: 999px; border: 1px solid #fde68a;">
-                                                                    📝 {note} ({count} แก้ว)
-                                                                </span>
-                                                            {/each}
-                                                        </div>
-                                                    {/if}
-                                                </div>
-                                            </div>
-
-                                            <div style="flex-shrink: 0; text-align: right;">
-                                                <span style="font-size: 1.1rem; font-weight: 900; color: {isChecked ? '#16a34a' : '#1e293b'};">
-                                                    x{sweet.count}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    {/each}
-                                </div>
-
-                                <!-- สรุปรวมช็อตและโน้ตของทั้งเมนู (ถ้ามีมากกว่า 1 ระดับความหวาน) -->
-                                {#if menu.sweetnessList.length > 1 && (Object.keys(menu.overallAddons).length > 0 || Object.keys(menu.overallNotes).length > 0)}
-                                    <div style="margin-top: 0.75rem; padding-top: 0.6rem; border-top: 1px solid #f1f5f9; font-size: 0.78rem; color: #64748b; display: flex; flex-direction: column; gap: 0.25rem;">
-                                        {#if Object.keys(menu.overallAddons).length > 0}
-                                            <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
-                                                <strong style="color: #334155;">รวมช็อตทั้งหมดในเมนูนี้:</strong>
-                                                {#each Object.entries(menu.overallAddons) as [addon, count]}
-                                                    <span style="color: #166534; font-weight: 700;">+{addon} ({count} แก้ว)</span>
-                                                {/each}
-                                                {#if menu.totalNormalAddon > 0}
-                                                    <span style="color: #64748b;">| ปกติ ({menu.totalNormalAddon} แก้ว)</span>
-                                                {/if}
-                                            </div>
-                                        {/if}
-                                        {#if Object.keys(menu.overallNotes).length > 0}
-                                            <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
-                                                <strong style="color: #334155;">รวมโน้ตพิเศษทั้งหมด:</strong>
-                                                {#each Object.entries(menu.overallNotes) as [note, count]}
-                                                    <span style="color: #b45309; font-weight: 700;">• {note} ({count} แก้ว)</span>
-                                                {/each}
-                                            </div>
-                                        {/if}
-                                    </div>
-                                {/if}
-                            </div>
-                        {/each}
-                    </div>
-                {/if}
-
-                <!-- Modal Footer -->
-                <div style="margin-top: 1.25rem; border-top: 1px solid #e2e8f0; padding-top: 0.85rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                    <div style="font-size: 0.8rem; color: #64748b;">
-                        💡 ติ๊กที่แถวรายการเพื่อบันทึกว่าชงเสร็จแล้ว (ระบบนับความคืบหน้าให้อัตโนมัติ)
-                    </div>
-                    <button
-                        type="button"
-                        onclick={() => (showBrewSummaryModal = false)}
-                        class="btn-matcha-primary"
-                        style="padding: 0.5rem 1.4rem; font-size: 0.88rem; font-weight: 800; border-radius: 12px; background: #166534;"
-                    >
-                        ปิดหน้าต่าง
-                    </button>
-                </div>
-            </div>
-        </div>
-    {/if}
 </main>
 {/if}
 
