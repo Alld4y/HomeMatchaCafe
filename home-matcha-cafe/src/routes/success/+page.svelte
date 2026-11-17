@@ -134,6 +134,23 @@
             title: `คัดลอกรหัส ${id} แล้ว`
         });
     }
+
+    function copyOrderLineLink(order: OrderRecord) {
+        if (typeof window === 'undefined') return;
+        const origin = window.location.origin;
+        const link = `${origin}/success?phone=${encodeURIComponent(order.phone)}&openExternalBrowser=1`;
+        navigator.clipboard.writeText(link);
+        const toast = swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2000
+        });
+        toast.fire({
+            icon: 'success',
+            title: 'คัดลอกลิงก์สำหรับส่งใน LINE แล้ว 🍵'
+        });
+    }
 </script>
 
 <svelte:head>
@@ -192,7 +209,7 @@
                     <!-- Order Header -->
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-light);">
                         <div>
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                 <h3 style="margin: 0; font-size: 1.15rem; color: var(--matcha-deep);">
                                     {order.order_id || order.id}
                                 </h3>
@@ -202,6 +219,14 @@
                                     style="background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 2px;"
                                 >
                                     📋
+                                </button>
+                                <button
+                                    onclick={() => copyOrderLineLink(order)}
+                                    title="คัดลอกลิงก์สถานะออเดอร์สำหรับเปิดใน LINE"
+                                    class="btn-matcha-outline"
+                                    style="padding: 0.15rem 0.55rem; font-size: 0.72rem; border-radius: 999px; display: inline-flex; align-items: center; gap: 0.2rem;"
+                                >
+                                    💬 แชร์ลิงก์ LINE
                                 </button>
                             </div>
                             <span style="font-size: 0.75rem; color: var(--text-muted);">

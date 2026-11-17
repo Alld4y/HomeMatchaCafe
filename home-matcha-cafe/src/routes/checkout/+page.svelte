@@ -78,6 +78,7 @@
     let errorMessage = $state<string>('');
     let isLoading = $state<boolean>(false);
     let isFetchingQR = $state<boolean>(true);
+    let isLineBrowser = $state<boolean>(false);
 
     // Modal สั่งซื้อสำเร็จแบบค้างบนหน้าจอ
     let showSuccessModal = $state<boolean>(false);
@@ -277,6 +278,62 @@
         await generateNewQR(true);
     }
 
+    function getLineExternalUrl(): string {
+        if (typeof window === 'undefined') return '';
+        const url = new URL(window.location.href);
+        url.searchParams.set('openExternalBrowser', '1');
+        return url.toString();
+    }
+
+    function copyCheckoutLinkForLine() {
+        if (typeof window === 'undefined') return;
+        const link = getLineExternalUrl();
+        navigator.clipboard.writeText(link);
+        swal.fire({
+            icon: 'success',
+            title: 'คัดลอกลิงก์ชำระเงินเรียบร้อยแล้ว 🍵',
+            text: 'ลิงก์นี้มีพารามิเตอร์ openExternalBrowser=1 สำหรับเปิดใน Safari/Chrome เมื่อเปิดจาก LINE ค่ะ',
+            confirmButtonColor: '#456f2f'
+        });
+    }
+
+    async function fallbackDownloadRawQR() {
+        if (!qrImageUrl) return;
+        const fileName = `payment-qr-${totalPrice}baht.png`;
+        try {
+            const res = await fetch(qrImageUrl);
+            const blob = await res.blob();
+            const file = new File([blob], fileName, { type: 'image/png' });
+            if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: 'QR Code ชำระเงิน Home Matcha Cafe',
+                        text: `QR Code ชำระเงินยอด ${totalPrice} บาท ร้าน Home Matcha Cafe`
+                    });
+                    return;
+                } catch (shareErr: any) {
+                    if (shareErr.name === 'AbortError') return;
+                }
+            }
+            const downloadUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
+        } catch {
+            const link = document.createElement('a');
+            link.href = qrImageUrl;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }
+
     async function downloadQRWithDetails() {
         if (!qrImageUrl) return;
         try {
@@ -397,24 +454,67 @@
             ctx.font = '500 17px "Prompt", "Noto Sans Thai", sans-serif';
             ctx.fillText(`(สร้าง QR Code เมื่อเวลา ${genTimeText})`, width / 2, 860);
 
-            const dataUrl = canvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = `home-matcha-qr-${totalPrice}baht.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            // แปลง canvas เป็น Blob และ File เพื่อรองรับ Web Share API บน LINE / Mobile Browser
+            const fileName = `home-matcha-qr-${totalPrice}baht.png`;
+            const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+
+            if (blob) {
+                const file = new File([blob], fileName, { type: 'image/png' });
+
+                // ตรวจสอบ Web Share API (มือถือ / LINE In-App Browser)
+                if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
+                    try {
+                        await navigator.share({
+                            files: [file],
+                            title: 'QR Code ชำระเงิน Home Matcha Cafe',
+                            text: `QR Code ชำระเงินยอด ${totalPrice} บาท ร้าน Home Matcha Cafe`
+                        });
+                        return;
+                    } catch (shareErr: any) {
+                        if (shareErr.name === 'AbortError') {
+                            return; // ผู้ใช้กดยกเลิกแชร์เอง
+                        }
+                        console.warn('Web Share API failed, falling back to download:', shareErr);
+                    }
+                }
+
+                // Fallback สำหรับคอมพิวเตอร์ หรืออุปกรณ์ที่ไม่รองรับ Web Share API
+                const downloadUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
+            } else {
+                const dataUrl = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
         } catch (err) {
             console.error('Error generating QR card image:', err);
-            // Fallback ดาวน์โหลดรูป QR ปกติหากเกิดข้อผิดพลาด
-            const link = document.createElement('a');
-            link.href = qrImageUrl;
-            link.download = `home-matcha-qr-${totalPrice}baht.png`;
-            link.click();
+            await fallbackDownloadRawQR();
         }
     }
 
     onMount(() => {
+        // ตรวจสอบกรณีลูกค้าเปิดผ่าน LINE In-App Browser
+        if (typeof navigator !== 'undefined' && typeof window !== 'undefined') {
+            isLineBrowser = /Line\//i.test(navigator.userAgent);
+            const hasExternal = window.location.search.includes('openExternalBrowser=1');
+            if (isLineBrowser && !hasExternal) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('openExternalBrowser', '1');
+                window.location.replace(url.toString());
+                return;
+            }
+        }
+
         // 1. ดึงรายการสินค้าในตะกร้าล่าสุดเป็นหลักเสมอ (เพื่อให้เวลากลับไปเพิ่มเมนูแล้วได้ราคาล่าสุดทันที)
         const rawBasket = localStorage.getItem('basket');
         if (rawBasket) {
@@ -884,6 +984,23 @@
         {/if}
 
         {#if totalPrice > 0}
+            {#if isLineBrowser}
+                <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px; padding: 0.65rem 0.9rem; margin-bottom: 0.75rem; font-size: 0.8rem; color: #166534; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                        <span>💬</span>
+                        <span>เปิดผ่านแอป LINE: กดค้างรูป QR เพื่อบันทึก หรือเปิดด้วยเบราว์เซอร์หลัก</span>
+                    </div>
+                    <a
+                        href={getLineExternalUrl()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style="background: #166534; color: #ffffff; padding: 0.25rem 0.65rem; border-radius: 999px; text-decoration: none; font-weight: 700; font-size: 0.74rem; display: inline-flex; align-items: center; gap: 0.25rem;"
+                    >
+                        🌐 เปิดใน Safari / Chrome
+                    </a>
+                </div>
+            {/if}
+
             <!-- การ์ดแสดง QR Code -->
             <div class="qr-card-box">
                 {#if isFetchingQR}
@@ -892,7 +1009,17 @@
                         <span style="font-size: 0.85rem; color: var(--text-muted);">กำลังสร้าง QR Code...</span>
                     </div>
                 {:else if qrImageUrl}
-                    <img src={qrImageUrl} alt="PromptPay QR Code" class="qr-img" />
+                    <img
+                        src={qrImageUrl}
+                        alt="PromptPay QR Code"
+                        class="qr-img"
+                        style="user-select: auto; -webkit-touch-callout: default; pointer-events: auto; display: block; max-width: 100%; cursor: pointer;"
+                    />
+                    <!-- ข้อความแนะนำเล็กๆ ใต้รูป QR Code -->
+                    <p style="margin: 0.4rem 0 0 0; font-size: 0.78rem; color: #166534; background: #f0fdf4; border: 1px dashed #86efac; border-radius: 999px; padding: 0.25rem 0.75rem; display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 600;">
+                        📱 กดค้างที่รูป QR Code เพื่อบันทึกภาพ
+                    </p>
+
                     <div style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; margin-top: 0.5rem; text-align: center;">
                         <p style="margin: 0; font-weight: 700; color: var(--matcha-deep); font-size: 0.95rem;">ชื่อบัญชี: {promptpayName}</p>
                         <p style="margin: 2px 0 0 0; color: var(--matcha-dark); font-weight: 600;">
@@ -928,7 +1055,7 @@
                         type="button"
                         onclick={downloadQRWithDetails}
                         class="btn-matcha-outline" 
-                        style="padding: 0.45rem 1rem; font-size: 0.825rem; cursor: pointer;"
+                        style="padding: 0.45rem 1rem; font-size: 0.825rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;"
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -938,15 +1065,15 @@
                         บันทึกรูป QR Code
                     </button>
 
-                    <!-- <button
+                    <button
                         type="button"
-                        onclick={() => generateNewQR(true)}
+                        onclick={copyCheckoutLinkForLine}
                         class="btn-matcha-outline"
-                        style="padding: 0.45rem 0.9rem; font-size: 0.8rem;"
-                        title="กดเมื่อยังไม่ได้โอนเงิน และต้องการเริ่มนับเวลา QR Code 1 ชั่วโมงใหม่"
+                        style="padding: 0.45rem 0.9rem; font-size: 0.825rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;"
+                        title="คัดลอกลิงก์ชำระเงินสำหรับส่งให้ลูกค้าหรือเปิดใน LINE (เปิดเบราว์เซอร์ภายนอกอัตโนมัติ)"
                     >
-                        🔄 รีเซ็ตเวลา QR ใหม่
-                    </button> -->
+                        🔗 คัดลอกลิงก์ชำระเงิน (LINE)
+                    </button>
                 </div>
             {/if}
 

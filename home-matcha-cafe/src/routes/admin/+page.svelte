@@ -363,6 +363,20 @@
         }
     }
 
+    function copyOrderLineLink(order: any) {
+        if (typeof window === 'undefined') return;
+        const origin = window.location.origin;
+        const trackingUrl = `${origin}/success?phone=${encodeURIComponent(order.phone)}&openExternalBrowser=1`;
+        navigator.clipboard.writeText(trackingUrl);
+        swal.fire({
+            icon: 'success',
+            title: 'คัดลอกลิงก์ส่ง LINE สำเร็จ! 🍵',
+            text: `ลิงก์: ${trackingUrl}\n(ระบบจะเปิดใน Safari/Chrome ให้อัตโนมัติเมื่อกดใน LINE)`,
+            timer: 3000,
+            showConfirmButton: false
+        });
+    }
+
     // รายการเมนูสำหรับเลือกเมนูบ่ม (อัปเดตตามรายการเมนูจริงอัตโนมัติ)
     let availableDrinks = $derived(
         menuItems.length > 0
@@ -2043,6 +2057,17 @@
                                         💬 หมายเหตุ: {order.message}
                                     </p>
                                 {/if}
+                                <div style="margin-top: 0.45rem;">
+                                    <button
+                                        type="button"
+                                        onclick={() => copyOrderLineLink(order)}
+                                        class="btn-matcha-outline"
+                                        style="padding: 0.2rem 0.6rem; font-size: 0.72rem; border-radius: 999px; display: inline-flex; align-items: center; gap: 0.25rem;"
+                                        title="คัดลอกลิงก์สำหรับส่งให้ลูกค้าใน LINE (เปิดเบราว์เซอร์ภายนอกอัตโนมัติ)"
+                                    >
+                                        💬 คัดลอกลิงก์ส่ง LINE
+                                    </button>
+                                </div>
                             </div>
 
                             <!-- รายการแก้วที่ต้องชง -->

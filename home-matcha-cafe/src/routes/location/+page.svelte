@@ -351,7 +351,8 @@
             console.error('Error fetching QR from API:', err);
         } finally {
             isSubmitting = false;
-            goto('/checkout');
+            const hasExternal = typeof window !== 'undefined' && window.location.search.includes('openExternalBrowser=1');
+            goto(hasExternal ? '/checkout?openExternalBrowser=1' : '/checkout');
         }
     }
 </script>
