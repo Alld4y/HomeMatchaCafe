@@ -287,7 +287,8 @@ export async function createOrder(data: {
         ]
     );
 
-    return mapPgRowToOrder(res.rows[0]);
+    const mapped = mapPgRowToOrder(res.rows[0]);
+    return await processCompletedOrderLoyalty(mapped, false);
 }
 
 async function processCompletedOrderLoyalty(order: Order, wasAlreadyAwarded: boolean): Promise<Order> {

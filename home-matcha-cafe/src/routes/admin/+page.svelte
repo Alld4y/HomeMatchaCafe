@@ -172,6 +172,197 @@
     let currentCalMonth = $derived(calendarDate.getMonth()); // 0-11
     let editingDayModal = $state<{ dateStr: string; isOpen: boolean; customRounds: string[] } | null>(null);
 
+    // ➕ ระบบสร้างออเดอร์/เพิ่มแก้วลงคิวด้วยตนเอง (Admin Manual Order Creation)
+    let showCreateOrderModal = $state<boolean>(false);
+    let createOrderMode = $state<'member' | 'guest'>('member');
+    let createOrderMemberSearch = $state<string>('');
+    let selectedMemberForOrder = $state<any | null>(null);
+
+    let newOrderName = $state<string>('');
+    let newOrderPhone = $state<string>('');
+    let newOrderAddress = $state<string>('หน้าร้าน (รับเอง)');
+    let newOrderSellerMessage = $state<string>('');
+    let newOrderDeliveryDate = $state<string>('');
+    let newOrderDeliveryRound = $state<string>('รับหน้าร้าน / เสิร์ฟทันที');
+    let newOrderDeliveryRoundId = $state<string>('walkin');
+    let newOrderStatus = $state<'paid' | 'brewing' | 'ready_to_ship' | 'completed' | 'pending'>('paid');
+    let newOrderPaymentNote = $state<string>('ชำระแล้ว (เงินสด/แอดมินรับยอด)');
+    let newOrderCustomTotal = $state<number | null>(null);
+
+    let newOrderBasket = $state<Array<{
+        id: string;
+        thaiName: string;
+        englishName: string;
+        price: number;
+        quantity: number;
+        sweetness: number;
+        note: string;
+    }>>([]);
+
+    let currentDrinkMenuId = $state<string>('');
+    let currentDrinkSweetness = $state<number>(50);
+    let currentDrinkQuantity = $state<number>(1);
+    let currentDrinkNote = $state<string>('');
+    let currentDrinkCustomPrice = $state<number | null>(null);
+    let isSubmittingCreateOrder = $state<boolean>(false);
+
+    let filteredMembersForOrder = $derived.by(() => {
+        if (!membersList || membersList.length === 0) return [];
+        const q = createOrderMemberSearch.trim().toLowerCase();
+        if (!q) return membersList.slice(0, 15);
+        return membersList.filter((m: any) => {
+            const name = (m.fullName || `${m.firstName || ''} ${m.lastName || ''}`).toLowerCase();
+            const phone = (m.phone || '').replace(/[^0-9]/g, '');
+            return name.includes(q) || phone.includes(q);
+        }).slice(0, 20);
+    });
+
+    let newOrderCalculatedTotal = $derived(
+        newOrderBasket.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+    );
+
+    let effectiveNewOrderTotal = $derived(
+        newOrderCustomTotal !== null && newOrderCustomTotal >= 0 ? newOrderCustomTotal : newOrderCalculatedTotal
+    );
+
+    function openCreateOrderModal() {
+        loadMembers();
+        loadMenus();
+        newOrderBasket = [];
+        selectedMemberForOrder = null;
+        createOrderMemberSearch = '';
+        createOrderMode = 'member';
+        newOrderName = '';
+        newOrderPhone = '';
+        newOrderAddress = 'หน้าร้าน (รับเอง)';
+        newOrderSellerMessage = '';
+        newOrderDeliveryDate = new Date().toISOString().split('T')[0];
+        newOrderDeliveryRound = 'รับหน้าร้าน / เสิร์ฟทันที';
+        newOrderDeliveryRoundId = 'walkin';
+        newOrderStatus = 'paid';
+        newOrderPaymentNote = 'ชำระแล้ว (เงินสด/แอดมินรับยอด)';
+        newOrderCustomTotal = null;
+        currentDrinkMenuId = menuItems.length > 0 ? menuItems[0].id : '';
+        currentDrinkSweetness = 50;
+        currentDrinkQuantity = 1;
+        currentDrinkNote = '';
+        currentDrinkCustomPrice = null;
+        showCreateOrderModal = true;
+    }
+
+    function selectMemberForNewOrder(m: any) {
+        selectedMemberForOrder = m;
+        newOrderName = m.fullName || `${m.firstName || ''} ${m.lastName || ''}`.trim() || 'สมาชิก';
+        newOrderPhone = m.phone || '';
+        createOrderMemberSearch = '';
+    }
+
+    function clearSelectedMemberForOrder() {
+        selectedMemberForOrder = null;
+        newOrderName = '';
+        newOrderPhone = '';
+        createOrderMemberSearch = '';
+    }
+
+    function addDrinkToNewOrder() {
+        if (!currentDrinkMenuId && menuItems.length > 0) {
+            currentDrinkMenuId = menuItems[0].id;
+        }
+        const item = menuItems.find((m: any) => m.id === currentDrinkMenuId);
+        if (!item) {
+            swal.fire({ icon: 'warning', title: 'กรุณาเลือกเมนูเครื่องดื่ม', confirmButtonColor: '#456f2f' });
+            return;
+        }
+
+        const price = currentDrinkCustomPrice !== null && currentDrinkCustomPrice >= 0 ? currentDrinkCustomPrice : Number(item.price || 55);
+
+        newOrderBasket = [
+            ...newOrderBasket,
+            {
+                id: item.id,
+                thaiName: item.thaiName || item.name || 'มัทฉะ',
+                englishName: item.englishName || item.id,
+                price,
+                quantity: Math.max(1, currentDrinkQuantity || 1),
+                sweetness: currentDrinkSweetness ?? 50,
+                note: currentDrinkNote.trim()
+            }
+        ];
+
+        currentDrinkQuantity = 1;
+        currentDrinkNote = '';
+        currentDrinkCustomPrice = null;
+    }
+
+    function removeDrinkFromNewOrder(idx: number) {
+        newOrderBasket = newOrderBasket.filter((_, i) => i !== idx);
+    }
+
+    async function handleConfirmCreateOrder() {
+        if (!newOrderName.trim()) {
+            swal.fire({ icon: 'warning', title: 'กรุณากรอกชื่อลูกค้าหรือเลือกสมาชิก', confirmButtonColor: '#456f2f' });
+            return;
+        }
+        if (newOrderBasket.length === 0) {
+            swal.fire({ icon: 'warning', title: 'ยังไม่มีเครื่องดื่มในรายการ', text: 'กรุณาเลือกเครื่องดื่มแล้วกด "+ เพิ่มแก้วนี้ลงรายการ" ก่อนบันทึกนะคะ', confirmButtonColor: '#456f2f' });
+            return;
+        }
+
+        isSubmittingCreateOrder = true;
+        try {
+            const finalMessageParts = [
+                newOrderPaymentNote ? `[${newOrderPaymentNote}]` : '',
+                selectedMemberForOrder ? `(สมาชิก: ${selectedMemberForOrder.fullName || selectedMemberForOrder.phone})` : '',
+                newOrderSellerMessage ? newOrderSellerMessage.trim() : ''
+            ].filter(Boolean);
+
+            const payload = {
+                name: newOrderName.trim(),
+                phone: newOrderPhone.trim() || '0000000000',
+                address: newOrderAddress.trim() || 'หน้าร้าน (รับเอง)',
+                message: finalMessageParts.join(' '),
+                basket: newOrderBasket,
+                totalPrice: effectiveNewOrderTotal,
+                deliveryDate: newOrderDeliveryDate || new Date().toISOString().split('T')[0],
+                deliveryRound: newOrderDeliveryRound,
+                deliveryRoundId: newOrderDeliveryRoundId,
+                status: newOrderStatus,
+                isAdminCreated: true
+            };
+
+            const res = await fetch('/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await res.json();
+            if (res.ok && result.success) {
+                showCreateOrderModal = false;
+                await loadOrders();
+                await loadMembers();
+                swal.fire({
+                    icon: 'success',
+                    title: 'เพิ่มออเดอร์ลงคิวสำเร็จ! 🍵',
+                    text: `รหัสคำสั่งซื้อ: ${result.order_id || result.order?.order_id || ''}`,
+                    confirmButtonColor: '#456f2f'
+                });
+            } else {
+                swal.fire({
+                    icon: 'error',
+                    title: 'บันทึกไม่สำเร็จ',
+                    text: result.message || 'เกิดข้อผิดพลาดในการสร้างออเดอร์',
+                    confirmButtonColor: '#d9483b'
+                });
+            }
+        } catch (err: any) {
+            console.error('Error creating order:', err);
+            swal.fire({ icon: 'error', title: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', confirmButtonColor: '#d9483b' });
+        } finally {
+            isSubmittingCreateOrder = false;
+        }
+    }
+
     // รายการเมนูสำหรับเลือกเมนูบ่ม (อัปเดตตามรายการเมนูจริงอัตโนมัติ)
     let availableDrinks = $derived(
         menuItems.length > 0
@@ -1501,6 +1692,9 @@
         </div>
 
         <div class="admin-header-actions">
+            <button onclick={openCreateOrderModal} class="btn-matcha-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 800; background: #15803d; border-color: #15803d; display: inline-flex; align-items: center; gap: 0.35rem;">
+                ➕ เพิ่มออเดอร์เข้าคิว
+            </button>
             <button onclick={() => { loadOrders(); loadMembers(); loadMenus(); }} class="btn-matcha-outline" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
                 🔄 รีเฟรชข้อมูล
             </button>
@@ -1613,6 +1807,21 @@
                     {completedCount} <span style="font-size: 0.9rem; font-weight: 500;">ออเดอร์</span>
                 </h2>
             </div>
+        </div>
+
+        <!-- แถบเครื่องมือจัดการคิวและปุ่มสร้างออเดอร์ -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.9rem;">
+            <div style="font-size: 0.95rem; font-weight: 800; color: #1e293b; display: flex; align-items: center; gap: 0.4rem;">
+                📋 กระดานคิวชงและคำสั่งซื้อ
+            </div>
+            <button 
+                type="button"
+                onclick={openCreateOrderModal} 
+                class="btn-matcha-primary" 
+                style="padding: 0.45rem 1.15rem; font-size: 0.85rem; font-weight: 800; background: #166534; box-shadow: 0 3px 10px rgba(22, 101, 52, 0.25); display: inline-flex; align-items: center; gap: 0.35rem;"
+            >
+                ➕ เพิ่มออเดอร์ / แก้วเข้าคิว
+            </button>
         </div>
 
         <!-- แถบตัวกรองสถานะ -->
@@ -2780,6 +2989,451 @@
                             </div>
                         </div>
                     {/each}
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- ➕ Modal เพิ่มออเดอร์/แก้วเข้าคิวด้วยตนเอง (สำหรับแอดมิน) -->
+    {#if showCreateOrderModal}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+            style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 1rem; overflow-y: auto;"
+            onclick={() => (showCreateOrderModal = false)}
+        >
+            <div
+                style="background: #ffffff; border-radius: 24px; max-width: 680px; width: 100%; padding: 1.5rem 1.75rem; text-align: left; box-shadow: 0 25px 60px rgba(0,0,0,0.3); max-height: 92vh; overflow-y: auto;"
+                onclick={(e) => e.stopPropagation()}
+            >
+                <!-- Modal Header -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.85rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.3rem; color: #14532d; font-weight: 800; display: flex; align-items: center; gap: 0.5rem;">
+                            <span>➕ เพิ่มออเดอร์ / แก้วเข้าคิวชง</span>
+                        </h3>
+                        <p style="margin: 0.25rem 0 0 0; font-size: 0.82rem; color: #64748b;">
+                            สร้างออเดอร์สำหรับลูกค้าหน้าร้าน หรือเลือกสมาชิกสะสมแต้มโดยตรง
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onclick={() => (showCreateOrderModal = false)}
+                        style="background: #f1f5f9; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 1.1rem; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 1.2rem;">
+                    <!-- 1. หมวดเลือกลูกค้า / สมาชิก -->
+                    <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                            <span style="font-weight: 800; font-size: 0.92rem; color: #1e293b; display: flex; align-items: center; gap: 0.4rem;">
+                                👤 1. ข้อมูลลูกค้า / สมาชิก
+                            </span>
+                            <!-- แท็บเลือกประเภท: สมาชิก vs ทั่วไป -->
+                            <div style="display: flex; background: #e2e8f0; border-radius: 999px; padding: 2px;">
+                                <button
+                                    type="button"
+                                    onclick={() => { createOrderMode = 'member'; }}
+                                    style="border: none; border-radius: 999px; padding: 0.25rem 0.75rem; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.15s; {createOrderMode === 'member' ? 'background: #166534; color: #fff;' : 'background: transparent; color: #475569;'}"
+                                >
+                                    👥 สมาชิกสะสมแต้ม
+                                </button>
+                                <button
+                                    type="button"
+                                    onclick={() => { createOrderMode = 'guest'; clearSelectedMemberForOrder(); newOrderName = 'ลูกค้าทั่วไป (Walk-in)'; }}
+                                    style="border: none; border-radius: 999px; padding: 0.25rem 0.75rem; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.15s; {createOrderMode === 'guest' ? 'background: #166534; color: #fff;' : 'background: transparent; color: #475569;'}"
+                                >
+                                    🚶 ทั่วไป / Walk-in
+                                </button>
+                            </div>
+                        </div>
+
+                        {#if createOrderMode === 'member'}
+                            {#if selectedMemberForOrder}
+                                <!-- การ์ดแสดงสมาชิกที่เลือกแล้ว -->
+                                <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px; padding: 0.85rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                                    <div>
+                                        <div style="font-size: 0.95rem; font-weight: 800; color: #14532d; display: flex; align-items: center; gap: 0.4rem;">
+                                            <span>✅ {selectedMemberForOrder.fullName || `${selectedMemberForOrder.firstName || ''} ${selectedMemberForOrder.lastName || ''}`.trim() || 'สมาชิก'}</span>
+                                            <span style="font-size: 0.75rem; background: #dcfce7; color: #15803d; border: 1px solid #86efac; padding: 0.1rem 0.5rem; border-radius: 999px;">
+                                                {selectedMemberForOrder.phone}
+                                            </span>
+                                        </div>
+                                        <div style="font-size: 0.78rem; color: #166534; margin-top: 0.25rem;">
+                                            ⭐ แต้มสะสมปัจจุบัน: <strong>{selectedMemberForOrder.points || 0}</strong> แต้ม (สั่งสะสมแล้ว {selectedMemberForOrder.totalStampsEarned || 0} แก้ว)
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onclick={clearSelectedMemberForOrder}
+                                        style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.35rem 0.7rem; font-size: 0.76rem; font-weight: 700; color: #475569; cursor: pointer;"
+                                    >
+                                        🔄 เปลี่ยนสมาชิก
+                                    </button>
+                                </div>
+                            {:else}
+                                <!-- ช่องค้นหาสมาชิก -->
+                                <div>
+                                    <input
+                                        type="text"
+                                        class="form-input"
+                                        placeholder="🔍 ค้นหาสมาชิกด้วยชื่อ หรือเบอร์โทรศัพท์..."
+                                        bind:value={createOrderMemberSearch}
+                                        style="font-size: 0.85rem; padding: 0.5rem 0.75rem; width: 100%; margin-bottom: 0.5rem;"
+                                    />
+                                    <div style="max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.35rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 0.4rem;">
+                                        {#if filteredMembersForOrder.length === 0}
+                                            <div style="font-size: 0.8rem; color: #94a3b8; text-align: center; padding: 0.6rem;">
+                                                ไม่พบสมาชิกที่ตรงกับคำค้นหา
+                                            </div>
+                                        {:else}
+                                            {#each filteredMembersForOrder as m}
+                                                <div
+                                                    style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; border-radius: 8px; background: #f8fafc; border: 1px solid #f1f5f9; cursor: pointer; transition: background 0.15s;"
+                                                    onclick={() => selectMemberForNewOrder(m)}
+                                                >
+                                                    <div>
+                                                        <span style="font-weight: 700; font-size: 0.85rem; color: #1e293b;">
+                                                            {m.fullName || `${m.firstName || ''} ${m.lastName || ''}`.trim() || 'สมาชิก'}
+                                                        </span>
+                                                        <span style="font-size: 0.75rem; color: #64748b; margin-left: 0.4rem;">
+                                                            📞 {m.phone}
+                                                        </span>
+                                                    </div>
+                                                    <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                                        <span style="font-size: 0.72rem; background: #dcfce7; color: #14532d; padding: 0.15rem 0.45rem; border-radius: 999px; font-weight: 700;">
+                                                            ⭐ {m.points || 0} แต้ม
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            style="background: #166534; color: #ffffff; border: none; border-radius: 6px; padding: 0.2rem 0.55rem; font-size: 0.74rem; font-weight: 700; cursor: pointer;"
+                                                        >
+                                                            เลือก
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            {/each}
+                                        {/if}
+                                    </div>
+                                </div>
+                            {/if}
+                        {/if}
+
+                        <!-- ช่องชื่อและเบอร์โทร (แก้ไขได้เสมอ) -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.75rem;">
+                            <div>
+                                <label class="form-label" style="font-size: 0.78rem;" for="createOrderName">ชื่อผู้รับ / ชื่อลูกค้า *:</label>
+                                <input
+                                    id="createOrderName"
+                                    type="text"
+                                    class="form-input"
+                                    placeholder="เช่น คุณหมอเอ, สมาชิก"
+                                    bind:value={newOrderName}
+                                    style="font-size: 0.85rem;"
+                                />
+                            </div>
+                            <div>
+                                <label class="form-label" style="font-size: 0.78rem;" for="createOrderPhone">เบอร์โทรศัพท์ (สำหรับสะสมแต้ม):</label>
+                                <input
+                                    id="createOrderPhone"
+                                    type="tel"
+                                    class="form-input"
+                                    placeholder="เช่น 0812345678"
+                                    bind:value={newOrderPhone}
+                                    style="font-size: 0.85rem;"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. หมวดเลือกแก้วเครื่องดื่ม -->
+                    <div style="background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 16px; padding: 1rem;">
+                        <span style="font-weight: 800; font-size: 0.92rem; color: #14532d; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.75rem;">
+                            🍵 2. เลือกเครื่องดื่มลงคิว
+                        </span>
+
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem; background: #ffffff; border: 1px solid #dcfce7; border-radius: 12px; padding: 0.85rem;">
+                            <!-- เมนูเครื่องดื่ม & ราคา -->
+                            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.6rem;">
+                                <div>
+                                    <label class="form-label" style="font-size: 0.78rem;" for="drinkMenuSelect">เลือกเมนูเครื่องดื่ม:</label>
+                                    <select id="drinkMenuSelect" class="form-input" bind:value={currentDrinkMenuId} style="font-size: 0.85rem;">
+                                        {#each menuItems as item}
+                                            <option value={item.id}>
+                                                {item.thaiName} ({item.price}฿) {item.isFermented ? '⏳ เมนูบ่ม' : ''} {!item.isAvailable ? '⛔ (ปิดจำหน่าย)' : ''}
+                                            </option>
+                                        {/each}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="form-label" style="font-size: 0.78rem;" for="drinkCustomPrice">ราคา/แก้ว (บาท):</label>
+                                    <input
+                                        id="drinkCustomPrice"
+                                        type="number"
+                                        min="0"
+                                        class="form-input"
+                                        placeholder={String(menuItems.find((m) => m.id === currentDrinkMenuId)?.price || 55)}
+                                        bind:value={currentDrinkCustomPrice}
+                                        style="font-size: 0.85rem;"
+                                    />
+                                </div>
+                            </div>
+
+                            <!-- ความหวาน & จำนวน -->
+                            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.6rem; align-items: center;">
+                                <div>
+                                    <label class="form-label" style="font-size: 0.78rem; margin-bottom: 0.35rem; display: block;" for="sweetnessPicker">ระดับความหวาน:</label>
+                                    <div style="display: flex; gap: 0.3rem;" id="sweetnessPicker">
+                                        {#each [0, 25, 50, 75, 100] as sweet}
+                                            <button
+                                                type="button"
+                                                onclick={() => (currentDrinkSweetness = sweet)}
+                                                style="flex: 1; padding: 0.35rem 0.2rem; font-size: 0.75rem; font-weight: 800; border-radius: 8px; border: 1px solid #86efac; cursor: pointer; transition: all 0.15s; {currentDrinkSweetness === sweet ? 'background: #166534; color: #fff; border-color: #166534;' : 'background: #f0fdf4; color: #166534;'}"
+                                            >
+                                                {sweet}%
+                                            </button>
+                                        {/each}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="form-label" style="font-size: 0.78rem; margin-bottom: 0.35rem; display: block;" for="drinkQtyInput">จำนวนแก้ว:</label>
+                                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                        <button
+                                            type="button"
+                                            onclick={() => (currentDrinkQuantity = Math.max(1, currentDrinkQuantity - 1))}
+                                            style="width: 32px; height: 32px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; font-weight: 800; font-size: 1rem; cursor: pointer;"
+                                        >-</button>
+                                        <input
+                                            id="drinkQtyInput"
+                                            type="number"
+                                            min="1"
+                                            bind:value={currentDrinkQuantity}
+                                            style="width: 48px; text-align: center; font-weight: 800; font-size: 0.9rem; padding: 0.3rem; border: 1px solid #cbd5e1; border-radius: 8px;"
+                                        />
+                                        <button
+                                            type="button"
+                                            onclick={() => (currentDrinkQuantity = currentDrinkQuantity + 1)}
+                                            style="width: 32px; height: 32px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; font-weight: 800; font-size: 1rem; cursor: pointer;"
+                                        >+</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- โน้ต & แท็กด่วน -->
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+                                    <label class="form-label" style="font-size: 0.78rem; margin: 0;" for="drinkNoteInput">โน้ตพิเศษแก้วนี้:</label>
+                                    <div style="display: flex; gap: 0.3rem; flex-wrap: wrap;">
+                                        {#each ['แยกน้ำแข็ง', 'ชงร้อน', 'ไม่ใส่นมข้น', 'แก้วส่วนตัว'] as tag}
+                                            <button
+                                                type="button"
+                                                onclick={() => { currentDrinkNote = currentDrinkNote ? `${currentDrinkNote}, ${tag}` : tag; }}
+                                                style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 999px; padding: 0.15rem 0.5rem; font-size: 0.7rem; color: #475569; cursor: pointer;"
+                                            >
+                                                +{tag}
+                                            </button>
+                                        {/each}
+                                    </div>
+                                </div>
+                                <input
+                                    id="drinkNoteInput"
+                                    type="text"
+                                    class="form-input"
+                                    placeholder="เช่น แยกน้ำแข็ง, นำแก้วมาเอง"
+                                    bind:value={currentDrinkNote}
+                                    style="font-size: 0.82rem;"
+                                />
+                            </div>
+
+                            <!-- ปุ่มเพิ่มแก้วลงรายการ -->
+                            <button
+                                type="button"
+                                onclick={addDrinkToNewOrder}
+                                style="background: #166534; color: #ffffff; border: none; border-radius: 10px; padding: 0.6rem; font-size: 0.88rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; box-shadow: 0 3px 10px rgba(22, 101, 52, 0.2);"
+                            >
+                                ➕ เพิ่มแก้วนี้ลงรายการ (Add to Order)
+                            </button>
+                        </div>
+
+                        <!-- ตารางรายการเครื่องดื่มที่เพิ่มแล้วในออเดอร์ -->
+                        <div style="margin-top: 0.85rem;">
+                            <div style="font-size: 0.82rem; font-weight: 800; color: #14532d; margin-bottom: 0.4rem;">
+                                📋 รายการแก้วในออเดอร์นี้ ({newOrderBasket.reduce((sum, item) => sum + item.quantity, 0)} แก้ว):
+                            </div>
+                            {#if newOrderBasket.length === 0}
+                                <div style="background: #ffffff; border: 1.5px dashed #86efac; border-radius: 12px; padding: 1.25rem; text-align: center; color: #64748b; font-size: 0.85rem;">
+                                    ยังไม่มีเครื่องดื่มในรายการ กรุณาเลือกเมนูแล้วกดปุ่ม "เพิ่มแก้วนี้ลงรายการ" ด้านบนค่ะ
+                                </div>
+                            {:else}
+                                <div style="display: flex; flex-direction: column; gap: 0.45rem;">
+                                    {#each newOrderBasket as item, idx}
+                                        <div style="display: flex; justify-content: space-between; align-items: center; background: #ffffff; border: 1px solid #bbf7d0; border-radius: 10px; padding: 0.5rem 0.75rem;">
+                                            <div>
+                                                <div style="font-weight: 800; font-size: 0.88rem; color: #1e293b;">
+                                                    {item.thaiName} <span style="font-weight: 600; font-size: 0.76rem; color: #166534;">(หวาน {item.sweetness}%)</span>
+                                                </div>
+                                                {#if item.note}
+                                                    <div style="font-size: 0.75rem; color: #d97706;">
+                                                        📝 {item.note}
+                                                    </div>
+                                                {/if}
+                                                <div style="font-size: 0.76rem; color: #64748b;">
+                                                    {item.price} บาท × {item.quantity} = <strong>{item.price * item.quantity}</strong> บาท
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onclick={() => removeDrinkFromNewOrder(idx)}
+                                                style="background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 8px; padding: 0.3rem 0.55rem; font-size: 0.78rem; font-weight: 800; cursor: pointer;"
+                                                title="ลบแก้วนี้"
+                                            >
+                                                🗑️ ลบ
+                                            </button>
+                                        </div>
+                                    {/each}
+                                </div>
+
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.6rem; padding: 0.5rem 0.75rem; background: #ffffff; border-radius: 10px; border: 1px solid #86efac;">
+                                    <span style="font-weight: 800; font-size: 0.88rem; color: #14532d;">ยอดรวมคำนวณ:</span>
+                                    <span style="font-weight: 900; font-size: 1.1rem; color: #15803d;">{newOrderCalculatedTotal} บาท</span>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+
+                    <!-- 3. วันที่และสถานที่จัดส่ง -->
+                    <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 1rem;">
+                        <span style="font-weight: 800; font-size: 0.92rem; color: #1e293b; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.75rem;">
+                            🚚 3. วันที่และสถานที่จัดส่ง
+                        </span>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-bottom: 0.75rem;">
+                            <div>
+                                <label class="form-label" style="font-size: 0.78rem;" for="orderDeliveryDate">วันที่จัดส่ง:</label>
+                                <input
+                                    id="orderDeliveryDate"
+                                    type="date"
+                                    class="form-input"
+                                    bind:value={newOrderDeliveryDate}
+                                    style="font-size: 0.85rem;"
+                                />
+                            </div>
+                            <div>
+                                <label class="form-label" style="font-size: 0.78rem;" for="orderDeliveryRound">รอบจัดส่ง:</label>
+                                <select
+                                    id="orderDeliveryRound"
+                                    class="form-input"
+                                    bind:value={newOrderDeliveryRound}
+                                    onchange={(e) => {
+                                        const val = (e.target as HTMLSelectElement).value;
+                                        if (val.includes('เช้า')) newOrderDeliveryRoundId = 'morning';
+                                        else if (val.includes('เที่ยง')) newOrderDeliveryRoundId = 'noon';
+                                        else newOrderDeliveryRoundId = 'walkin';
+                                    }}
+                                    style="font-size: 0.85rem;"
+                                >
+                                    <option value="รับหน้าร้าน / เสิร์ฟทันที">☕ รับหน้าร้าน / เสิร์ฟทันที</option>
+                                    <option value="รอบเช้า (07:00–08:00 น.)">🌅 รอบเช้า (07:00–08:00 น.)</option>
+                                    <option value="รอบเที่ยง (12:30–13:00 น.)">☀️ รอบเที่ยง (12:30–13:00 น.)</option>
+                                    {#each settings.deliveryRounds as round}
+                                        <option value="{round.name} ({round.timeSlot})">
+                                            📦 {round.name} ({round.timeSlot})
+                                        </option>
+                                    {/each}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- สถานที่จัดส่งและปุ่มด่วน -->
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; flex-wrap: wrap; gap: 0.3rem;">
+                                <label class="form-label" style="font-size: 0.78rem; margin: 0;" for="orderAddressInput">สถานที่จัดส่ง / แผนกใน รพ.:</label>
+                                <div style="display: flex; gap: 0.25rem; flex-wrap: wrap;">
+                                    {#each ['หน้าร้าน (รับเอง)', 'OPD', 'IPD 2', 'IPD 3', 'ห้องฉุกเฉิน ER', 'ตึกอำนวยการ', 'ห้องแล็บ', 'ห้องยา', 'แฟลตเจ้าหน้าที่'] as loc}
+                                        <button
+                                            type="button"
+                                            onclick={() => (newOrderAddress = loc)}
+                                            style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 999px; padding: 0.15rem 0.45rem; font-size: 0.7rem; color: #475569; cursor: pointer;"
+                                        >
+                                            {loc}
+                                        </button>
+                                    {/each}
+                                </div>
+                            </div>
+                            <input
+                                id="orderAddressInput"
+                                type="text"
+                                class="form-input"
+                                placeholder="ระบุสถานที่ส่ง เช่น แผนกผู้ป่วยนอก (OPD)"
+                                bind:value={newOrderAddress}
+                                style="font-size: 0.85rem;"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- 4. สถานะและวิธีชำระเงิน -->
+                    <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 1rem;">
+                        <span style="font-weight: 800; font-size: 0.92rem; color: #1e293b; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.75rem;">
+                            💳 4. สถานะออเดอร์และการชำระเงิน
+                        </span>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+                            <div>
+                                <label class="form-label" style="font-size: 0.78rem;" for="orderInitialStatus">สถานะเริ่มต้น:</label>
+                                <select id="orderInitialStatus" class="form-input" bind:value={newOrderStatus} style="font-size: 0.85rem; font-weight: 700;">
+                                    <option value="paid">🟢 พร้อมชง / รับยอดแล้ว (paid)</option>
+                                    <option value="brewing">🍵 กำลังชง (brewing)</option>
+                                    <option value="ready_to_ship">✨ ชงเสร็จแล้ว (ready_to_ship)</option>
+                                    <option value="completed">✅ จัดส่งสำเร็จ / รับเครื่องดื่มแล้ว (completed)</option>
+                                    <option value="pending">🟡 รอตรวจสลิป / รอชำระ (pending)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label" style="font-size: 0.78rem;" for="orderPayNote">บันทึกการชำระเงิน:</label>
+                                <select id="orderPayNote" class="form-input" bind:value={newOrderPaymentNote} style="font-size: 0.85rem;">
+                                    <option value="ชำระแล้ว (เงินสด/แอดมินรับยอด)">💵 ชำระแล้ว (เงินสด/แอดมินรับยอด)</option>
+                                    <option value="ชำระแล้ว (โอนเงิน/PromptPay)">📱 ชำระแล้ว (โอนเงิน/PromptPay)</option>
+                                    <option value="สิทธิ์พิเศษ / เลี้ยงรับรอง">🎁 สิทธิ์พิเศษ / เลี้ยงรับรอง</option>
+                                    <option value="ยังไม่ชำระ (เก็บเงินปลายทาง)">⏳ ยังไม่ชำระ (เก็บเงินปลายทาง)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 0.6rem;">
+                            <label class="form-label" style="font-size: 0.78rem;" for="orderSellerMsg">หมายเหตุเพิ่มเติมถึงผู้ชง/จัดส่ง (ถ้ามี):</label>
+                            <input
+                                id="orderSellerMsg"
+                                type="text"
+                                class="form-input"
+                                placeholder="เช่น ฝากวางไว้ที่โต๊ะพยาบาล"
+                                bind:value={newOrderSellerMessage}
+                                style="font-size: 0.82rem;"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Footer Actions -->
+                <div style="display: flex; gap: 0.65rem; margin-top: 1.4rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+                    <button
+                        type="button"
+                        onclick={handleConfirmCreateOrder}
+                        disabled={isSubmittingCreateOrder || newOrderBasket.length === 0}
+                        style="flex: 2; padding: 0.8rem; background: #166534; color: #ffffff; border: none; border-radius: 12px; font-weight: 800; font-size: 0.95rem; cursor: {isSubmittingCreateOrder || newOrderBasket.length === 0 ? 'not-allowed' : 'pointer'}; opacity: {isSubmittingCreateOrder || newOrderBasket.length === 0 ? '0.6' : '1'}; display: flex; align-items: center; justify-content: center; gap: 0.4rem; box-shadow: 0 4px 14px rgba(22, 101, 52, 0.3);"
+                    >
+                        {isSubmittingCreateOrder ? '⏳ กำลังบันทึก...' : `✅ ยืนยันเพิ่มออเดอร์เข้าคิว (${effectiveNewOrderTotal} บาท)`}
+                    </button>
+                    <button
+                        type="button"
+                        onclick={() => (showCreateOrderModal = false)}
+                        class="btn-matcha-outline"
+                        style="flex: 1; padding: 0.8rem; border-radius: 12px; font-weight: 700;"
+                    >
+                        ยกเลิก
+                    </button>
                 </div>
             </div>
         </div>

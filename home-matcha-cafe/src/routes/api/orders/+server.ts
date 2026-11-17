@@ -36,6 +36,7 @@ export const POST: RequestHandler = async ({ request }) => {
         let reviewReason = '';
         let useFreeCupReward = false;
         let discountAmount = 0;
+        let customStatus: any = undefined;
 
         if (contentType.includes('multipart/form-data')) {
             const formData = await request.formData();
@@ -127,6 +128,9 @@ export const POST: RequestHandler = async ({ request }) => {
             slipImageUrl = body.slipImage || '';
             useFreeCupReward = Boolean(body.useFreeCupReward);
             discountAmount = Number(body.discountAmount || 0);
+            if (body.status) {
+                customStatus = body.status;
+            }
         }
 
         if (!recipientName || !phone || !address) {
@@ -179,7 +183,7 @@ export const POST: RequestHandler = async ({ request }) => {
             deliveryRoundId: deliveryRoundId || undefined,
             redeemedFreeCups,
             discountAmount,
-            status: requiresManualReview ? 'pending' : (slipImageUrl || redeemedFreeCups > 0 ? 'paid' : 'pending')
+            status: customStatus || (requiresManualReview ? 'pending' : (slipImageUrl || redeemedFreeCups > 0 ? 'paid' : 'pending'))
         });
 
         return json({
