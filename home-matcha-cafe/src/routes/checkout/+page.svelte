@@ -828,7 +828,7 @@
                         บันทึกรูป QR Code
                     </button>
 
-                    <button
+                    <!-- <button
                         type="button"
                         onclick={() => generateNewQR(true)}
                         class="btn-matcha-outline"
@@ -836,7 +836,7 @@
                         title="กดเมื่อยังไม่ได้โอนเงิน และต้องการเริ่มนับเวลา QR Code 1 ชั่วโมงใหม่"
                     >
                         🔄 รีเซ็ตเวลา QR ใหม่
-                    </button>
+                    </button> -->
                 </div>
             {/if}
 
