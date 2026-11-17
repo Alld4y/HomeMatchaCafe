@@ -485,7 +485,7 @@
         // 🔍 ตรวจสอบเบราว์เซอร์และแพลตฟอร์ม
         const ua = navigator.userAgent || '';
         isLineBrowser = /Line\//i.test(ua);
-        isIosDevice = /iPhone|iPad|iPod/i.test(ua);
+        isIosDevice = /iPhone|iPad|iPod/i.test(ua) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         isStandalone = window.matchMedia('(display-mode: standalone)').matches || ((window.navigator as any).standalone === true);
 
         // หากเปิดใน LINE และยังไม่ได้กดปิดแถบแจ้งเตือน ให้แสดงแถบแนะนำเปิดเบราว์เซอร์นอก
@@ -860,23 +860,31 @@
                 <p class="install-modal-subtitle">เปิดสั่งเครื่องดื่มได้ไว</p>
             </div>
 
-            <!-- แท็บเลือกระบบปฏิบัติการ (Android / iOS) -->
-            <div class="install-modal-tabs">
-                <button
-                    type="button"
-                    class="install-tab-btn {activeInstallTab === 'android' ? 'active' : ''}"
-                    onclick={() => (activeInstallTab = 'android')}
-                >
-                    Android (Chrome)
-                </button>
-                <button
-                    type="button"
-                    class="install-tab-btn {activeInstallTab === 'ios' ? 'active' : ''}"
-                    onclick={() => (activeInstallTab = 'ios')}
-                >
-                    iPhone / iPad (Safari)
-                </button>
-            </div>
+            <!-- แท็บเลือกระบบปฏิบัติการ (ถ้าเป็น iOS / Safari ไม่ต้องแสดงแท็บ Chrome ให้สับสน) -->
+            {#if !isIosDevice}
+                <div class="install-modal-tabs">
+                    <button
+                        type="button"
+                        class="install-tab-btn {activeInstallTab === 'android' ? 'active' : ''}"
+                        onclick={() => (activeInstallTab = 'android')}
+                    >
+                        Android (Chrome)
+                    </button>
+                    <button
+                        type="button"
+                        class="install-tab-btn {activeInstallTab === 'ios' ? 'active' : ''}"
+                        onclick={() => (activeInstallTab = 'ios')}
+                    >
+                        iPhone / iPad (Safari)
+                    </button>
+                </div>
+            {:else}
+                <div style="text-align: center; margin-bottom: 1rem;">
+                    <span style="display: inline-block; background: #f0fdf4; color: #166534; font-size: 0.82rem; font-weight: 700; padding: 0.35rem 0.9rem; border-radius: 999px; border: 1px solid #bbf7d0;">
+                        🍎 วิธีติดตั้งสำหรับ iPhone / iPad (Safari)
+                    </span>
+                </div>
+            {/if}
 
             <!-- เนื้อหาแท็บ Android -->
             {#if activeInstallTab === 'android'}
