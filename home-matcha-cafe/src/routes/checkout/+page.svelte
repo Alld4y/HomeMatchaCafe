@@ -123,11 +123,39 @@
         return `${m} นาที ${String(s).padStart(2, '0')} วินาที`;
     }
 
+    let hasHandledExpired = false;
+
+    function handleExpiredCart() {
+        if (hasHandledExpired || showSuccessModal) return;
+        hasHandledExpired = true;
+
+        // ล้างตะกร้าสินค้าและ Session ทันที
+        cart.clearCart();
+        storedBasket = [];
+        localStorage.removeItem('basket');
+        localStorage.removeItem('hmc_qr_session');
+        localStorage.removeItem('qrDataUrl');
+
+        swal.fire({
+            icon: 'warning',
+            title: 'QR Code หมดอายุแล้ว (เกิน 1 ชั่วโมง)',
+            text: 'เนื่องจากไม่มีการชำระเงินภายในเวลา 1 ชั่วโมง ระบบได้ทำการยกเลิกและนำสินค้าออกจากตะกร้าเรียบร้อยแล้ว กรุณาเลือกสั่งเครื่องดื่มใหม่อีกครั้งนะคะ 🍵',
+            confirmButtonColor: '#456f2f',
+            confirmButtonText: 'กลับไปหน้าเมนู',
+            allowOutsideClick: false
+        }).then(() => {
+            goto('/menu');
+        });
+    }
+
     function updateCountdown() {
         if (!qrExpiresAt) return;
         const expMs = new Date(qrExpiresAt).getTime();
         const diffSec = Math.floor((expMs - Date.now()) / 1000);
         remainingSeconds = Math.max(0, diffSec);
+        if (remainingSeconds <= 0 && !hasHandledExpired && !showSuccessModal) {
+            handleExpiredCart();
+        }
     }
 
     async function generateNewQR(forceNewTimestamp = false) {
@@ -156,6 +184,13 @@
                             Number(saved.netCartAmount) === Number(netCartAmount);
 
                         if (isSameCartAndPrice && saved.qrDataUrl && saved.qrGeneratedAt && saved.expiresAt) {
+                            const expMs = new Date(saved.expiresAt).getTime();
+                            if (expMs <= Date.now()) {
+                                isFetchingQR = false;
+                                handleExpiredCart();
+                                return;
+                            }
+
                             qrImageUrl = saved.qrDataUrl;
                             qrGeneratedAt = saved.qrGeneratedAt;
                             qrExpiresAt = saved.expiresAt;
@@ -397,6 +432,19 @@
             (sum: number, it: any) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 1),
             0
         );
+
+        if ((!storedBasket || storedBasket.length === 0) && (!cart.items || cart.items.length === 0)) {
+            swal.fire({
+                icon: 'warning',
+                title: 'ไม่มีสินค้าในตะกร้า',
+                text: 'กรุณาเลือกเครื่องดื่มก่อนดำเนินการชำระเงินนะคะ',
+                confirmButtonColor: '#456f2f',
+                confirmButtonText: 'ไปเลือกเมนู'
+            }).then(() => {
+                goto('/menu');
+            });
+            return;
+        }
 
         const rawUserData = localStorage.getItem('userData');
         if (rawUserData) {
@@ -798,7 +846,7 @@
                             </div>
                             <div>
                                 {#if isQrExpired}
-                                    ⚠️ <strong>QR Code นี้แสดงเกิน 1 ชั่วโมงแล้ว</strong> กดรีเซ็ตเวลา QR ใหม่ หรือกดปุ่มด้านล่างสุดหากโอนแล้ว
+                                    ⚠️ <strong>QR Code นี้หมดอายุแล้ว (เกิน 1 ชั่วโมง)</strong> ระบบได้ยกเลิกและนำสินค้าออกจากตะกร้าแล้วค่ะ
                                 {:else}
                                     เวลาโอนในสลิปต้องหลัง {formatShortTime(qrGeneratedAt)} (เหลือเวลา <strong>{formatCountdown(remainingSeconds)}</strong>)
                                 {/if}

@@ -149,6 +149,21 @@
     function loadCartFromStorage() {
         if (typeof window === 'undefined') return;
         try {
+            // หากเคยสร้าง QR Code ไว้แล้วเกิน 1 ชั่วโมง ให้ล้างตะกร้าและ Session ทั้งหมดทิ้งอัตโนมัติ
+            const rawSession = localStorage.getItem('hmc_qr_session');
+            if (rawSession) {
+                try {
+                    const session = JSON.parse(rawSession);
+                    if (session.expiresAt && new Date(session.expiresAt).getTime() <= Date.now()) {
+                        localStorage.removeItem('hmc_qr_session');
+                        localStorage.removeItem('basket');
+                        localStorage.removeItem('qrDataUrl');
+                        basketItems = [];
+                        return;
+                    }
+                } catch {}
+            }
+
             const raw = localStorage.getItem('basket');
             if (raw) {
                 const parsed = JSON.parse(raw);
