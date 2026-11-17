@@ -867,14 +867,14 @@
                     class="install-tab-btn {activeInstallTab === 'android' ? 'active' : ''}"
                     onclick={() => (activeInstallTab = 'android')}
                 >
-                    🤖 Android (Chrome)
+                    Android (Chrome)
                 </button>
                 <button
                     type="button"
                     class="install-tab-btn {activeInstallTab === 'ios' ? 'active' : ''}"
                     onclick={() => (activeInstallTab = 'ios')}
                 >
-                    🍎 iPhone / iPad (Safari)
+                    iPhone / iPad (Safari)
                 </button>
             </div>
 
@@ -902,7 +902,7 @@
                             <span class="install-step-num">1</span>
                             <div class="install-step-content">
                                 <strong>เปิดผ่าน Google Chrome</strong>
-                                <p>แตะปุ่มเมนู <strong>(⋮) จุดสามจุด</strong> ที่มุมบนขวาของเบราว์เซอร์</p>
+                                <p>แตะปุ่มเมนู <strong style="display: inline;">(⋮) จุดสามจุด</strong> ที่มุมบนขวาของเบราว์เซอร์</p>
                             </div>
                         </div>
 
@@ -910,10 +910,7 @@
                             <span class="install-step-num">2</span>
                             <div class="install-step-content">
                                 <strong>เลือก "ติดตั้งแอปพลิเคชัน" (Install app)</strong>
-                                <p>แตะเมนู <strong>"ติดตั้งแอปพลิเคชัน"</strong> 📲</p>
-                                <span class="install-tip-badge">
-                                    💡 หลีกเลี่ยง "เพิ่มลงในหน้าจอหลัก" เพื่อให้ได้ไอคอนร้านเดี่ยวๆ ไร้ตรา Chrome
-                                </span>
+                                <p>แตะเมนู <strong style="display: inline;">"ติดตั้งแอปพลิเคชัน"</strong> 📲</p>
                             </div>
                         </div>
 
@@ -921,7 +918,7 @@
                             <span class="install-step-num">3</span>
                             <div class="install-step-content">
                                 <strong>กดยืนยันการติดตั้ง</strong>
-                                <p>แตะ <strong>"ติดตั้ง"</strong> ในหน้าต่างยืนยัน รอ 5-10 วินาที ไอคอนแอปจะไปอยู่ที่หน้าจอโฮมทันที</p>
+                                <p>แตะ <strong style="display: inline;">"ติดตั้ง"</strong> <br>ในหน้าต่างยืนยัน รอ 5-10 วินาที ไอคอนแอปจะไปอยู่ที่หน้าจอโฮมทันที</p>
                             </div>
                         </div>
                     </div>
@@ -934,7 +931,7 @@
                             <span class="install-step-num">1</span>
                             <div class="install-step-content">
                                 <strong>เปิดผ่าน Safari บน iPhone</strong>
-                                <p>แตะปุ่มแชร์ <strong>⎋ (Share)</strong> ที่แถบด้านล่างของหน้าจอ</p>
+                                <p>แตะปุ่มแชร์ <strong style="display: inline;"> Share</strong> ที่แถบด้านล่างของหน้าจอ</p>
                             </div>
                         </div>
 
@@ -942,7 +939,7 @@
                             <span class="install-step-num">2</span>
                             <div class="install-step-content">
                                 <strong>เลือก "เพิ่มไปยังหน้าจอโฮม"</strong>
-                                <p>เลื่อนลงมาด้านล่าง แล้วแตะ <strong>"เพิ่มไปยังหน้าจอโฮม" ＋</strong></p>
+                                <p>เลื่อนลงมาด้านล่าง แล้วแตะ <strong>＋ " เพิ่มไปยังหน้าจอโฮม"</strong></p>
                             </div>
                         </div>
 
@@ -951,9 +948,9 @@
                             <div class="install-step-content">
                                 <strong>แตะ "เพิ่ม" (Add)</strong>
                                 <p>แตะปุ่ม <strong>"เพิ่ม (Add)"</strong> ที่มุมบนขวาของหน้าจอ</p>
-                                <span class="install-tip-badge">
+                                <!-- <span class="install-tip-badge">
                                     ✨ บน iOS จะได้ไอคอนร้านเต็มวงกลมคมชัด ไร้ตราเบราว์เซอร์ 100%
-                                </span>
+                                </span> -->
                             </div>
                         </div>
                     </div>

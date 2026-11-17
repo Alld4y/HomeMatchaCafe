@@ -1957,7 +1957,7 @@
         </div>
     </main>
 {:else}
-<main class="menu-page-wrapper admin-page-shell" style="max-width: 1240px; margin: 0 auto; width: 100%; padding-bottom: 5rem;">
+<main class="menu-page-wrapper admin-page-shell" style="max-width: 1100px; margin: 0 auto; width: 100%; padding-bottom: 5rem;">
     <!-- Admin Header -->
     <div class="admin-header-bar">
         <div class="admin-header-title-box">
@@ -2147,15 +2147,15 @@
         </div>
 
         <!-- 🍵 การ์ดพับเก็บได้: สรุปคิวชงเครื่องดื่มและเช็คลิสต์บาริสต้า (Collapsible Drink Prep Summary Card) -->
-        <div style="background: #ffffff; border: 1.5px solid #bbf7d0; border-radius: 16px; margin-bottom: 1.25rem; overflow: hidden; box-shadow: 0 3px 12px rgba(22, 101, 52, 0.06); transition: all 0.2s ease;">
+        <div class="brew-summary-card" style="background: #ffffff; border: 1.5px solid #bbf7d0; border-radius: 16px; margin-bottom: 1.25rem; overflow: hidden; box-shadow: 0 3px 12px rgba(22, 101, 52, 0.06); transition: all 0.2s ease; width: 100%; max-width: 100%; box-sizing: border-box;">
             <!-- Header แถบหัวการ์ด (กดเพื่อยุบ/ขยายได้ตลอดเวลา) -->
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
                 onclick={() => (isBrewSummaryExpanded = !isBrewSummaryExpanded)}
-                style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.15rem; background: #f0fdf4; cursor: pointer; user-select: none; border-bottom: {isBrewSummaryExpanded ? '1px solid #dcfce7' : 'none'}; gap: 0.75rem; flex-wrap: wrap;"
+                style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.15rem; background: #f0fdf4; cursor: pointer; user-select: none; border-bottom: {isBrewSummaryExpanded ? '1px solid #dcfce7' : 'none'}; gap: 0.75rem; flex-wrap: wrap; width: 100%; box-sizing: border-box;"
             >
-                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; flex: 1; min-width: 0;">
                     <span style="font-size: 1rem; font-weight: 800; color: #14532d; display: flex; align-items: center; gap: 0.4rem;">
                         🍵 สรุปคิวชงเครื่องดื่ม
                     </span>
@@ -2169,7 +2169,7 @@
                     {/if}
                 </div>
 
-                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
                     <span style="font-size: 0.8rem; font-weight: 800; color: #166534; background: #dcfce7; padding: 0.25rem 0.65rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.3rem;">
                         {isBrewSummaryExpanded ? '▲ ยุบเก็บ' : '▼ ขยายดูสรุป'}
                     </span>
@@ -2185,17 +2185,17 @@
 
             <!-- เนื้อหาการ์ดสรุปคิวชง (แสดงเมื่อขยาย) -->
             {#if isBrewSummaryExpanded}
-                <div style="padding: 1rem 1.15rem; background: #ffffff;">
+                <div style="padding: 1rem 1.15rem; background: #ffffff; width: 100%; box-sizing: border-box;">
                     <!-- ตัวกรองเลือกรอบส่ง (Filter by Delivery Round) -->
                     {#if Object.keys(availableDeliveryRounds).length > 1}
-                        <div style="display: flex; gap: 0.35rem; overflow-x: auto; padding-bottom: 0.4rem; margin-bottom: 0.75rem; align-items: center;">
-                            <span style="font-size: 0.76rem; font-weight: 800; color: #475569; white-space: nowrap; margin-right: 0.2rem;">
+                        <div style="display: flex; gap: 0.35rem; overflow-x: auto; padding-bottom: 0.4rem; margin-bottom: 0.75rem; align-items: center; width: 100%; max-width: 100%; box-sizing: border-box; -webkit-overflow-scrolling: touch;">
+                            <span style="font-size: 0.76rem; font-weight: 800; color: #475569; white-space: nowrap; margin-right: 0.2rem; flex-shrink: 0;">
                                 🚚 แยกรอบส่ง:
                             </span>
                             <button
                                 type="button"
                                 onclick={() => (selectedRoundFilter = 'all')}
-                                style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700; border-radius: 999px; border: 1.5px solid {selectedRoundFilter === 'all' ? '#0284c7' : '#cbd5e1'}; background: {selectedRoundFilter === 'all' ? '#0284c7' : '#ffffff'}; color: {selectedRoundFilter === 'all' ? '#ffffff' : '#475569'}; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;"
+                                style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700; border-radius: 999px; border: 1.5px solid {selectedRoundFilter === 'all' ? '#0284c7' : '#cbd5e1'}; background: {selectedRoundFilter === 'all' ? '#0284c7' : '#ffffff'}; color: {selectedRoundFilter === 'all' ? '#ffffff' : '#475569'}; cursor: pointer; white-space: nowrap; transition: all 0.15s ease; flex-shrink: 0;"
                             >
                                 ทุกรอบส่ง ({filteredOrders.reduce((sum, o) => sum + (o.basket || []).reduce((bS, it) => bS + Math.max(1, Number(it.quantity) || 1), 0), 0)} แก้ว)
                             </button>
@@ -2203,7 +2203,7 @@
                                 <button
                                     type="button"
                                     onclick={() => (selectedRoundFilter = round)}
-                                    style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700; border-radius: 999px; border: 1.5px solid {selectedRoundFilter === round ? '#0284c7' : '#cbd5e1'}; background: {selectedRoundFilter === round ? '#0284c7' : '#ffffff'}; color: {selectedRoundFilter === round ? '#ffffff' : '#475569'}; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;"
+                                    style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700; border-radius: 999px; border: 1.5px solid {selectedRoundFilter === round ? '#0284c7' : '#cbd5e1'}; background: {selectedRoundFilter === round ? '#0284c7' : '#ffffff'}; color: {selectedRoundFilter === round ? '#ffffff' : '#475569'}; cursor: pointer; white-space: nowrap; transition: all 0.15s ease; flex-shrink: 0;"
                                 >
                                     🚚 {round} ({count} แก้ว)
                                 </button>
@@ -2213,9 +2213,9 @@
 
                     <!-- แถบ Progress Bar & ปุ่ม Action ของ Checklist -->
                     {#if filteredTotalCups > 0}
-                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0.75rem 0.95rem; margin-bottom: 1rem;">
+                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0.75rem 0.95rem; margin-bottom: 1rem; width: 100%; box-sizing: border-box;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
-                                <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                                <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; flex: 1; min-width: 0;">
                                     <span style="font-weight: 800; font-size: 0.86rem; color: #1e293b;">
                                         ความคืบหน้าการชง:
                                     </span>
@@ -2228,7 +2228,7 @@
                                         </span>
                                     {/if}
                                 </div>
-                                <div style="display: flex; gap: 0.35rem;">
+                                <div style="display: flex; gap: 0.35rem; flex-shrink: 0;">
                                     <button
                                         type="button"
                                         onclick={checkAllBrewItems}
@@ -2271,38 +2271,38 @@
                             </p>
                         </div>
                     {:else}
-                        <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+                        <div style="display: flex; flex-direction: column; gap: 0.85rem; width: 100%; box-sizing: border-box;">
                             {#each brewSummaryList as menu, menuIdx}
                                 {@const menuAllChecked = isMenuAllChecked(menu)}
                                 <div
-                                    style="background: {menuAllChecked ? '#f8fafc' : '#ffffff'}; border: 1.5px solid {menuAllChecked ? '#bbf7d0' : '#e2e8f0'}; border-radius: 14px; padding: 0.85rem 1rem; box-shadow: 0 1px 4px rgba(0,0,0,0.02); transition: all 0.15s ease;"
+                                    style="background: {menuAllChecked ? '#f8fafc' : '#ffffff'}; border: 1.5px solid {menuAllChecked ? '#bbf7d0' : '#e2e8f0'}; border-radius: 14px; padding: 0.85rem 1rem; box-shadow: 0 1px 4px rgba(0,0,0,0.02); transition: all 0.15s ease; width: 100%; box-sizing: border-box;"
                                 >
                                     <!-- หัวการ์ดเมนู -->
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.4rem; border-bottom: 1px dashed #e2e8f0; padding-bottom: 0.5rem;">
-                                        <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-                                            <span style="font-size: 0.92rem; font-weight: 800; color: #1e293b;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.4rem; border-bottom: 1px dashed #e2e8f0; padding-bottom: 0.5rem; width: 100%; box-sizing: border-box;">
+                                        <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; flex: 1; min-width: 0;">
+                                            <span style="font-size: 0.92rem; font-weight: 800; color: #1e293b; word-break: break-word;">
                                                 {menuIdx + 1}. {menu.menuName}
                                             </span>
                                             {#if menu.isFermented}
-                                                <span style="background: #fef08a; color: #854d0e; font-size: 0.68rem; font-weight: 800; padding: 0.1rem 0.35rem; border-radius: 4px;">
+                                                <span style="background: #fef08a; color: #854d0e; font-size: 0.68rem; font-weight: 800; padding: 0.1rem 0.35rem; border-radius: 4px; flex-shrink: 0;">
                                                     เมนูบ่ม
                                                 </span>
                                             {/if}
-                                            <span style="background: #e0f2fe; color: #0369a1; font-size: 0.76rem; font-weight: 800; padding: 0.1rem 0.5rem; border-radius: 999px;">
+                                            <span style="background: #e0f2fe; color: #0369a1; font-size: 0.76rem; font-weight: 800; padding: 0.1rem 0.5rem; border-radius: 999px; flex-shrink: 0;">
                                                 รวม {menu.totalCups} แก้ว
                                             </span>
                                         </div>
                                         <button
                                             type="button"
                                             onclick={() => toggleMenuAll(menu)}
-                                            style="background: {menuAllChecked ? '#dcfce7' : '#f1f5f9'}; border: 1px solid {menuAllChecked ? '#86efac' : '#cbd5e1'}; color: {menuAllChecked ? '#166534' : '#475569'}; font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;"
+                                            style="background: {menuAllChecked ? '#dcfce7' : '#f1f5f9'}; border: 1px solid {menuAllChecked ? '#86efac' : '#cbd5e1'}; color: {menuAllChecked ? '#166534' : '#475569'}; font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; flex-shrink: 0;"
                                         >
                                             {menuAllChecked ? '✓ เสร็จแล้วทั้งเมนู' : '✓ ติ๊กทั้งเมนู'}
                                         </button>
                                     </div>
 
                                     <!-- รายการระดับความหวาน & ช็อต & โน้ต (Checklist Items) -->
-                                    <div style="display: flex; flex-direction: column; gap: 0.45rem;">
+                                    <div style="display: flex; flex-direction: column; gap: 0.45rem; width: 100%; box-sizing: border-box;">
                                         {#each menu.sweetnessList as sweet}
                                             {@const itemKey = getBrewItemKey(menu.menuName, sweet.sweetness)}
                                             {@const isChecked = !!brewChecklist[itemKey]}
@@ -2310,9 +2310,9 @@
                                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                                             <div
                                                 onclick={() => toggleChecklistItem(itemKey)}
-                                                style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; padding: 0.55rem 0.75rem; border-radius: 8px; border: 1.5px solid {isChecked ? '#86efac' : '#f1f5f9'}; background: {isChecked ? '#f0fdf4' : '#f8fafc'}; cursor: pointer; transition: all 0.15s ease;"
+                                                style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; padding: 0.55rem 0.75rem; border-radius: 8px; border: 1.5px solid {isChecked ? '#86efac' : '#f1f5f9'}; background: {isChecked ? '#f0fdf4' : '#f8fafc'}; cursor: pointer; transition: all 0.15s ease; width: 100%; box-sizing: border-box;"
                                             >
-                                                <div style="display: flex; align-items: flex-start; gap: 0.55rem;">
+                                                <div style="display: flex; align-items: flex-start; gap: 0.55rem; flex: 1; min-width: 0;">
                                                     <!-- Custom styled checkbox -->
                                                     <input
                                                         type="checkbox"
@@ -2321,7 +2321,7 @@
                                                         onchange={() => toggleChecklistItem(itemKey)}
                                                         style="width: 19px; height: 19px; accent-color: #16a34a; cursor: pointer; margin-top: 2px; flex-shrink: 0;"
                                                     />
-                                                    <div>
+                                                    <div style="flex: 1; min-width: 0;">
                                                         <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
                                                             <span style="font-weight: 800; font-size: 0.88rem; color: {isChecked ? '#166534' : '#1e293b'}; text-decoration: {isChecked ? 'line-through' : 'none'};">
                                                                 หวาน {sweet.sweetness}%
@@ -2335,7 +2335,7 @@
                                                         {#if Object.keys(sweet.addonBreakdown).length > 0}
                                                             <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.25rem;">
                                                                 {#each Object.entries(sweet.addonBreakdown) as [addon, count]}
-                                                                    <span style="display: inline-block; background: #dcfce7; color: #166534; font-size: 0.72rem; font-weight: 800; padding: 0.08rem 0.45rem; border-radius: 999px; border: 1px solid #86efac;">
+                                                                    <span style="display: inline-block; background: #dcfce7; color: #166534; font-size: 0.72rem; font-weight: 800; padding: 0.08rem 0.45rem; border-radius: 999px; border: 1px solid #86efac; word-break: break-word;">
                                                                         🍵 +{addon} ({count} แก้ว)
                                                                     </span>
                                                                 {/each}
@@ -2351,13 +2351,13 @@
                                                         {#if Object.keys(sweet.roundBreakdown).length > 0}
                                                             <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.25rem;">
                                                                 {#each Object.entries(sweet.roundBreakdown) as [round, count]}
-                                                                    <span style="display: inline-block; background: #e0f2fe; color: #0369a1; font-size: 0.72rem; font-weight: 700; padding: 0.08rem 0.45rem; border-radius: 999px; border: 1px solid #bae6fd;">
+                                                                    <span style="display: inline-block; background: #e0f2fe; color: #0369a1; font-size: 0.72rem; font-weight: 700; padding: 0.08rem 0.45rem; border-radius: 999px; border: 1px solid #bae6fd; word-break: break-word;">
                                                                         🚚 {round} ({count} แก้ว)
                                                                     </span>
                                                                 {/each}
                                                                 {#if Object.keys(sweet.dateBreakdown).length > 0}
                                                                     {#each Object.entries(sweet.dateBreakdown) as [date, count]}
-                                                                        <span style="display: inline-block; background: #f8fafc; color: #475569; font-size: 0.7rem; font-weight: 600; padding: 0.08rem 0.4rem; border-radius: 999px; border: 1px solid #e2e8f0;">
+                                                                        <span style="display: inline-block; background: #f8fafc; color: #475569; font-size: 0.7rem; font-weight: 600; padding: 0.08rem 0.4rem; border-radius: 999px; border: 1px solid #e2e8f0; word-break: break-word;">
                                                                             📅 {date}
                                                                         </span>
                                                                     {/each}
@@ -2369,7 +2369,7 @@
                                                         {#if Object.keys(sweet.noteBreakdown).length > 0}
                                                             <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.25rem;">
                                                                 {#each Object.entries(sweet.noteBreakdown) as [note, count]}
-                                                                    <span style="display: inline-block; background: #fef3c7; color: #92400e; font-size: 0.72rem; font-weight: 700; padding: 0.08rem 0.45rem; border-radius: 999px; border: 1px solid #fde68a;">
+                                                                    <span style="display: inline-block; background: #fef3c7; color: #92400e; font-size: 0.72rem; font-weight: 700; padding: 0.08rem 0.45rem; border-radius: 999px; border: 1px solid #fde68a; word-break: break-word;">
                                                                         📝 {note} ({count} แก้ว)
                                                                     </span>
                                                                 {/each}
@@ -2378,8 +2378,8 @@
                                                     </div>
                                                 </div>
 
-                                                <div style="flex-shrink: 0; text-align: right;">
-                                                    <span style="font-size: 1.05rem; font-weight: 900; color: {isChecked ? '#16a34a' : '#1e293b'};">
+                                                <div style="flex-shrink: 0; text-align: right; padding-left: 0.35rem;">
+                                                    <span style="font-size: 1.05rem; font-weight: 900; color: {isChecked ? '#16a34a' : '#1e293b'}; background: {isChecked ? '#dcfce7' : '#f1f5f9'}; padding: 0.15rem 0.45rem; border-radius: 6px; display: inline-block;">
                                                         x{sweet.count}
                                                     </span>
                                                 </div>
@@ -2389,12 +2389,12 @@
 
                                     <!-- สรุปรวมช็อตและโน้ตของทั้งเมนู (ถ้ามีมากกว่า 1 ระดับความหวาน) -->
                                     {#if menu.sweetnessList.length > 1 && (Object.keys(menu.overallAddons).length > 0 || Object.keys(menu.overallNotes).length > 0 || Object.keys(menu.overallRounds).length > 0)}
-                                        <div style="margin-top: 0.65rem; padding-top: 0.5rem; border-top: 1px solid #f1f5f9; font-size: 0.76rem; color: #64748b; display: flex; flex-direction: column; gap: 0.2rem;">
+                                        <div style="margin-top: 0.65rem; padding-top: 0.5rem; border-top: 1px solid #f1f5f9; font-size: 0.76rem; color: #64748b; display: flex; flex-direction: column; gap: 0.25rem; width: 100%; box-sizing: border-box;">
                                             {#if Object.keys(menu.overallRounds).length > 0}
                                                 <div style="display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;">
                                                     <strong style="color: #334155;">รอบจัดส่งในเมนูนี้:</strong>
                                                     {#each Object.entries(menu.overallRounds) as [round, count]}
-                                                        <span style="color: #0369a1; font-weight: 700;">🚚 {round} ({count} แก้ว)</span>
+                                                        <span style="color: #0369a1; font-weight: 700; background: #e0f2fe; padding: 0.05rem 0.4rem; border-radius: 999px;">🚚 {round} ({count} แก้ว)</span>
                                                     {/each}
                                                 </div>
                                             {/if}
@@ -2402,10 +2402,10 @@
                                                 <div style="display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;">
                                                     <strong style="color: #334155;">รวมช็อตทั้งหมดในเมนูนี้:</strong>
                                                     {#each Object.entries(menu.overallAddons) as [addon, count]}
-                                                        <span style="color: #166534; font-weight: 700;">+{addon} ({count} แก้ว)</span>
+                                                        <span style="color: #166534; font-weight: 700; background: #dcfce7; padding: 0.05rem 0.4rem; border-radius: 999px;">+{addon} ({count} แก้ว)</span>
                                                     {/each}
                                                     {#if menu.totalNormalAddon > 0}
-                                                        <span style="color: #64748b;">| ปกติ ({menu.totalNormalAddon} แก้ว)</span>
+                                                        <span style="color: #64748b; background: #f1f5f9; padding: 0.05rem 0.35rem; border-radius: 999px;">ปกติ ({menu.totalNormalAddon} แก้ว)</span>
                                                     {/if}
                                                 </div>
                                             {/if}
@@ -2413,7 +2413,7 @@
                                                 <div style="display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;">
                                                     <strong style="color: #334155;">รวมโน้ตพิเศษทั้งหมด:</strong>
                                                     {#each Object.entries(menu.overallNotes) as [note, count]}
-                                                        <span style="color: #b45309; font-weight: 700;">• {note} ({count} แก้ว)</span>
+                                                        <span style="color: #b45309; font-weight: 700; background: #fef3c7; padding: 0.05rem 0.4rem; border-radius: 999px;">• {note} ({count} แก้ว)</span>
                                                     {/each}
                                                 </div>
                                             {/if}
@@ -2425,14 +2425,14 @@
                     {/if}
 
                     <!-- ปุ่มยุบเก็บด้านล่าง เพื่อความสะดวกบนมือถือไม่ต้องเลื่อนขึ้นบนสุด -->
-                    <div style="margin-top: 0.85rem; padding-top: 0.65rem; border-top: 1px dashed #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-                        <span style="font-size: 0.76rem; color: #64748b;">
+                    <div style="margin-top: 0.85rem; padding-top: 0.65rem; border-top: 1px dashed #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; width: 100%; box-sizing: border-box;">
+                        <span style="font-size: 0.76rem; color: #64748b; flex: 1; min-width: 180px;">
                             💡 ติ๊กที่รายการเพื่อมาร์กชงเสร็จ (ระบบนับความคืบหน้าเรียลไทม์)
                         </span>
                         <button
                             type="button"
                             onclick={() => (isBrewSummaryExpanded = false)}
-                            style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 6px; cursor: pointer;"
+                            style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 6px; cursor: pointer; flex-shrink: 0;"
                         >
                             ▲ ยุบเก็บการ์ดสรุป
                         </button>
@@ -2442,7 +2442,7 @@
         </div>
 
         <!-- กล่องเลือกทั้งหมด & คำสั่ง Bulk Action -->
-        <div style="background: #ffffff; border: 1px solid var(--border-light); border-radius: 14px; padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+        <div style="background: #ffffff; border: 1px solid var(--border-light); border-radius: 14px; padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; width: 100%; max-width: 100%; box-sizing: border-box;">
             <div style="display: flex; align-items: center; gap: 0.6rem;">
                 <input 
                     type="checkbox"
@@ -2511,15 +2511,15 @@
                 <p>กำลังโหลดรายการคำสั่งซื้อ...</p>
             </div>
         {:else if filteredOrders.length === 0}
-            <div class="form-card" style="text-align: center; padding: 3rem 1.5rem; width: 100%;">
+            <div class="form-card admin-order-card" style="text-align: center; padding: 3rem 1.5rem; width: 100%; max-width: 100%; box-sizing: border-box;">
                 <p style="font-size: 2.5rem; margin: 0 0 0.5rem 0;">📋</p>
                 <h3 style="margin: 0; color: var(--matcha-deep);">ไม่มีคำสั่งซื้อในสถานะนี้</h3>
             </div>
         {:else}
-            <div style="display: flex; flex-direction: column; gap: 1.25rem; width: 100%;">
+            <div class="admin-orders-container" style="display: flex; flex-direction: column; gap: 1.25rem; width: 100%; max-width: 100%; box-sizing: border-box;">
                 {#each filteredOrders as order, index}
                     <div 
-                        class="form-card" 
+                        class="form-card admin-order-card" 
                         style="
                             padding: 1.5rem; 
                             text-align: left; 
@@ -2531,6 +2531,9 @@
                                 order.status === 'pending' ? '#d97706' : '#94a3b8'
                             }; 
                             {order.status === 'pending' ? 'background: #fffdf7;' : ''}
+                            width: 100%;
+                            max-width: 100%;
+                            box-sizing: border-box;
                         "
                     >
                         <!-- แถบด้านบน: Checkbox + คิวที่ + รหัสออเดอร์ + ปุ่มเปลี่ยนสถานะ -->
@@ -4096,6 +4099,35 @@
 {/if}
 
 <style>
+    .admin-page-shell {
+        max-width: 1100px !important;
+        width: 100% !important;
+        margin: 0 auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        box-sizing: border-box !important;
+    }
+
+    .admin-page-shell .form-card {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    .admin-order-card {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .brew-summary-card {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
     .admin-header-bar {
         width: 100%;
         display: flex;
@@ -4246,8 +4278,16 @@
 
     @media (max-width: 768px) {
         .admin-page-shell {
+            padding-top: 5.5rem !important;
             padding-left: 0.75rem !important;
             padding-right: 0.75rem !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow-x: hidden !important;
+        }
+
+        .admin-order-card {
+            padding: 1rem 0.85rem !important;
         }
 
         .admin-header-bar {
