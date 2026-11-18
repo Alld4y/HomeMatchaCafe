@@ -81,8 +81,8 @@
     let adminAuthError = $state('');
     let isVerifyingAdmin = $state(false);
 
-    // แท็บหน้า Admin: 'orders' | 'delivery' | 'settings' | 'members' | 'menus'
-    let activeTab = $state<'orders' | 'delivery' | 'settings' | 'members' | 'menus'>('orders');
+    // แท็บหน้า Admin: 'orders' | 'delivery' | 'history' | 'settings' | 'members' | 'menus'
+    let activeTab = $state<'orders' | 'delivery' | 'history' | 'settings' | 'members' | 'menus'>('orders');
 
     // ข้อมูลคำสั่งซื้อ
     let orders = $state<AdminOrder[]>([]);
@@ -412,27 +412,116 @@
               ]
     );
 
-    // คำนวณสรุปยอด
-    let totalSales = $derived(
-        orders
-            .filter((o) => o.status !== 'cancelled' && o.status !== 'pending')
-            .reduce((sum, o) => sum + (o.totalPrice || 0), 0)
-    );
-    let manualReviewOrders = $derived(orders.filter((o) => o.status === 'pending'));
-    let brewingCount = $derived(orders.filter((o) => o.status === 'brewing' || o.status === 'paid').length);
-    let readyToShipCount = $derived(orders.filter((o) => o.status === 'ready_to_ship').length);
-    let completedCount = $derived(orders.filter((o) => o.status === 'completed').length);
+    // คำนวณวันที่ของวันนี้ในรูปแบบ YYYY-MM-DD (UTC+7)
+    let todayDateStr = $derived.by(() => {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    });
 
     // เรียงลำดับคำสั่งซื้อตามเวลาที่สั่ง (FIFO: สั่งก่อนอยู่บนสุด ตามบรีฟแม่ค้า)
     let sortedOrders = $derived(
         [...orders].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     );
 
+    // 🍵 คิวงานปัจจุบัน ณ ตอนนั้น (Live Working Queue):
+    // - ตัดออเดอร์ที่ยกเลิก (cancelled) ออก 100% ไม่นำมาแสดงในคิวสดเลย
+    // - แสดงเฉพาะออเดอร์ที่ยังต้องทำจริง (pending, paid, brewing, ready_to_ship, delivering)
+    // - และออเดอร์ที่ส่งเสร็จแล้วเฉพาะของ "วันนี้" (completed of today)
+    let liveOrders = $derived.by(() => {
+        return sortedOrders.filter((o) => {
+            if (o.status === 'cancelled') return false;
+            if (o.status !== 'completed') return true;
+            const orderDate = o.deliveryDate || o.createdAt.slice(0, 10);
+            return orderDate === todayDateStr;
+        });
+    });
+
+    // คำนวณสรุปยอดของคิวงานสด
+    let liveTotalSales = $derived(
+        liveOrders
+            .filter((o) => o.status !== 'cancelled' && o.status !== 'pending')
+            .reduce((sum, o) => sum + (o.totalPrice || 0), 0)
+    );
+    let totalSales = $derived(
+        orders
+            .filter((o) => o.status !== 'cancelled' && o.status !== 'pending')
+            .reduce((sum, o) => sum + (o.totalPrice || 0), 0)
+    );
+    let manualReviewOrders = $derived(liveOrders.filter((o) => o.status === 'pending'));
+    let brewingCount = $derived(liveOrders.filter((o) => o.status === 'brewing' || o.status === 'paid').length);
+    let readyToShipCount = $derived(liveOrders.filter((o) => o.status === 'ready_to_ship').length);
+    let todayCompletedCount = $derived(liveOrders.filter((o) => o.status === 'completed').length);
+    let completedCount = $derived(orders.filter((o) => o.status === 'completed').length);
+
     let filteredOrders = $derived(
         selectedFilter === 'all'
-            ? sortedOrders
-            : sortedOrders.filter((o) => o.status === selectedFilter)
+            ? liveOrders
+            : liveOrders.filter((o) => o.status === selectedFilter)
     );
+
+    // 📜 ตัวแปรและการคำนวณสำหรับแท็บประวัติคำสั่งซื้อ (Order History & Archive)
+    let historyDateRange = $state<'all' | 'today' | 'yesterday' | 'week' | 'custom'>('all');
+    let historyCustomDate = $state<string>('');
+    let historyStatusFilter = $state<string>('all'); // 'all' | 'completed' | 'cancelled' | 'pending' | 'active'
+    let historySearchQuery = $state<string>('');
+
+    let historyFilteredOrders = $derived.by(() => {
+        let list = orders;
+
+        // 1. กรองตามช่วงวันที่
+        if (historyDateRange === 'today') {
+            list = list.filter((o) => (o.deliveryDate || o.createdAt.slice(0, 10)) === todayDateStr);
+        } else if (historyDateRange === 'yesterday') {
+            const yd = new Date();
+            yd.setDate(yd.getDate() - 1);
+            const ydStr = `${yd.getFullYear()}-${String(yd.getMonth() + 1).padStart(2, '0')}-${String(yd.getDate()).padStart(2, '0')}`;
+            list = list.filter((o) => (o.deliveryDate || o.createdAt.slice(0, 10)) === ydStr);
+        } else if (historyDateRange === 'week') {
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            const weekAgoMs = weekAgo.getTime();
+            list = list.filter((o) => new Date(o.createdAt).getTime() >= weekAgoMs);
+        } else if (historyDateRange === 'custom' && historyCustomDate) {
+            list = list.filter((o) => (o.deliveryDate || o.createdAt.slice(0, 10)) === historyCustomDate);
+        }
+
+        // 2. กรองตามสถานะ
+        if (historyStatusFilter === 'completed') {
+            list = list.filter((o) => o.status === 'completed');
+        } else if (historyStatusFilter === 'cancelled') {
+            list = list.filter((o) => o.status === 'cancelled');
+        } else if (historyStatusFilter === 'pending') {
+            list = list.filter((o) => o.status === 'pending');
+        } else if (historyStatusFilter === 'active') {
+            list = list.filter((o) => o.status !== 'completed' && o.status !== 'cancelled');
+        }
+
+        // 3. กรองตามคำค้นหา (ชื่อ / เบอร์ / รหัสออเดอร์)
+        const q = historySearchQuery.trim().toLowerCase();
+        if (q) {
+            list = list.filter((o) => {
+                const name = (o.name || '').toLowerCase();
+                const phone = (o.phone || '');
+                const orderId = (o.order_id || o.id || '').toLowerCase();
+                const addr = (o.address || '').toLowerCase();
+                return name.includes(q) || phone.includes(q) || orderId.includes(q) || addr.includes(q);
+            });
+        }
+
+        // เรียงจากออเดอร์ล่าสุดไปเก่าสุดสำหรับประวัติ
+        return [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    });
+
+    let historyTotalSales = $derived(
+        historyFilteredOrders
+            .filter((o) => o.status !== 'cancelled' && o.status !== 'pending')
+            .reduce((sum, o) => sum + (o.totalPrice || 0), 0)
+    );
+    let historyCompletedCount = $derived(historyFilteredOrders.filter((o) => o.status === 'completed').length);
+    let historyCancelledCount = $derived(historyFilteredOrders.filter((o) => o.status === 'cancelled').length);
 
     // 🍵 ระบบสรุปคิวชงเครื่องดื่มและเช็คลิสต์บาริสต้า (Barista Drink Prep Summary & Checklist)
     let isBrewSummaryExpanded = $state<boolean>(false);
@@ -461,10 +550,11 @@
         totalNormalAddon: number;
     }
 
-    // รอบจัดส่งทั้งหมดที่มีอยู่ในคำสั่งซื้อปัจจุบัน
+    // รอบจัดส่งทั้งหมดที่มีอยู่ในคำสั่งซื้อที่ต้องชง ณ ตอนนั้น
     let availableDeliveryRounds = $derived.by(() => {
         const counts: Record<string, number> = {};
-        for (const order of filteredOrders) {
+        const brewTargetOrders = liveOrders.filter((o) => o.status === 'paid' || o.status === 'brewing');
+        for (const order of brewTargetOrders) {
             const roundName = (order.deliveryRound || 'รอบปกติ').trim();
             const cups = (order.basket || []).reduce((sum, it) => sum + Math.max(1, Number(it.quantity) || 1), 0);
             counts[roundName] = (counts[roundName] || 0) + cups;
@@ -472,11 +562,14 @@
         return counts;
     });
 
-    let activeSummaryOrders = $derived(
-        selectedRoundFilter === 'all'
-            ? filteredOrders
-            : filteredOrders.filter((o) => (o.deliveryRound || 'รอบปกติ').trim() === selectedRoundFilter)
-    );
+    let activeSummaryOrders = $derived.by(() => {
+        // นับเฉพาะออเดอร์ที่ต้องชงจริง ณ ตอนนั้น (รับยอดแล้ว/กำลังชง) ตัดยกเลิก/เสร็จแล้ว/วันเก่าออกเด็ดขาด
+        const brewTargetOrders = liveOrders.filter((o) => o.status === 'paid' || o.status === 'brewing');
+        if (selectedRoundFilter === 'all') {
+            return brewTargetOrders;
+        }
+        return brewTargetOrders.filter((o) => (o.deliveryRound || 'รอบปกติ').trim() === selectedRoundFilter);
+    });
 
     let filteredTotalCups = $derived(
         activeSummaryOrders.reduce((sum, o) => {
@@ -886,15 +979,6 @@
     // 🛵 ระบบตัวช่วยในการจัดส่ง (Delivery Runner Assistant)
     // ========================================================
     let selectedDeliveryRoundFilter = $state<string>('auto'); // 'auto' | roundId | 'all'
-
-    // คำนวณวันที่ของวันนี้ในรูปแบบ YYYY-MM-DD (UTC+7)
-    let todayDateStr = $derived.by(() => {
-        const d = new Date();
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${y}-${m}-${day}`;
-    });
 
     // ตรวจจับรอบส่งปัจจุบันตามเวลาจริง
     function detectCurrentDeliveryRoundId(): string {
@@ -2158,14 +2242,14 @@
         </div>
     </div>
 
-    <!-- แถบสลับแท็บหลัก 4 แท็บ -->
+    <!-- แถบสลับแท็บหลัก 6 แท็บ -->
     <div class="admin-main-tabs">
         <button 
             type="button"
             onclick={() => (activeTab = 'orders')}
             class="admin-main-tab-btn {activeTab === 'orders' ? 'active' : ''}"
         >
-            <span>🍵 คิวชง & ออเดอร์</span>
+            <span>🍵 คิวงานปัจจุบัน</span>
             {#if brewingCount > 0}
                 <span style="background: var(--matcha-primary); color: #fff; font-size: 0.72rem; padding: 0.08rem 0.45rem; border-radius: 999px;">
                     {brewingCount}
@@ -2189,6 +2273,14 @@
                     {pendingDeliveryOrders.length}
                 </span>
             {/if}
+        </button>
+
+        <button 
+            type="button"
+            onclick={() => (activeTab = 'history')}
+            class="admin-main-tab-btn {activeTab === 'history' ? 'active' : ''}"
+        >
+            <span>📜 ประวัติคำสั่งซื้อ</span>
         </button>
 
         <button 
@@ -2245,12 +2337,12 @@
             </div>
         {/if}
 
-        <!-- สรุปสถิติ 4 ช่อง -->
+        <!-- สรุปสถิติคิวปัจจุบัน 4 ช่อง -->
         <div class="admin-stats-grid">
             <div class="form-card admin-stat-card">
-                <p style="margin: 0; font-size: 0.78rem; color: var(--text-muted);">💰 ยอดขายที่ยืนยันแล้ว</p>
+                <p style="margin: 0; font-size: 0.78rem; color: var(--text-muted);">💰 ยอดขายในคิววันนี้</p>
                 <h2 class="admin-stat-value" style="color: var(--matcha-dark);">
-                    {Number(totalSales.toFixed(2))} <span style="font-size: 0.9rem; font-weight: 500;">บาท</span>
+                    {Number(liveTotalSales.toFixed(2))} <span style="font-size: 0.9rem; font-weight: 500;">บาท</span>
                 </h2>
             </div>
 
@@ -2269,9 +2361,9 @@
             </div>
 
             <div class="form-card admin-stat-card">
-                <p style="margin: 0; font-size: 0.78rem; color: var(--text-muted);">✅ จัดส่งสำเร็จแล้ว</p>
+                <p style="margin: 0; font-size: 0.78rem; color: var(--text-muted);">✅ จัดส่งสำเร็จแล้ววันนี้</p>
                 <h2 class="admin-stat-value" style="color: var(--green-status);">
-                    {completedCount} <span style="font-size: 0.9rem; font-weight: 500;">ออเดอร์</span>
+                    {todayCompletedCount} <span style="font-size: 0.9rem; font-weight: 500;">ออเดอร์</span>
                 </h2>
             </div>
         </div>
@@ -2279,7 +2371,7 @@
         <!-- แถบเครื่องมือจัดการคิวและปุ่มสร้างออเดอร์ -->
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.9rem;">
             <div style="font-size: 0.95rem; font-weight: 800; color: #1e293b; display: flex; align-items: center; gap: 0.4rem;">
-                📋 กระดานคิวชงและคำสั่งซื้อ
+                📋 กระดานคิวชงและคำสั่งซื้อ (เฉพาะคิวปัจจุบัน)
             </div>
             <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                 <button 
@@ -2302,10 +2394,10 @@
             </div>
         </div>
 
-        <!-- แถบตัวกรองสถานะ -->
+        <!-- แถบตัวกรองสถานะ (เฉพาะคิวปัจจุบัน) -->
         <div class="category-filter-bar" style="margin-bottom: 1.25rem; width: 100%;">
             <button class="category-tab-btn {selectedFilter === 'all' ? 'active' : ''}" onclick={() => { selectedFilter = 'all'; selectedOrderIds = []; }}>
-                ทั้งหมด ({orders.length})
+                ทั้งหมดในคิว ({liveOrders.length})
             </button>
             <button 
                 class="category-tab-btn {selectedFilter === 'pending' ? 'active' : ''}" 
@@ -2315,19 +2407,19 @@
                 🔔 รอตรวจสลิป ({manualReviewOrders.length})
             </button>
             <button class="category-tab-btn {selectedFilter === 'paid' ? 'active' : ''}" onclick={() => { selectedFilter = 'paid'; selectedOrderIds = []; }}>
-                รับยอดแล้ว ({orders.filter((o) => o.status === 'paid').length})
+                รับยอดแล้ว ({liveOrders.filter((o) => o.status === 'paid').length})
             </button>
             <button class="category-tab-btn {selectedFilter === 'brewing' ? 'active' : ''}" onclick={() => { selectedFilter = 'brewing'; selectedOrderIds = []; }}>
-                🍵 กำลังชง ({orders.filter((o) => o.status === 'brewing').length})
+                🍵 กำลังชง ({liveOrders.filter((o) => o.status === 'brewing').length})
             </button>
             <button class="category-tab-btn {selectedFilter === 'ready_to_ship' ? 'active' : ''}" onclick={() => { selectedFilter = 'ready_to_ship'; selectedOrderIds = []; }}>
                 ✨ ชงเสร็จแล้ว ({readyToShipCount})
             </button>
             <button class="category-tab-btn {selectedFilter === 'delivering' ? 'active' : ''}" onclick={() => { selectedFilter = 'delivering'; selectedOrderIds = []; }}>
-                🛵 กำลังส่ง ({orders.filter((o) => o.status === 'delivering').length})
+                🛵 กำลังส่ง ({liveOrders.filter((o) => o.status === 'delivering').length})
             </button>
             <button class="category-tab-btn {selectedFilter === 'completed' ? 'active' : ''}" onclick={() => { selectedFilter = 'completed'; selectedOrderIds = []; }}>
-                สำเร็จ ({completedCount})
+                ส่งแล้ววันนี้ ({todayCompletedCount})
             </button>
         </div>
 
@@ -3117,6 +3209,254 @@
                             {/each}
                         </div>
                     {/if}
+                </div>
+            {/if}
+        </div>
+    {/if}
+
+    <!-- ======================================================== -->
+    <!-- แท็บ: ประวัติคำสั่งซื้อทั้งหมด (Order History & Archive)     -->
+    <!-- ======================================================== -->
+    {#if activeTab === 'history'}
+        <div style="display: flex; flex-direction: column; gap: 1.25rem; width: 100%;">
+            <!-- Header ประวัติคำสั่งซื้อ -->
+            <div class="form-card" style="padding: 1.25rem 1.5rem; text-align: left; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border: 1.5px solid #cbd5e1;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                            <span style="font-size: 1.5rem;">📜</span>
+                            <h2 style="margin: 0; font-size: 1.35rem; color: #1e293b; font-weight: 800;">
+                                ประวัติคำสั่งซื้อ & รายการย้อนหลัง (Order History)
+                            </h2>
+                        </div>
+                        <p style="margin: 0; font-size: 0.88rem; color: #64748b;">
+                            รวมประวัติออเดอร์ทั้งหมดในอดีต รายการที่จัดส่งเสร็จสิ้น และรายการที่ยกเลิก
+                        </p>
+                    </div>
+
+                    <!-- สรุปตัวเลขสถิติของช่วงเวลาที่เลือก -->
+                    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                        <div style="background: #ffffff; border: 1px solid #e2e8f0; padding: 0.5rem 0.9rem; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <div style="font-size: 0.72rem; color: #64748b; font-weight: 600;">💰 ยอดขายช่วงนี้</div>
+                            <div style="font-size: 1.15rem; font-weight: 800; color: #15803d;">{Number(historyTotalSales.toFixed(2))} ฿</div>
+                        </div>
+                        <div style="background: #ffffff; border: 1px solid #e2e8f0; padding: 0.5rem 0.9rem; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <div style="font-size: 0.72rem; color: #64748b; font-weight: 600;">✅ สำเร็จแล้ว</div>
+                            <div style="font-size: 1.15rem; font-weight: 800; color: #16a34a;">{historyCompletedCount}</div>
+                        </div>
+                        <div style="background: #ffffff; border: 1px solid #fecaca; padding: 0.5rem 0.9rem; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <div style="font-size: 0.72rem; color: #991b1b; font-weight: 600;">🚫 ยกเลิก</div>
+                            <div style="font-size: 1.15rem; font-weight: 800; color: #dc2626;">{historyCancelledCount}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- แถบเครื่องมือกรองวันที่ & ค้นหา -->
+                <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px dashed #cbd5e1; display: flex; flex-direction: column; gap: 0.85rem;">
+                    <!-- แถวที่ 1: ช่วงวันที่ -->
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <span style="font-size: 0.82rem; font-weight: 700; color: #475569; margin-right: 0.25rem;">
+                            📅 วันที่:
+                        </span>
+                        <button
+                            type="button"
+                            onclick={() => (historyDateRange = 'all')}
+                            style="padding: 0.35rem 0.8rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.2s; border: 1.5px solid {historyDateRange === 'all' ? '#1e293b' : '#cbd5e1'}; background: {historyDateRange === 'all' ? '#1e293b' : '#ffffff'}; color: {historyDateRange === 'all' ? '#ffffff' : '#475569'};"
+                        >
+                            ทั้งหมดทุกวัน ({orders.length})
+                        </button>
+                        <button
+                            type="button"
+                            onclick={() => (historyDateRange = 'today')}
+                            style="padding: 0.35rem 0.8rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.2s; border: 1.5px solid {historyDateRange === 'today' ? '#1e293b' : '#cbd5e1'}; background: {historyDateRange === 'today' ? '#1e293b' : '#ffffff'}; color: {historyDateRange === 'today' ? '#ffffff' : '#475569'};"
+                        >
+                            วันนี้
+                        </button>
+                        <button
+                            type="button"
+                            onclick={() => (historyDateRange = 'yesterday')}
+                            style="padding: 0.35rem 0.8rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.2s; border: 1.5px solid {historyDateRange === 'yesterday' ? '#1e293b' : '#cbd5e1'}; background: {historyDateRange === 'yesterday' ? '#1e293b' : '#ffffff'}; color: {historyDateRange === 'yesterday' ? '#ffffff' : '#475569'};"
+                        >
+                            เมื่อวาน
+                        </button>
+                        <button
+                            type="button"
+                            onclick={() => (historyDateRange = 'week')}
+                            style="padding: 0.35rem 0.8rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.2s; border: 1.5px solid {historyDateRange === 'week' ? '#1e293b' : '#cbd5e1'}; background: {historyDateRange === 'week' ? '#1e293b' : '#ffffff'}; color: {historyDateRange === 'week' ? '#ffffff' : '#475569'};"
+                        >
+                            7 วันล่าสุด
+                        </button>
+                        <div style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                            <input
+                                type="date"
+                                bind:value={historyCustomDate}
+                                onchange={() => (historyDateRange = 'custom')}
+                                style="padding: 0.3rem 0.6rem; border-radius: 8px; border: 1.5px solid {historyDateRange === 'custom' ? '#1e293b' : '#cbd5e1'}; font-size: 0.8rem;"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- แถวที่ 2: ฟิลเตอร์สถานะ & ช่องค้นหา -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                            <button
+                                type="button"
+                                onclick={() => (historyStatusFilter = 'all')}
+                                style="padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer; border: 1.5px solid {historyStatusFilter === 'all' ? '#0284c7' : '#cbd5e1'}; background: {historyStatusFilter === 'all' ? '#0284c7' : '#ffffff'}; color: {historyStatusFilter === 'all' ? '#ffffff' : '#334155'};"
+                            >
+                                ทั้งหมด ({historyFilteredOrders.length})
+                            </button>
+                            <button
+                                type="button"
+                                onclick={() => (historyStatusFilter = 'completed')}
+                                style="padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer; border: 1.5px solid {historyStatusFilter === 'completed' ? '#16a34a' : '#cbd5e1'}; background: {historyStatusFilter === 'completed' ? '#16a34a' : '#ffffff'}; color: {historyStatusFilter === 'completed' ? '#ffffff' : '#334155'};"
+                            >
+                                ✅ ส่งสำเร็จแล้ว ({orders.filter(o => o.status === 'completed').length})
+                            </button>
+                            <button
+                                type="button"
+                                onclick={() => (historyStatusFilter = 'cancelled')}
+                                style="padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer; border: 1.5px solid {historyStatusFilter === 'cancelled' ? '#dc2626' : '#fecaca'}; background: {historyStatusFilter === 'cancelled' ? '#dc2626' : '#fff5f5'}; color: {historyStatusFilter === 'cancelled' ? '#ffffff' : '#b91c1c'};"
+                            >
+                                🚫 ยกเลิกแล้ว ({orders.filter(o => o.status === 'cancelled').length})
+                            </button>
+                            <button
+                                type="button"
+                                onclick={() => (historyStatusFilter = 'pending')}
+                                style="padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.8rem; font-weight: 700; cursor: pointer; border: 1.5px solid {historyStatusFilter === 'pending' ? '#d97706' : '#cbd5e1'}; background: {historyStatusFilter === 'pending' ? '#d97706' : '#ffffff'}; color: {historyStatusFilter === 'pending' ? '#ffffff' : '#334155'};"
+                            >
+                                🔔 รอตรวจสลิป ({orders.filter(o => o.status === 'pending').length})
+                            </button>
+                        </div>
+
+                        <!-- ช่องค้นหาในประวัติ -->
+                        <div style="flex: 1; max-width: 320px; min-width: 200px;">
+                            <input
+                                type="text"
+                                bind:value={historySearchQuery}
+                                placeholder="🔍 ค้นชื่อ, เบอร์โทร, เลขออเดอร์..."
+                                style="width: 100%; padding: 0.4rem 0.75rem; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 0.85rem;"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- รายการออเดอร์ในประวัติ -->
+            {#if historyFilteredOrders.length === 0}
+                <div class="form-card" style="padding: 3rem 1.5rem; text-align: center; background: #ffffff;">
+                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📭</div>
+                    <h3 style="font-size: 1.15rem; color: #475569; margin: 0 0 0.5rem 0;">
+                        ไม่พบรายการคำสั่งซื้อในช่วงเวลานี้
+                    </h3>
+                    <p style="font-size: 0.85rem; color: #94a3b8; margin: 0;">
+                        ลองปรับเปลี่ยนเงื่อนไขวันที่ หรือตัวกรองสถานะด้านบนนะคะ
+                    </p>
+                </div>
+            {:else}
+                <div class="admin-orders-container" style="display: flex; flex-direction: column; gap: 1.25rem; width: 100%; max-width: 100%; box-sizing: border-box;">
+                    {#each historyFilteredOrders as order (order.id)}
+                        <div 
+                            class="form-card admin-order-card" 
+                            style="
+                                padding: 1.5rem; 
+                                text-align: left; 
+                                border-left: 6px solid {
+                                    order.status === 'completed' ? 'var(--green-status)' : 
+                                    order.status === 'cancelled' ? '#ef4444' : 
+                                    order.status === 'ready_to_ship' ? '#0284c7' :
+                                    order.status === 'brewing' ? 'var(--matcha-primary)' : 
+                                    order.status === 'delivering' ? 'var(--gold-accent, #d97706)' : '#d97706'
+                                }; 
+                                {order.status === 'cancelled' ? 'background: #fff8f8; opacity: 0.9;' : ''}
+                                width: 100%;
+                                max-width: 100%;
+                                box-sizing: border-box;
+                            "
+                        >
+                            <!-- ส่วนหัวการ์ด -->
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-light);">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                    <h3 style="margin: 0; font-size: 1.15rem; color: var(--matcha-deep);">
+                                        {order.order_id || order.id}
+                                    </h3>
+                                    <span class="status-pill {order.status}">
+                                        <span class="pulse-dot"></span>
+                                        {getStatusName(order.status)}
+                                    </span>
+                                    {#if order.status === 'cancelled'}
+                                        <span style="background: #fee2e2; color: #b91c1c; font-size: 0.75rem; font-weight: 800; padding: 0.15rem 0.55rem; border-radius: 6px;">
+                                            🚫 ยกเลิกแล้ว
+                                        </span>
+                                    {/if}
+                                </div>
+
+                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                    <span style="font-size: 0.8rem; color: var(--text-muted);">
+                                        สั่งเมื่อ: {formatTime(order.createdAt)}
+                                    </span>
+                                    <select 
+                                        class="form-select" 
+                                        style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: 8px;"
+                                        value={order.status}
+                                        onchange={(e) => updateStatus(order.id, (e.target as HTMLSelectElement).value as any)}
+                                    >
+                                        <option value="pending">รอตรวจสลิป</option>
+                                        <option value="paid">รับยอดแล้ว</option>
+                                        <option value="brewing">กำลังชง</option>
+                                        <option value="ready_to_ship">ชงเสร็จแล้ว</option>
+                                        <option value="delivering">กำลังส่ง</option>
+                                        <option value="completed">ส่งสำเร็จ</option>
+                                        <option value="cancelled">ยกเลิก</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- ข้อมูลลูกค้า & วันจัดส่ง -->
+                            <div style="margin: 0.85rem 0; font-size: 0.9rem; display: flex; flex-direction: column; gap: 0.35rem;">
+                                <div><strong>ลูกค้า:</strong> {order.name} (โทร: <a href="tel:{order.phone}" style="color: var(--matcha-deep); font-weight: 700;">{order.phone}</a>)</div>
+                                <div><strong>สถานที่จัดส่ง:</strong> {order.address}</div>
+                                <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: #475569;">
+                                    <span>📅 วันที่ส่ง: <strong>{order.deliveryDate || order.createdAt.slice(0, 10)}</strong></span>
+                                    <span>⏰ รอบส่ง: <strong>{order.deliveryRound || 'รอบปกติ'}</strong></span>
+                                </div>
+                                {#if order.message}
+                                    <div style="background: #f8fafc; border-radius: 6px; padding: 0.35rem 0.6rem; font-size: 0.82rem; color: #64748b;">
+                                        <strong>โน้ต:</strong> {order.message}
+                                    </div>
+                                {/if}
+                            </div>
+
+                            <!-- รายการเครื่องดื่ม & สลิป -->
+                            <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-light);">
+                                <div style="flex: 1; min-width: 200px;">
+                                    <div style="font-size: 0.82rem; font-weight: 700; color: var(--matcha-deep); margin-bottom: 0.35rem;">รายการสินค้า:</div>
+                                    {#each order.basket as item}
+                                        <div style="font-size: 0.85rem; color: #334155; margin-bottom: 0.2rem;">
+                                            • {item.thaiName || item.name} x{item.quantity} (หวาน {item.sweetness ?? 50}%)
+                                            {#if item.addonName} <span style="color: #15803d; font-size: 0.8rem;">(+{item.addonName})</span>{/if}
+                                            {#if item.note} <span style="color: #b45309; font-size: 0.8rem;">[{item.note}]</span>{/if}
+                                        </div>
+                                    {/each}
+                                    <div style="margin-top: 0.45rem; font-size: 0.95rem; font-weight: 800; color: var(--matcha-dark);">
+                                        ยอดรวม: {order.totalPrice} บาท
+                                    </div>
+                                </div>
+
+                                {#if order.slipImage}
+                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                    <div 
+                                        onclick={() => (selectedSlip = order.slipImage || null)}
+                                        style="cursor: pointer; position: relative; border-radius: 8px; overflow: hidden; border: 1.5px solid #cbd5e1; width: 68px; height: 80px;"
+                                        title="คลิกเพื่อดูสลิป"
+                                    >
+                                        <img src={order.slipImage} alt="Slip" style="width: 100%; height: 100%; object-fit: cover;" />
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+                    {/each}
                 </div>
             {/if}
         </div>
