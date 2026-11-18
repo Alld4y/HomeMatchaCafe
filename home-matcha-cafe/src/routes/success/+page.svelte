@@ -17,31 +17,22 @@
 
     async function checkPushStatus() {
         if (typeof window === 'undefined') return;
-        const phone = member?.phone || searchPhone.trim();
+        const phone = member?.phone;
         if (phone && isPushNotificationSupported()) {
             isSubscribedToPush = await checkServerSubscription(phone);
         }
     }
 
     $effect(() => {
-        const phone = member?.phone || searchPhone.trim();
+        const phone = member?.phone;
         if (phone) {
             checkPushStatus();
         }
     });
 
     async function handleTogglePush() {
-        const activePhone = member?.phone || searchPhone.trim();
-        if (!activePhone) {
-            swal.fire({
-                icon: 'info',
-                title: 'กรุณาระบุเบอร์โทรศัพท์',
-                text: 'กรุณาระบุเบอร์โทรศัพท์ในช่องค้นหา หรือเข้าสู่ระบบสมาชิกเพื่อเปิดรับการแจ้งเตือนค่ะ'
-            });
-            return;
-        }
-
-        if (!member) {
+        const activePhone = member?.phone;
+        if (!activePhone || !member) {
             const res = await swal.fire({
                 icon: 'info',
                 title: 'เข้าสู่ระบบสมาชิกเพื่อเปิดแจ้งเตือน',
@@ -116,7 +107,6 @@
     }
 
     let ordersList = $state<OrderRecord[]>([]);
-    let searchPhone = $state('');
     let loading = $state(true);
 
     const statusSteps = [
@@ -168,9 +158,15 @@
     }
 
     async function fetchHistory(phoneToFetch?: string) {
+        const targetPhone = phoneToFetch || member?.phone;
+        if (!targetPhone) {
+            ordersList = [];
+            loading = false;
+            return;
+        }
+
         loading = true;
         try {
-            const targetPhone = phoneToFetch ?? searchPhone;
             const res = await fetch('/api/get-history', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -193,15 +189,20 @@
     }
 
     onMount(() => {
-        const rawPhone = localStorage.getItem('phone');
-        if (rawPhone) {
-            try {
-                searchPhone = JSON.parse(rawPhone);
-            } catch {
-                searchPhone = rawPhone.replace(/"/g, '');
-            }
+        if (member?.phone) {
+            fetchHistory(member.phone);
+        } else {
+            loading = false;
         }
-        fetchHistory();
+    });
+
+    $effect(() => {
+        if (member?.phone) {
+            fetchHistory(member.phone);
+        } else {
+            ordersList = [];
+            loading = false;
+        }
     });
 
     function copyOrderId(id: string) {
@@ -228,7 +229,7 @@
         <span class="menu-header-badge">📦 ORDER TRACKING & HISTORY</span>
         <h1 class="menu-main-title">ติดตามสถานะและประวัติคำสั่งซื้อ</h1>
         <p class="menu-subtitle">
-            ดูสถานะเครื่องดื่มของคุณแบบเรียลไทม์ หรือค้นหาตามเบอร์โทรศัพท์
+            ดูสถานะเครื่องดื่มของคุณแบบเรียลไทม์ และตรวจสอบประวัติคำสั่งซื้อของคุณ
         </p>
     </div>
 
@@ -261,42 +262,80 @@
         </button>
     </div>
 
-    <!-- Search Phone Box -->
-    <div style="width: 100%; max-width: 680px; margin-bottom: 2rem;">
-        <form onsubmit={(e) => { e.preventDefault(); fetchHistory(); }} style="display: flex; gap: 0.5rem;">
-            <input 
-                type="tel" 
-                class="form-input" 
-                bind:value={searchPhone} 
-                placeholder="กรอกเบอร์โทรศัพท์ที่ใช้สั่งซื้อ (เช่น 0812345678)" 
-                style="flex-grow: 1;"
-            />
-            <button type="submit" class="btn-matcha-primary" style="padding: 0.75rem 1.5rem; white-space: nowrap;">
-                ค้นหาออเดอร์
-            </button>
-        </form>
-    </div>
-
-    <!-- Orders List Section -->
-    <div style="width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 1.5rem;">
-        {#if loading}
-            <div style="text-align: center; padding: 3rem 0;">
-                <div class="spinner" style="margin: 0 auto 1rem auto;"></div>
-                <p style="color: var(--text-muted); font-size: 0.95rem;">กำลังโหลดข้อมูลคำสั่งซื้อ...</p>
-            </div>
-        {:else if ordersList.length === 0}
-            <div class="form-card" style="text-align: center; padding: 3rem 1.5rem;">
-                <p style="font-size: 3rem; margin: 0 0 1rem 0;">🍵</p>
-                <h3 style="margin: 0 0 0.5rem 0; color: var(--matcha-deep);">ยังไม่พบประวัติคำสั่งซื้อ</h3>
-                <p style="margin: 0 0 1.5rem 0; color: var(--text-muted); font-size: 0.9rem;">
-                    ลองค้นหาด้วยเบอร์โทรศัพท์อื่น หรือเริ่มสั่งเครื่องดื่มมัทฉะแก้วโปรดของคุณได้เลยครับ
-                </p>
-                <button onclick={() => goto('/menu')} class="btn-matcha-primary">
-                    สั่งเครื่องดื่มตอนนี้
+    <!-- สภาพที่ 1: หากยังไม่ได้เข้าสู่ระบบสมาชิก -->
+    {#if !member}
+        <div class="form-card" style="width: 100%; max-width: 680px; text-align: center; padding: 3.5rem 1.5rem; background: #ffffff; border: 1.5px dashed #86efac; border-radius: 18px; margin-bottom: 2rem;">
+            <div style="font-size: 3.2rem; margin-bottom: 0.6rem;">🔒</div>
+            <h2 style="margin: 0 0 0.5rem 0; color: #14532d; font-size: 1.35rem; font-weight: 800;">
+                เข้าสู่ระบบสมาชิกเพื่อดูประวัติคำสั่งซื้อ
+            </h2>
+            <p style="margin: 0 0 1.6rem 0; color: #64748b; font-size: 0.92rem; line-height: 1.55; max-width: 440px; margin-inline: auto;">
+                เพื่อความปลอดภัยและความเป็นส่วนตัว ระบบจะแสดงเฉพาะประวัติคำสั่งซื้อของบัญชีของคุณเท่านั้นค่ะ 🍵
+            </p>
+            <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
+                <button
+                    type="button"
+                    class="btn-matcha-primary"
+                    style="padding: 0.75rem 1.6rem; font-size: 0.95rem;"
+                    onclick={() => memberCtx?.openAuthModal('login')}
+                >
+                    🔐 เข้าสู่ระบบสมาชิก
+                </button>
+                <button
+                    type="button"
+                    class="btn-matcha-outline"
+                    style="padding: 0.75rem 1.4rem; font-size: 0.95rem;"
+                    onclick={() => memberCtx?.openAuthModal('register')}
+                >
+                    ✨ สมัครสมาชิกใหม่
                 </button>
             </div>
-        {:else}
-            {#each ordersList as order}
+        </div>
+    {:else}
+        <!-- สภาพที่ 2: ล็อกอินแล้ว แสดงข้อมูลสมาชิกเจ้าของประวัติ -->
+        <div style="width: 100%; max-width: 720px; margin-bottom: 1.25rem; background: #ffffff; border: 1.5px solid #dcfce7; border-radius: 14px; padding: 0.85rem 1.15rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; gap: 0.65rem;">
+                <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #15803d, #22c55e); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.1rem; box-shadow: 0 3px 8px rgba(21, 128, 61, 0.25);">
+                    {member.firstName ? member.firstName.charAt(0) : '🍵'}
+                </div>
+                <div>
+                    <div style="font-size: 0.95rem; font-weight: 800; color: #14532d;">
+                        คำสั่งซื้อของคุณ {member.fullName}
+                    </div>
+                    <div style="font-size: 0.78rem; color: #64748b;">
+                        📱 {member.phone} · บัญชีสมาชิกของคุณ (แสดงเฉพาะของตนเอง)
+                    </div>
+                </div>
+            </div>
+            <button
+                type="button"
+                onclick={() => fetchHistory(member.phone)}
+                style="background: #f0fdf4; border: 1.5px solid #86efac; color: #15803d; padding: 0.4rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.35rem;"
+            >
+                🔄 รีเฟรชสถานะ
+            </button>
+        </div>
+
+        <!-- Orders List Section -->
+        <div style="width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 1.5rem;">
+            {#if loading}
+                <div style="text-align: center; padding: 3rem 0;">
+                    <div class="spinner" style="margin: 0 auto 1rem auto;"></div>
+                    <p style="color: var(--text-muted); font-size: 0.95rem;">กำลังโหลดข้อมูลคำสั่งซื้อ...</p>
+                </div>
+            {:else if ordersList.length === 0}
+                <div class="form-card" style="text-align: center; padding: 3rem 1.5rem;">
+                    <p style="font-size: 3rem; margin: 0 0 1rem 0;">🍵</p>
+                    <h3 style="margin: 0 0 0.5rem 0; color: var(--matcha-deep);">ยังไม่พบประวัติคำสั่งซื้อของคุณ</h3>
+                    <p style="margin: 0 0 1.5rem 0; color: var(--text-muted); font-size: 0.9rem;">
+                        ยังไม่มีรายการสั่งซื้อที่เชื่อมโยงกับเบอร์ {member.phone} ค่ะ<br/>เริ่มสั่งเครื่องดื่มมัทฉะแก้วโปรดของคุณได้เลยนะคะ
+                    </p>
+                    <button onclick={() => goto('/menu')} class="btn-matcha-primary">
+                        🍵 สั่งเครื่องดื่มตอนนี้
+                    </button>
+                </div>
+            {:else}
+                {#each ordersList as order}
                 {@const badge = getStatusBadge(order.status)}
                 {@const currentStepIdx = getStepIndex(order.status)}
 
@@ -422,4 +461,5 @@
             {/each}
         {/if}
     </div>
+    {/if}
 </main>

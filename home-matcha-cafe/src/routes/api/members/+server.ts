@@ -7,7 +7,8 @@ import {
     loginMember,
     redeemFreeCupPoints,
     updateMemberByAdmin,
-    deleteMemberByAdmin
+    deleteMemberByAdmin,
+    updateMemberProfile
 } from '$lib/server/members';
 import { getStoreSettings } from '$lib/server/settings';
 
@@ -74,6 +75,15 @@ export const POST: RequestHandler = async ({ request }) => {
 
         if (action === 'redeem') {
             const result = await redeemFreeCupPoints(body.phone || '', body.stampsToDeduct);
+            return json(result, { status: result.success ? 200 : 400 });
+        }
+
+        if (action === 'update-profile') {
+            const result = await updateMemberProfile(
+                body.phone || '',
+                body.firstName || '',
+                body.lastName || ''
+            );
             return json(result, { status: result.success ? 200 : 400 });
         }
 

@@ -350,3 +350,43 @@ export async function deleteMemberByAdmin(id: number): Promise<boolean> {
     const res = await pool.query('DELETE FROM public.members WHERE id = $1 RETURNING id', [id]);
     return res.rows.length > 0;
 }
+
+/**
+ * ให้ลูกค้าอัปเดตชื่อ-นามสกุลของตนเอง (Profile Update)
+ */
+export async function updateMemberProfile(
+    phone: string,
+    firstName: string,
+    lastName: string
+): Promise<{ success: boolean; member?: Member; message?: string }> {
+    await ensurePgSchema();
+    const cleanedPhone = cleanPhone(phone);
+    if (!cleanedPhone) {
+        return { success: false, message: 'ไม่พบเบอร์โทรศัพท์สมาชิก' };
+    }
+    const cleanFirst = (firstName || '').trim();
+    const cleanLast = (lastName || '').trim();
+    if (!cleanFirst || !cleanLast) {
+        return { success: false, message: 'กรุณากรอกชื่อและนามสกุลให้ครบถ้วนค่ะ' };
+    }
+
+    const res = await pool.query(
+        `UPDATE public.members
+         SET first_name = $1,
+             last_name = $2,
+             updated_at = NOW()
+         WHERE phone = $3
+         RETURNING *`,
+        [cleanFirst, cleanLast, cleanedPhone]
+    );
+
+    if (res.rows.length === 0) {
+        return { success: false, message: 'ไม่พบข้อมูลสมาชิกในระบบ' };
+    }
+
+    return {
+        success: true,
+        member: mapRowToMember(res.rows[0]),
+        message: 'อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้วค่ะ 🍵'
+    };
+}

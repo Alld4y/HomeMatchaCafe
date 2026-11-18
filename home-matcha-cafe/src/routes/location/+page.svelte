@@ -134,9 +134,35 @@
         }
 
         // หากล็อกอินสมาชิกอยู่ ให้ใช้ชื่อและเบอร์โทรของสมาชิกอัตโนมัติ
-        if (memberCtx?.member) {
-            recipientName = memberCtx.member.fullName || recipientName;
-            phone = memberCtx.member.phone || phone;
+        const rawMember = typeof window !== 'undefined' ? localStorage.getItem('hmc_member') : null;
+        const isLogged = Boolean(memberCtx?.member || rawMember);
+
+        if (!isLogged) {
+            swal.fire({
+                icon: 'info',
+                title: 'กรุณาสมัครหรือเข้าสู่ระบบสมาชิก',
+                text: 'ระบบบังคับให้เข้าสู่ระบบสมาชิกก่อนทำรายการสั่งซื้อ เพื่อสะสมแต้มและติดตามสถานะคำสั่งซื้อค่ะ 🍵',
+                confirmButtonColor: '#456f2f',
+                confirmButtonText: '🔐 เข้าสู่ระบบ / สมัครสมาชิก',
+                allowOutsideClick: false,
+                allowEscapeKey: false
+            }).then(() => {
+                memberCtx?.openAuthModal('login', () => {
+                    const currentMem = memberCtx?.member || (typeof window !== 'undefined' && localStorage.getItem('hmc_member') ? JSON.parse(localStorage.getItem('hmc_member')!) : null);
+                    if (!currentMem) {
+                        goto('/menu');
+                    } else {
+                        if (currentMem.fullName) recipientName = currentMem.fullName;
+                        if (currentMem.phone) phone = currentMem.phone;
+                    }
+                });
+            });
+        } else {
+            const currentMem = memberCtx?.member || (rawMember ? JSON.parse(rawMember) : null);
+            if (currentMem) {
+                recipientName = currentMem.fullName || recipientName;
+                phone = currentMem.phone || phone;
+            }
         }
 
         // โหลดตารางวันและรอบส่งจาก Settings API
@@ -180,6 +206,23 @@
         const trimmedName = recipientName.trim();
         const trimmedPhone = phone.trim();
         const trimmedAddress = address.trim();
+
+        const isLogged = Boolean(
+            memberCtx?.member ||
+            (typeof window !== 'undefined' && localStorage.getItem('hmc_member'))
+        );
+        if (!isLogged) {
+            swal.fire({
+                icon: 'warning',
+                title: 'ต้องเป็นสมาชิกก่อนสั่งซื้อ',
+                text: 'กรุณาสมัครสมาชิกหรือเข้าสู่ระบบก่อนทำการสั่งซื้อนะคะ 🍵',
+                confirmButtonColor: '#456f2f',
+                confirmButtonText: '🔐 เข้าสู่ระบบ / สมัครสมาชิก'
+            }).then(() => {
+                memberCtx?.openAuthModal('login');
+            });
+            return;
+        }
 
         if (!trimmedName || !trimmedPhone || !trimmedAddress) {
             errorMessage = 'กรุณากรอกชื่อผู้รับ เบอร์โทรศัพท์ และสถานที่จัดส่งให้ครบถ้วน';

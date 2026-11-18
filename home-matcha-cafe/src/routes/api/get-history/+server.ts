@@ -5,12 +5,11 @@ import { getOrdersByPhone, getAllOrders } from '$lib/server/db';
 export const POST: RequestHandler = async ({ request }) => {
     try {
         const body = await request.json();
-        const phone = body.phone || '';
+        const phone = (body.phone || '').trim().replace(/[^0-9]/g, '');
         
         if (!phone) {
-            // หากไม่ระบุเบอร์ ดึงรายการล่าสุด
-            const orders = await getAllOrders();
-            return json(orders);
+            // ไม่ส่งคืนรายการทั้งหมดเด็ดขาดเพื่อความเป็นส่วนตัว
+            return json([]);
         }
 
         const orders = await getOrdersByPhone(phone);
@@ -22,9 +21,9 @@ export const POST: RequestHandler = async ({ request }) => {
 };
 
 export const GET: RequestHandler = async ({ url }) => {
-    const phone = url.searchParams.get('phone') || '';
+    const phone = (url.searchParams.get('phone') || '').trim().replace(/[^0-9]/g, '');
     if (!phone) {
-        return json(await getAllOrders());
+        return json([]);
     }
     return json(await getOrdersByPhone(phone));
 };

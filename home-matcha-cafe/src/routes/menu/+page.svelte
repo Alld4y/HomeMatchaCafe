@@ -26,6 +26,7 @@
 	}
 
 	const cart = getContext<any>('cartData');
+	const memberCtx = getContext<any>('memberData');
 
 	let categories = $state<MenuCategory[]>([
 		{ id: 'clear', name: 'ชงใส (Clear)', icon: '🌿', sortOrder: 1 },
@@ -158,6 +159,38 @@
 			});
 			return;
 		}
+
+		const isMemberLoggedIn = Boolean(
+			memberCtx?.member ||
+			(typeof window !== 'undefined' && localStorage.getItem('hmc_member'))
+		);
+
+		if (!isMemberLoggedIn) {
+			swal.fire({
+				icon: 'info',
+				title: 'กรุณาสมัครหรือเข้าสู่ระบบสมาชิก',
+				text: 'ระบบบังคับให้เข้าสู่ระบบสมาชิกก่อนสั่งซื้อ เพื่อสะสมแต้มและติดตามสถานะคำสั่งซื้อค่ะ 🍵',
+				showCancelButton: true,
+				confirmButtonColor: '#456f2f',
+				cancelButtonColor: '#71717a',
+				confirmButtonText: '🔐 เข้าสู่ระบบ / สมัครสมาชิก',
+				cancelButtonText: 'ไว้ก่อน'
+			}).then((result) => {
+				if (result.isConfirmed) {
+					memberCtx?.openAuthModal('login', () => {
+						const logged = Boolean(
+							memberCtx?.member ||
+							(typeof window !== 'undefined' && localStorage.getItem('hmc_member'))
+						);
+						if (logged) {
+							goto('/location');
+						}
+					});
+				}
+			});
+			return;
+		}
+
 		goto('/location');
 	}
 </script>
