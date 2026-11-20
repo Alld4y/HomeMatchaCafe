@@ -65,6 +65,7 @@ export interface LineOaSettings {
     notifyOnDelivering: boolean;
     notifyOnCompleted: boolean;
     notifyOnCancelled: boolean;
+    notifyOnPhoneLinked: boolean;
 
     // Admin Notification Events
     notifyAdminOnNewOrder: boolean;
@@ -196,6 +197,7 @@ const DEFAULT_SETTINGS: StoreSettings = {
         notifyOnDelivering: true,
         notifyOnCompleted: true,
         notifyOnCancelled: true,
+        notifyOnPhoneLinked: true,
         notifyAdminOnNewOrder: true,
         notifyAdminOnSlipUploaded: true
     },
@@ -349,6 +351,7 @@ function normalizeSettings(parsed: any): StoreSettings {
             notifyOnDelivering: parsedLineOa.notifyOnDelivering !== false,
             notifyOnCompleted: parsedLineOa.notifyOnCompleted !== false,
             notifyOnCancelled: parsedLineOa.notifyOnCancelled !== false,
+            notifyOnPhoneLinked: parsedLineOa.notifyOnPhoneLinked !== false,
             notifyAdminOnNewOrder: parsedLineOa.notifyAdminOnNewOrder !== false,
             notifyAdminOnSlipUploaded: parsedLineOa.notifyAdminOnSlipUploaded !== false
         },

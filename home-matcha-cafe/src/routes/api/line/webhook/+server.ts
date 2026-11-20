@@ -283,81 +283,10 @@ export const POST: RequestHandler = async ({ request }) => {
                         : '';
                     const memberStamps = isMember ? Number(memberUpdate.rows[0].points || 0) : 0;
 
-                    if (isMember) {
-                        const linkedBubble = {
-                            type: 'bubble',
-                            header: {
-                                type: 'box',
-                                layout: 'vertical',
-                                backgroundColor: '#166534',
-                                paddingAll: '16px',
-                                contents: [
-                                    { type: 'text', text: 'HOME MATCHA CAFE', weight: 'bold', size: 'xs', color: '#bbf7d0' },
-                                    { type: 'text', text: '✅ เชื่อมต่อบัญชีสำเร็จ!', weight: 'bold', size: 'md', color: '#ffffff', margin: 'xs' }
-                                ]
-                            },
-                            body: {
-                                type: 'box',
-                                layout: 'vertical',
-                                paddingAll: '16px',
-                                contents: [
-                                    {
-                                        type: 'text',
-                                        text: `เบอร์โทรศัพท์: ${cleanDigits}`,
-                                        weight: 'bold',
-                                        size: 'sm',
-                                        color: '#1e293b'
-                                    },
-                                    {
-                                        type: 'text',
-                                        text: `ยินดีต้อนรับคุณ ${memberName} ✨\nขณะนี้คุณมีคะแนนสะสม ${memberStamps} ดวง\nระบบจะแจ้งเตือนสถานะออเดอร์ของคุณผ่านช่องทางนี้โดยอัตโนมัติค่ะ 🍵`,
-                                        size: 'xs',
-                                        color: '#475569',
-                                        wrap: true,
-                                        margin: 'sm'
-                                    }
-                                ]
-                            },
-                            footer: {
-                                type: 'box',
-                                layout: 'vertical',
-                                paddingAll: '14px',
-                                contents: [
-                                    {
-                                        type: 'button',
-                                        style: 'primary',
-                                        color: '#166534',
-                                        action: {
-                                            type: 'uri',
-                                            label: 'เข้าสู่ระบบ / บัตรสะสมแต้ม',
-                                            uri: `https://homematchacafe.store/loyalty?phone=${cleanDigits}`
-                                        }
-                                    }
-                                ]
-                            }
-                        };
-
-                        await replyLineMessage(token, replyToken, [
-                            {
-                                type: 'flex',
-                                altText: 'เชื่อมต่อบัญชีสำเร็จ!',
-                                contents: linkedBubble
-                            }
-                        ]);
-                    } else {
-                        // ยังไม่ได้เป็นสมาชิก: ตรวจสอบว่าแอดมินตั้งค่าการ์ดชวนสมัครสมาชิกไว้หรือไม่
-                        let registerBubble: any = null;
-                        if (lineOa.useCustomRegisterCard && lineOa.registerCardBubble) {
-                            try {
-                                const rawJson = JSON.stringify(lineOa.registerCardBubble);
-                                const replacedJson = rawJson.replace(/\{phone\}/g, cleanDigits);
-                                registerBubble = JSON.parse(replacedJson);
-                            } catch (parseErr) {
-                                console.error('Error replacing {phone} in registerCardBubble:', parseErr);
-                                registerBubble = lineOa.registerCardBubble;
-                            }
-                        } else {
-                            registerBubble = {
+                    // ตรวจสอบว่าเปิดส่งการ์ดหลังจากได้รับเบอร์โทรศัพท์ (Event ได้เบอร์) หรือไม่
+                    if (lineOa.notifyOnPhoneLinked !== false) {
+                        if (isMember) {
+                            const linkedBubble = {
                                 type: 'bubble',
                                 header: {
                                     type: 'box',
@@ -366,7 +295,7 @@ export const POST: RequestHandler = async ({ request }) => {
                                     paddingAll: '16px',
                                     contents: [
                                         { type: 'text', text: 'HOME MATCHA CAFE', weight: 'bold', size: 'xs', color: '#bbf7d0' },
-                                        { type: 'text', text: '✨ สมาชิกสะสมแต้ม 10 แก้วฟรี 🍵', weight: 'bold', size: 'md', color: '#ffffff', margin: 'xs' }
+                                        { type: 'text', text: '✅ เชื่อมต่อบัญชีสำเร็จ!', weight: 'bold', size: 'md', color: '#ffffff', margin: 'xs' }
                                     ]
                                 },
                                 body: {
@@ -383,7 +312,7 @@ export const POST: RequestHandler = async ({ request }) => {
                                         },
                                         {
                                             type: 'text',
-                                            text: 'ระบบบันทึกเบอร์โทรของคุณเรียบร้อยแล้วค่ะ! คุณยังไม่ได้เป็นสมาชิกสะสมแต้มของร้าน กดปุ่มด้านล่างเพื่อรับสิทธิ์สะสมแต้ม 10 แก้วฟรี 1 แก้วได้เลยนะคะ (ระบบจะกรอกเบอร์โทรให้อัตโนมัติค่ะ) 🍵',
+                                            text: `ยินดีต้อนรับคุณ ${memberName} ✨\nขณะนี้คุณมีคะแนนสะสม ${memberStamps} ดวง\nระบบจะแจ้งเตือนสถานะออเดอร์ของคุณผ่านช่องทางนี้โดยอัตโนมัติค่ะ 🍵`,
                                             size: 'xs',
                                             color: '#475569',
                                             wrap: true,
@@ -394,7 +323,6 @@ export const POST: RequestHandler = async ({ request }) => {
                                 footer: {
                                     type: 'box',
                                     layout: 'vertical',
-                                    spacing: 'sm',
                                     paddingAll: '14px',
                                     contents: [
                                         {
@@ -403,31 +331,106 @@ export const POST: RequestHandler = async ({ request }) => {
                                             color: '#166534',
                                             action: {
                                                 type: 'uri',
-                                                label: '✨ สมัครสมาชิกสะสมแต้ม',
-                                                uri: `https://homematchacafe.store/loyalty?action=register&phone=${cleanDigits}`
-                                            }
-                                        },
-                                        {
-                                            type: 'button',
-                                            style: 'secondary',
-                                            action: {
-                                                type: 'uri',
-                                                label: '🍵 ดูเมนูสั่งเครื่องดื่ม',
-                                                uri: 'https://homematchacafe.store/menu'
+                                                label: 'เข้าสู่ระบบ / บัตรสะสมแต้ม',
+                                                uri: `https://homematchacafe.store/loyalty?phone=${cleanDigits}`
                                             }
                                         }
                                     ]
                                 }
                             };
-                        }
 
-                        await replyLineMessage(token, replyToken, [
-                            {
-                                type: 'flex',
-                                altText: '✨ สมัครสมาชิกสะสมแต้ม Home Matcha Cafe',
-                                contents: registerBubble
+                            await replyLineMessage(token, replyToken, [
+                                {
+                                    type: 'flex',
+                                    altText: 'เชื่อมต่อบัญชีสำเร็จ!',
+                                    contents: linkedBubble
+                                }
+                            ]);
+                        } else {
+                            // ยังไม่ได้เป็นสมาชิก: ตรวจสอบว่าแอดมินตั้งค่าการ์ดชวนสมัครสมาชิกไว้หรือไม่
+                            let registerBubble: any = null;
+                            if (lineOa.useCustomRegisterCard && lineOa.registerCardBubble) {
+                                try {
+                                    const rawJson = JSON.stringify(lineOa.registerCardBubble);
+                                    const replacedJson = rawJson.replace(/\{phone\}/g, cleanDigits);
+                                    registerBubble = JSON.parse(replacedJson);
+                                } catch (parseErr) {
+                                    console.error('Error replacing {phone} in registerCardBubble:', parseErr);
+                                    registerBubble = lineOa.registerCardBubble;
+                                }
+                            } else {
+                                registerBubble = {
+                                    type: 'bubble',
+                                    header: {
+                                        type: 'box',
+                                        layout: 'vertical',
+                                        backgroundColor: '#166534',
+                                        paddingAll: '16px',
+                                        contents: [
+                                            { type: 'text', text: 'HOME MATCHA CAFE', weight: 'bold', size: 'xs', color: '#bbf7d0' },
+                                            { type: 'text', text: '✨ สมาชิกสะสมแต้ม 10 แก้วฟรี 🍵', weight: 'bold', size: 'md', color: '#ffffff', margin: 'xs' }
+                                        ]
+                                    },
+                                    body: {
+                                        type: 'box',
+                                        layout: 'vertical',
+                                        paddingAll: '16px',
+                                        contents: [
+                                            {
+                                                type: 'text',
+                                                text: `เบอร์โทรศัพท์: ${cleanDigits}`,
+                                                weight: 'bold',
+                                                size: 'sm',
+                                                color: '#1e293b'
+                                            },
+                                            {
+                                                type: 'text',
+                                                text: 'ระบบบันทึกเบอร์โทรของคุณเรียบร้อยแล้วค่ะ! คุณยังไม่ได้เป็นสมาชิกสะสมแต้มของร้าน กดปุ่มด้านล่างเพื่อรับสิทธิ์สะสมแต้ม 10 แก้วฟรี 1 แก้วได้เลยนะคะ (ระบบจะกรอกเบอร์โทรให้อัตโนมัติค่ะ) 🍵',
+                                                size: 'xs',
+                                                color: '#475569',
+                                                wrap: true,
+                                                margin: 'sm'
+                                            }
+                                        ]
+                                    },
+                                    footer: {
+                                        type: 'box',
+                                        layout: 'vertical',
+                                        spacing: 'sm',
+                                        paddingAll: '14px',
+                                        contents: [
+                                            {
+                                                type: 'button',
+                                                style: 'primary',
+                                                color: '#166534',
+                                                action: {
+                                                    type: 'uri',
+                                                    label: '✨ สมัครสมาชิกสะสมแต้ม',
+                                                    uri: `https://homematchacafe.store/loyalty?action=register&phone=${cleanDigits}`
+                                                }
+                                            },
+                                            {
+                                                type: 'button',
+                                                style: 'secondary',
+                                                action: {
+                                                    type: 'uri',
+                                                    label: '🍵 ดูเมนูสั่งเครื่องดื่ม',
+                                                    uri: 'https://homematchacafe.store/menu'
+                                                }
+                                            }
+                                        ]
+                                    }
+                                };
                             }
-                        ]);
+
+                            await replyLineMessage(token, replyToken, [
+                                {
+                                    type: 'flex',
+                                    altText: '✨ สมัครสมาชิกสะสมแต้ม Home Matcha Cafe',
+                                    contents: registerBubble
+                                }
+                            ]);
+                        }
                     }
                     continue;
                 } catch (linkErr) {

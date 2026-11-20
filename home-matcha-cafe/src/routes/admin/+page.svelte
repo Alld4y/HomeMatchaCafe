@@ -108,6 +108,7 @@
         notifyOnDelivering: boolean;
         notifyOnCompleted: boolean;
         notifyOnCancelled: boolean;
+        notifyOnPhoneLinked: boolean;
         notifyAdminOnNewOrder: boolean;
         notifyAdminOnSlipUploaded: boolean;
     }
@@ -190,6 +191,7 @@
             notifyOnDelivering: true,
             notifyOnCompleted: true,
             notifyOnCancelled: true,
+            notifyOnPhoneLinked: true,
             notifyAdminOnNewOrder: true,
             notifyAdminOnSlipUploaded: true
         },
@@ -5059,6 +5061,21 @@
                             </div>
                         </div>
                     </label>
+
+                    <!-- 8. ได้รับเบอร์โทรศัพท์จากลูกค้า (Event ได้เบอร์) -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1.5px solid #fbcfe8; border-radius: 10px; background: #fdf2f8; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnPhoneLinked}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #be185d;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #831843;">📱 ได้รับเบอร์โทรศัพท์ (Event ได้เบอร์)</strong>
+                            <div style="font-size: 0.8rem; color: #9d174d; margin-top: 0.2rem;">
+                                ส่งการ์ดตอบกลับทันที (แจ้งผลเชื่อมต่อบัญชี / การ์ดชวนสมัครสมาชิก) เมื่อลูกค้าพิมพ์เบอร์ 10 หลัก
+                            </div>
+                        </div>
+                    </label>
                 </div>
             </div>
 
@@ -5208,29 +5225,46 @@
                     <div style="display: flex; align-items: center; gap: 0.65rem;">
                         <span style="font-size: 1.3rem;">✨</span>
                         <div>
-                            <div style="display: flex; align-items: center; gap: 0.45rem;">
-                                <strong style="font-size: 0.88rem; color: #831843;">การตอบกลับเมื่อลูกค้าพิมพ์เบอร์โทร 10 หลัก:</strong>
+                            <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+                                <strong style="font-size: 0.88rem; color: #831843;">การตอบกลับเมื่อลูกค้าพิมพ์เบอร์โทร 10 หลัก (Event ได้เบอร์):</strong>
+                                {#if settings.lineOa.notifyOnPhoneLinked !== false}
+                                    <span style="font-size: 0.72rem; background: #22c55e; color: #ffffff; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 9999px;">
+                                        ● เปิดส่งการ์ด
+                                    </span>
+                                {:else}
+                                    <span style="font-size: 0.72rem; background: #f1f5f9; color: #64748b; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 9999px; border: 1px solid #cbd5e1;">
+                                        ○ ปิดส่งการ์ด
+                                    </span>
+                                {/if}
                                 {#if settings.lineOa.useCustomRegisterCard}
                                     <span style="font-size: 0.72rem; background: #db2777; color: #ffffff; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 9999px;">
-                                        ● ใช้การ์ดออกแบบเอง (Flex)
+                                        ● การ์ดออกแบบเอง (Flex)
                                     </span>
                                 {:else}
                                     <span style="font-size: 0.72rem; background: #ffffff; color: #9d174d; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 9999px; border: 1px solid #fbcfe8;">
-                                        ○ ใช้การ์ดมาตรฐานของระบบ
+                                        ○ การ์ดมาตรฐาน
                                     </span>
                                 {/if}
                             </div>
                             <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; color: #701a75; line-height: 1.4;">
-                                หากเบอร์ที่พิมพ์มายังไม่เคยเป็นสมาชิก ระบบจะตอบกลับด้วยการ์ดชวนสมัครสมาชิกพร้อมนำเบอร์ไปกรอกใส่ฟอร์มสมัครให้อัตโนมัติ (สามารถออกแบบการ์ดนี้ได้ในข้อ 6)
+                                เมื่อลูกค้าพิมพ์เบอร์ 10 หลัก หากเปิดใช้งานระบบจะส่งการ์ดแจ้งผลเชื่อมต่อ หรือการ์ดชวนสมัครสมาชิกพร้อมกรอกเบอร์ให้อัตโนมัติ
                             </p>
                         </div>
                     </div>
-                    <div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                        <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; font-weight: 700; color: #831843; cursor: pointer; background: #ffffff; padding: 0.3rem 0.65rem; border-radius: 6px; border: 1px solid #fbcfe8;">
+                            <input
+                                type="checkbox"
+                                bind:checked={settings.lineOa.notifyOnPhoneLinked}
+                                style="width: 16px; height: 16px; accent-color: #be185d;"
+                            />
+                            <span>ส่งการ์ดหลังได้เบอร์</span>
+                        </label>
                         {#if settings.lineOa.useCustomRegisterCard}
                             <button
                                 type="button"
                                 onclick={unsetRegisterCard}
-                                style="font-size: 0.75rem; background: #ffffff; color: #dc2626; border: 1px solid #fecaca; border-radius: 6px; padding: 0.25rem 0.6rem; cursor: pointer; font-weight: 700;"
+                                style="font-size: 0.75rem; background: #ffffff; color: #dc2626; border: 1px solid #fecaca; border-radius: 6px; padding: 0.3rem 0.6rem; cursor: pointer; font-weight: 700;"
                             >
                                 สลับไปใช้การ์ดระบบ
                             </button>
@@ -5801,9 +5835,19 @@
                                     </span>
                                 {/if}
                             </div>
-                            <p style="margin: 0 0 0.65rem 0; font-size: 0.78rem; color: #64748b; line-height: 1.45;">
+                            <p style="margin: 0 0 0.5rem 0; font-size: 0.78rem; color: #64748b; line-height: 1.45;">
                                 ตั้งให้ระบบส่งการ์ดที่กำลังออกแบบอยู่นี้ เมื่อลูกค้าพิมพ์เบอร์โทรศัพท์ 10 หลักที่ยังไม่ได้สมัครสมาชิก โดยระบบจะดึงเบอร์ไปกรอกในหน้าสมัครให้อัตโนมัติ
                             </p>
+                            <div style="background: rgba(255,255,255,0.7); border: 1px solid #fbcfe8; border-radius: 8px; padding: 0.45rem 0.65rem; margin-bottom: 0.65rem;">
+                                <label style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.8rem; font-weight: 700; color: #831843; cursor: pointer;">
+                                    <input
+                                        type="checkbox"
+                                        bind:checked={settings.lineOa.notifyOnPhoneLinked}
+                                        style="width: 16px; height: 16px; accent-color: #be185d;"
+                                    />
+                                    <span>เปิดส่งการ์ดตอบกลับหลังได้เบอร์ (Event ได้เบอร์)</span>
+                                </label>
+                            </div>
                             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                                 <button
                                     type="button"
