@@ -79,6 +79,9 @@ export interface LineOaSettings {
     notifyOnCancelled: boolean;
     notifyOnPhoneLinked: boolean;
 
+    // การ์ดแจ้งเตือนสถานะออเดอร์ออกแบบเอง (Custom Status Flex Cards)
+    customStatusCards?: Record<string, { enabled: boolean; bubble: any; blocks?: any[] | null }>;
+
     // Admin Notification Events
     notifyAdminOnNewOrder: boolean;
     notifyAdminOnSlipUploaded: boolean;
@@ -222,6 +225,7 @@ const DEFAULT_SETTINGS: StoreSettings = {
         notifyOnCompleted: true,
         notifyOnCancelled: true,
         notifyOnPhoneLinked: true,
+        customStatusCards: {},
         notifyAdminOnNewOrder: true,
         notifyAdminOnSlipUploaded: true
     },
@@ -395,6 +399,9 @@ function normalizeSettings(parsed: any): StoreSettings {
             notifyOnCompleted: parsedLineOa.notifyOnCompleted !== false,
             notifyOnCancelled: parsedLineOa.notifyOnCancelled !== false,
             notifyOnPhoneLinked: parsedLineOa.notifyOnPhoneLinked !== false,
+            customStatusCards: parsedLineOa.customStatusCards && typeof parsedLineOa.customStatusCards === 'object'
+                ? parsedLineOa.customStatusCards
+                : {},
             notifyAdminOnNewOrder: parsedLineOa.notifyAdminOnNewOrder !== false,
             notifyAdminOnSlipUploaded: parsedLineOa.notifyAdminOnSlipUploaded !== false
         },

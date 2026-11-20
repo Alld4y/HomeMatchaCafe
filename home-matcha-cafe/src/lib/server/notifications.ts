@@ -275,23 +275,91 @@ export async function sendLineStatusFlexMessage(
     if (!channelAccessToken || !toUserId) return false;
 
     const { title, body, eventType, orderCode, itemsSummary, totalPrice, url } = params;
+    const trackingUrl = url.startsWith('http') ? url : `https://homematchacafe.store${url}`;
 
-    const themeMap: Record<string, { color: string; badge: string; icon: string }> = {
-        order_created: { color: '#166534', badge: 'รับออเดอร์แล้ว', icon: '📝' },
-        slip_approved: { color: '#15803d', badge: 'อนุมัติการชำระเงิน', icon: '💳' },
-        brewing: { color: '#0d9488', badge: 'กำลังชงเครื่องดื่ม', icon: '🍵' },
-        ready_to_ship: { color: '#059669', badge: 'ชงเสร็จแล้ว รอจัดส่ง', icon: '📦' },
-        delivering: { color: '#2563eb', badge: 'กำลังนำส่ง', icon: '🛵' },
-        completed: { color: '#166534', badge: 'จัดส่งสำเร็จแล้ว', icon: '🎉' },
-        cancelled: { color: '#dc2626', badge: 'ยกเลิกออเดอร์', icon: '❌' },
-        custom: { color: '#166534', badge: 'แจ้งเตือนจากทางร้าน', icon: '📢' }
+    // ตรวจสอบว่าแอดมินตั้งค่าการ์ดแจ้งเตือนสถานะออกแบบเอง (Custom Status Card) สำหรับสถานะนี้หรือไม่
+    try {
+        const settings = await getStoreSettings();
+        const customCfg = settings.lineOa?.customStatusCards?.[eventType];
+        if (customCfg?.enabled && customCfg.bubble) {
+            let rawJson = JSON.stringify(customCfg.bubble);
+            rawJson = rawJson
+                .replace(/\{orderCode\}/g, orderCode || '')
+                .replace(/\{itemsSummary\}/g, itemsSummary || '')
+                .replace(/\{totalPrice\}/g, totalPrice !== undefined ? `฿${totalPrice.toLocaleString()}` : '')
+                .replace(/\{url\}/g, trackingUrl)
+                .replace(/\{trackingUrl\}/g, trackingUrl)
+                .replace(/\{title\}/g, title)
+                .replace(/\{body\}/g, body);
+            const customBubble = JSON.parse(rawJson);
+            return sendLineRawFlexMessage(channelAccessToken, toUserId, `${title}: ${body}`, customBubble);
+        }
+    } catch (cfgErr) {
+        console.warn('⚠️ Error checking custom status card:', cfgErr);
+    }
+
+    const themeMap: Record<string, { color: string; badge: string; icon: string; imageUrl: string }> = {
+        order_created: {
+            color: '#166534',
+            badge: 'รับออเดอร์แล้ว',
+            icon: '📝',
+            imageUrl: 'https://homematchacafe.store/image/mascot/cat-welcome.jpg'
+        },
+        slip_approved: {
+            color: '#15803d',
+            badge: 'อนุมัติการชำระเงินแล้ว',
+            icon: '💳',
+            imageUrl: 'https://homematchacafe.store/image/mascot/cat-ready.jpg'
+        },
+        brewing: {
+            color: '#0d9488',
+            badge: 'บาริสต้ากำลังชงมัทฉะ',
+            icon: '🍵',
+            imageUrl: 'https://homematchacafe.store/image/mascot/cat-brewing.jpg'
+        },
+        ready_to_ship: {
+            color: '#059669',
+            badge: 'ชงเสร็จแล้ว แพ็กพร้อมส่ง',
+            icon: '✨',
+            imageUrl: 'https://homematchacafe.store/image/mascot/cat-ready.jpg'
+        },
+        delivering: {
+            color: '#0284c7',
+            badge: 'ไรเดอร์กำลังนำส่งถึงที่',
+            icon: '🛵',
+            imageUrl: 'https://homematchacafe.store/image/mascot/cat-delivery.jpg'
+        },
+        completed: {
+            color: '#166534',
+            badge: 'จัดส่งสำเร็จเรียบร้อย',
+            icon: '🎉',
+            imageUrl: 'https://homematchacafe.store/image/mascot/cat-completed.jpg'
+        },
+        cancelled: {
+            color: '#dc2626',
+            badge: 'ออเดอร์ถูกยกเลิก',
+            icon: '❌',
+            imageUrl: 'https://homematchacafe.store/image/mascot/cat-cancelled.jpg'
+        },
+        custom: {
+            color: '#166534',
+            badge: 'แจ้งเตือนจากทางร้าน',
+            icon: '📢',
+            imageUrl: 'https://homematchacafe.store/image/mascot/cat-welcome.jpg'
+        }
     };
 
     const theme = themeMap[eventType] || themeMap.custom;
-    const trackingUrl = url.startsWith('http') ? url : `https://homematchacafe.store${url}`;
 
     const contents: any = {
         type: 'bubble',
+        hero: {
+            type: 'image',
+            url: theme.imageUrl,
+            size: 'full',
+            aspectRatio: '1:1',
+            aspectMode: 'cover'
+        },
         header: {
             type: 'box',
             layout: 'vertical',

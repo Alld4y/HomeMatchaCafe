@@ -121,6 +121,7 @@
         notifyOnCompleted: boolean;
         notifyOnCancelled: boolean;
         notifyOnPhoneLinked: boolean;
+        customStatusCards?: Record<string, { enabled: boolean; bubble: any; blocks?: any[] | null }>;
         notifyAdminOnNewOrder: boolean;
         notifyAdminOnSlipUploaded: boolean;
     }
@@ -216,6 +217,7 @@
             notifyOnCompleted: true,
             notifyOnCancelled: true,
             notifyOnPhoneLinked: true,
+            customStatusCards: {},
             notifyAdminOnNewOrder: true,
             notifyAdminOnSlipUploaded: true
         },
@@ -1534,7 +1536,7 @@
         designerCardBlocks = copy;
     }
 
-    function loadDesignerPreset(preset: 'promo' | 'loyalty' | 'delivery' | 'welcome' | 'register' | 'member') {
+    function loadDesignerPreset(preset: 'promo' | 'loyalty' | 'delivery' | 'welcome' | 'register' | 'member' | 'status_brewing' | 'status_ready' | 'status_delivering' | 'status_completed' | 'status_cancelled') {
         const now = Date.now();
         if (preset === 'welcome') {
             designerCardBlocks = [
@@ -1566,6 +1568,52 @@
                 { id: `b-${now}-5`, type: 'highlight', highlightText: '💡 กดปุ่มด้านล่างเพื่อเปิดหน้าสมัคร (ระบบจะกรอกเบอร์โทรให้อัตโนมัติค่ะ)' },
                 { id: `b-${now}-6`, type: 'button', buttonLabel: '✨ สมัครสมาชิกสะสมแต้มทันที', buttonUrl: 'https://homematchacafe.store/loyalty?action=register&phone={phone}', buttonStyle: 'gold', buttonAction: 'register' },
                 { id: `b-${now}-7`, type: 'button', buttonLabel: '🍵 ดูเมนูสั่งเครื่องดื่ม', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary', buttonAction: 'menu' }
+            ];
+        } else if (preset === 'status_brewing') {
+            designerCardBlocks = [
+                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://homematchacafe.store/image/mascot/cat-brewing.jpg', aspectRatio: '1:1' },
+                { id: `b-${now}-2`, type: 'tag', tagText: '🍵 บาริสต้าเริ่มชงเครื่องดื่ม', tagBg: '#ccfbf1', tagColor: '#0f766e' },
+                { id: `b-${now}-3`, type: 'title', titleText: 'กำลังชงออเดอร์ #{orderCode} สดใหม่ค่ะ ✨', titleSize: 'lg' },
+                { id: `b-${now}-4`, type: 'body', bodyText: 'ร้านตรวจสอบยอดชำระเรียบร้อยแล้ว และกำลังตั้งใจตีมัทฉะสดใหม่ถ้วยต่อถ้วยด้วยแปรงไม้ไผ่ชาเซ็นตามสูตรดั้งเดิมค่ะ 🍵\n{itemsSummary}' },
+                { id: `b-${now}-5`, type: 'highlight', highlightText: '⏳ กำลังเตรียมการจัดส่งตามรอบเวลาที่คุณระบุค่ะ' },
+                { id: `b-${now}-6`, type: 'button', buttonLabel: '🔍 ติดตามสถานะออเดอร์สด', buttonUrl: '{url}', buttonStyle: 'primary' }
+            ];
+        } else if (preset === 'status_ready') {
+            designerCardBlocks = [
+                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://homematchacafe.store/image/mascot/cat-ready.jpg', aspectRatio: '1:1' },
+                { id: `b-${now}-2`, type: 'tag', tagText: '✨ ชงเสร็จแล้ว แพ็กพร้อมส่ง', tagBg: '#d1fae5', tagColor: '#065f46' },
+                { id: `b-${now}-3`, type: 'title', titleText: 'เครื่องดื่มออเดอร์ #{orderCode} พร้อมส่งแล้วค่ะ 🍵', titleSize: 'lg' },
+                { id: `b-${now}-4`, type: 'body', bodyText: 'บาริสต้าชงเสร็จเรียบร้อยและบรรจุลงถุงเก็บความเย็นอย่างดี พร้อมให้ไรเดอร์ออกนำส่งตามรอบจัดส่งแล้วค่ะ ✨\n{itemsSummary}' },
+                { id: `b-${now}-5`, type: 'highlight', highlightText: '📦 บรรจุในถุงเก็บความเย็นพร้อมจัดส่ง' },
+                { id: `b-${now}-6`, type: 'button', buttonLabel: '🔍 ตรวจสอบรอบเวลาจัดส่ง', buttonUrl: '{url}', buttonStyle: 'primary' }
+            ];
+        } else if (preset === 'status_delivering') {
+            designerCardBlocks = [
+                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://homematchacafe.store/image/mascot/cat-delivery.jpg', aspectRatio: '1:1' },
+                { id: `b-${now}-2`, type: 'tag', tagText: '🛵 ไรเดอร์กำลังนำส่งถึงที่', tagBg: '#e0f2fe', tagColor: '#0369a1' },
+                { id: `b-${now}-3`, type: 'title', titleText: 'ไรเดอร์กำลังนำส่งออเดอร์ #{orderCode} ค่ะ! ✨', titleSize: 'lg' },
+                { id: `b-${now}-4`, type: 'body', bodyText: 'ไรเดอร์ออกเดินทางนำส่งเครื่องดื่มไปยังตึก/แผนกของคุณแล้วค่ะ กรุณารอรับสายโทรศัพท์หรือรอรับเครื่องดื่มที่จุดนัดส่งนะคะ 🛵' },
+                { id: `b-${now}-5`, type: 'highlight', highlightText: '🛵 ไรเดอร์กำลังเดินทางไปยังจุดนัดส่ง' },
+                { id: `b-${now}-6`, type: 'button', buttonLabel: '📍 ตรวจสอบจุดนัดรับ / แผนที่', buttonUrl: '{url}', buttonStyle: 'primary' }
+            ];
+        } else if (preset === 'status_completed') {
+            designerCardBlocks = [
+                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://homematchacafe.store/image/mascot/cat-completed.jpg', aspectRatio: '1:1' },
+                { id: `b-${now}-2`, type: 'tag', tagText: '🎉 จัดส่งสำเร็จเรียบร้อย', tagBg: '#dcfce7', tagColor: '#166534' },
+                { id: `b-${now}-3`, type: 'title', titleText: 'ส่งมอบเครื่องดื่มออเดอร์ #{orderCode} เรียบร้อยค่ะ! 🍵', titleSize: 'lg' },
+                { id: `b-${now}-4`, type: 'body', bodyText: 'ขอบคุณที่อุดหนุน Home Matcha Cafe นะคะ หวังว่าคุณจะประทับใจในรสชาติมัทฉะแก้วโปรดในวันนี้นะคะ ✨\nระบบได้บันทึกแต้มสะสมเข้าบัตรของคุณเรียบร้อยแล้วค่ะ' },
+                { id: `b-${now}-5`, type: 'highlight', highlightText: '⭐ สะสมครบ 10 แต้ม แลกรับเครื่องดื่มฟรี 1 แก้ว' },
+                { id: `b-${now}-6`, type: 'button', buttonLabel: '⭐ เปิดดูบัตรสะสมแต้มของฉัน', buttonUrl: 'https://homematchacafe.store/loyalty', buttonStyle: 'gold' },
+                { id: `b-${now}-7`, type: 'button', buttonLabel: '🍵 สั่งเครื่องดื่มอีกครั้ง', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary' }
+            ];
+        } else if (preset === 'status_cancelled') {
+            designerCardBlocks = [
+                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://homematchacafe.store/image/mascot/cat-cancelled.jpg', aspectRatio: '1:1' },
+                { id: `b-${now}-2`, type: 'tag', tagText: '❌ แจ้งยกเลิกออเดอร์', tagBg: '#fee2e2', tagColor: '#991b1b' },
+                { id: `b-${now}-3`, type: 'title', titleText: 'ออเดอร์ #{orderCode} ถูกยกเลิกเรียบร้อยค่ะ', titleSize: 'lg' },
+                { id: `b-${now}-4`, type: 'body', bodyText: 'ทางร้าน Home Matcha Cafe ขออภัยเป็นอย่างยิ่ง ออเดอร์ของคุณถูกยกเลิกแล้ว หากมีข้อสงสัยหรือติดขัดเรื่องการชำระเงิน สามารถติดต่อแอดมินทาง LINE ได้เลยนะคะ' },
+                { id: `b-${now}-5`, type: 'highlight', highlightText: '🙏 ทางร้านกราบขออภัยในความไม่สะดวกเป็นอย่างยิ่งค่ะ' },
+                { id: `b-${now}-6`, type: 'button', buttonLabel: '💬 ติดต่อแอดมินทาง LINE', buttonUrl: 'https://line.me/R/ti/p/@719wvlgi', buttonStyle: 'primary' }
             ];
         } else if (preset === 'promo') {
             designerCardBlocks = [
@@ -1891,6 +1939,64 @@
             swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'โหลดการ์ดสมัครสมาชิกที่บันทึกไว้แล้ว ✨', showConfirmButton: false, timer: 1500 });
         } else {
             loadDesignerPreset('register');
+        }
+    }
+
+    async function setAsStatusCard(statusKey: 'brewing' | 'ready_to_ship' | 'delivering' | 'completed' | 'cancelled') {
+        const bubble = buildDesignerFlexBubble();
+        if (!settings.lineOa.customStatusCards) {
+            settings.lineOa.customStatusCards = {};
+        }
+        settings.lineOa.customStatusCards[statusKey] = {
+            enabled: true,
+            bubble: bubble,
+            blocks: JSON.parse(JSON.stringify(designerCardBlocks))
+        };
+        await saveAllSettings();
+        const statusNameMap: Record<string, string> = {
+            brewing: '🍵 กำลังชง',
+            ready_to_ship: '✨ ชงเสร็จพร้อมส่ง',
+            delivering: '🛵 กำลังนำส่ง',
+            completed: '🎉 จัดส่งสำเร็จ',
+            cancelled: '❌ ยกเลิกออเดอร์'
+        };
+        swal.fire({
+            icon: 'success',
+            title: `ตั้งเป็นการ์ดแจ้งเตือน "${statusNameMap[statusKey]}" สำเร็จ! 🎉`,
+            text: `เมื่อออเดอร์ของลูกค้าเปลี่ยนเป็นสถานะนี้ บอท LINE จะส่งการ์ดที่คุณออกแบบนี้ให้ลูกค้าทันทีค่ะ 🍵`,
+            confirmButtonColor: '#166534'
+        });
+    }
+
+    async function unsetStatusCard(statusKey: string) {
+        if (settings.lineOa.customStatusCards?.[statusKey]) {
+            settings.lineOa.customStatusCards[statusKey].enabled = false;
+            await saveAllSettings();
+            swal.fire({
+                icon: 'info',
+                title: 'สลับกลับเป็นการ์ดมาตรฐานของระบบแล้วค่ะ',
+                text: 'ระบบจะส่งการ์ดมาสคอตมาตรฐานเมื่อออเดอร์มีสถานะนี้',
+                confirmButtonColor: '#166534'
+            });
+        }
+    }
+
+    function loadSavedStatusCard(statusKey: string) {
+        const cfg = settings.lineOa.customStatusCards?.[statusKey];
+        if (cfg?.blocks && Array.isArray(cfg.blocks) && cfg.blocks.length > 0) {
+            designerCardBlocks = JSON.parse(JSON.stringify(cfg.blocks));
+            swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `โหลดการ์ดสถานะที่บันทึกไว้แล้ว 🍵`, showConfirmButton: false, timer: 1500 });
+        } else {
+            const presetMap: Record<string, any> = {
+                brewing: 'status_brewing',
+                ready_to_ship: 'status_ready',
+                delivering: 'status_delivering',
+                completed: 'status_completed',
+                cancelled: 'status_cancelled'
+            };
+            if (presetMap[statusKey]) {
+                loadDesignerPreset(presetMap[statusKey]);
+            }
         }
     }
 
@@ -5663,40 +5769,67 @@
                     </div>
 
                     <!-- แถบเลือกเทมเพลตด่วน -->
-                    <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;">
-                        <span style="font-size: 0.78rem; color: #475569; font-weight: 700;">เทมเพลตด่วน:</span>
-                        <button type="button" onclick={() => loadDesignerPreset('welcome')} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 800; background: #ecfdf5; border: 1.5px solid #10b981; color: #065f46; border-radius: 8px; cursor: pointer;">
-                            👋 บัตรต้อนรับเพิ่มเพื่อน
-                        </button>
-                        <button type="button" onclick={() => loadDesignerPreset('member')} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 800; background: #f0fdf4; border: 1.5px solid #22c55e; color: #15803d; border-radius: 8px; cursor: pointer;">
-                            🟢 สมาชิกเดิม (พบเบอร์)
-                        </button>
-                        <button type="button" onclick={() => loadDesignerPreset('register')} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 800; background: #fdf2f8; border: 1.5px solid #f472b6; color: #9d174d; border-radius: 8px; cursor: pointer;">
-                            ✨ ชวนสมัครสมาชิกใหม่
-                        </button>
-                        <button type="button" onclick={() => loadDesignerPreset('promo')} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #f0fdf4; border: 1.5px solid #86efac; color: #166534; border-radius: 8px; cursor: pointer;">
-                            🍵 เมนูแนะนำ
-                        </button>
-                        <button type="button" onclick={() => loadDesignerPreset('loyalty')} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #fefce8; border: 1.5px solid #fde047; color: #854d0e; border-radius: 8px; cursor: pointer;">
-                            ⭐ สะสมแต้ม
-                        </button>
-                        <button type="button" onclick={() => loadDesignerPreset('delivery')} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #f0f9ff; border: 1.5px solid #7dd3fc; color: #0369a1; border-radius: 8px; cursor: pointer;">
-                            🛵 รอบส่ง
-                        </button>
-                        {#if settings.lineOa.useCustomWelcomeCard}
-                            <button type="button" onclick={loadSavedWelcomeCard} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 800; background: #ffffff; border: 1.5px solid #166534; color: #166534; border-radius: 8px; cursor: pointer;">
-                                📂 โหลดการ์ดต้อนรับของฉัน
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; max-width: 620px;">
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;">
+                            <span style="font-size: 0.74rem; color: #475569; font-weight: 800;">🏷️ ทั่วไป & ต้อนรับ:</span>
+                            <button type="button" onclick={() => loadDesignerPreset('welcome')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 800; background: #ecfdf5; border: 1.5px solid #10b981; color: #065f46; border-radius: 6px; cursor: pointer;">
+                                👋 ต้อนรับเพื่อนใหม่
                             </button>
-                        {/if}
-                        {#if settings.lineOa.useCustomMemberCard}
-                            <button type="button" onclick={loadSavedMemberCard} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 800; background: #ffffff; border: 1.5px solid #15803d; color: #15803d; border-radius: 8px; cursor: pointer;">
-                                📂 โหลดการ์ดสมาชิกของฉัน
+                            <button type="button" onclick={() => loadDesignerPreset('member')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 800; background: #f0fdf4; border: 1.5px solid #22c55e; color: #15803d; border-radius: 6px; cursor: pointer;">
+                                🟢 สมาชิกเดิม
                             </button>
-                        {/if}
-                        {#if settings.lineOa.useCustomRegisterCard}
-                            <button type="button" onclick={loadSavedRegisterCard} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 800; background: #ffffff; border: 1.5px solid #be185d; color: #be185d; border-radius: 8px; cursor: pointer;">
-                                📂 โหลดการ์ดสมัครของฉัน
+                            <button type="button" onclick={() => loadDesignerPreset('register')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 800; background: #fdf2f8; border: 1.5px solid #f472b6; color: #9d174d; border-radius: 6px; cursor: pointer;">
+                                ✨ ชวนสมัครใหม่
                             </button>
+                            <button type="button" onclick={() => loadDesignerPreset('loyalty')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #fefce8; border: 1.5px solid #fde047; color: #854d0e; border-radius: 6px; cursor: pointer;">
+                                ⭐ บัตรสะสมแต้ม
+                            </button>
+                            <button type="button" onclick={() => loadDesignerPreset('promo')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #f0fdf4; border: 1.5px solid #86efac; color: #166534; border-radius: 6px; cursor: pointer;">
+                                🍵 เมนูแนะนำ
+                            </button>
+                            <button type="button" onclick={() => loadDesignerPreset('delivery')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #f0f9ff; border: 1.5px solid #7dd3fc; color: #0369a1; border-radius: 6px; cursor: pointer;">
+                                🛵 รอบส่ง
+                            </button>
+                        </div>
+
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; border-top: 1px dashed #e2e8f0; padding-top: 0.4rem;">
+                            <span style="font-size: 0.74rem; color: #0f766e; font-weight: 800;">📢 แจ้งเตือนสถานะออเดอร์:</span>
+                            <button type="button" onclick={() => loadDesignerPreset('status_brewing')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #ccfbf1; border: 1.5px solid #14b8a6; color: #0f766e; border-radius: 6px; cursor: pointer;">
+                                🍵 กำลังชง
+                            </button>
+                            <button type="button" onclick={() => loadDesignerPreset('status_ready')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #d1fae5; border: 1.5px solid #10b981; color: #065f46; border-radius: 6px; cursor: pointer;">
+                                ✨ ชงเสร็จ
+                            </button>
+                            <button type="button" onclick={() => loadDesignerPreset('status_delivering')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #e0f2fe; border: 1.5px solid #38bdf8; color: #0284c7; border-radius: 6px; cursor: pointer;">
+                                🛵 กำลังส่ง
+                            </button>
+                            <button type="button" onclick={() => loadDesignerPreset('status_completed')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #dcfce7; border: 1.5px solid #86efac; color: #166534; border-radius: 6px; cursor: pointer;">
+                                🎉 ส่งสำเร็จ
+                            </button>
+                            <button type="button" onclick={() => loadDesignerPreset('status_cancelled')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #fee2e2; border: 1.5px solid #f87171; color: #991b1b; border-radius: 6px; cursor: pointer;">
+                                ❌ ยกเลิก
+                            </button>
+                        </div>
+
+                        {#if settings.lineOa.useCustomWelcomeCard || settings.lineOa.useCustomMemberCard || settings.lineOa.useCustomRegisterCard}
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; border-top: 1px dashed #e2e8f0; padding-top: 0.4rem;">
+                                <span style="font-size: 0.74rem; color: #1e293b; font-weight: 700;">📂 การ์ดที่บันทึกไว้:</span>
+                                {#if settings.lineOa.useCustomWelcomeCard}
+                                    <button type="button" onclick={loadSavedWelcomeCard} style="padding: 0.2rem 0.5rem; font-size: 0.72rem; font-weight: 800; background: #ffffff; border: 1px solid #166534; color: #166534; border-radius: 6px; cursor: pointer;">
+                                        การ์ดต้อนรับ
+                                    </button>
+                                {/if}
+                                {#if settings.lineOa.useCustomMemberCard}
+                                    <button type="button" onclick={loadSavedMemberCard} style="padding: 0.2rem 0.5rem; font-size: 0.72rem; font-weight: 800; background: #ffffff; border: 1px solid #15803d; color: #15803d; border-radius: 6px; cursor: pointer;">
+                                        การ์ดสมาชิกเดิม
+                                    </button>
+                                {/if}
+                                {#if settings.lineOa.useCustomRegisterCard}
+                                    <button type="button" onclick={loadSavedRegisterCard} style="padding: 0.2rem 0.5rem; font-size: 0.72rem; font-weight: 800; background: #ffffff; border: 1px solid #be185d; color: #be185d; border-radius: 6px; cursor: pointer;">
+                                        การ์ดชวนสมัคร
+                                    </button>
+                                {/if}
+                            </div>
                         {/if}
                     </div>
                 </div>
@@ -6226,6 +6359,82 @@
                                     </button>
                                 {/if}
                             </div>
+                        </div>
+
+                        <!-- กล่องตั้งเป็นการ์ดแจ้งเตือนสถานะออเดอร์ -->
+                        <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 1rem; margin-bottom: 0.85rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                    <span style="font-size: 1.05rem;">📢</span>
+                                    <strong style="font-size: 0.88rem; color: #1e293b;">ตั้งเป็นการ์ดแจ้งเตือนสถานะออเดอร์</strong>
+                                </div>
+                                <span style="font-size: 0.72rem; color: #64748b;">
+                                    💡 แทนค่า: {'{orderCode}'}, {'{itemsSummary}'}, {'{url}'}
+                                </span>
+                            </div>
+                            <p style="margin: 0 0 0.65rem 0; font-size: 0.78rem; color: #64748b; line-height: 1.45;">
+                                เลือกสถานะที่ต้องการนำการ์ดที่กำลังออกแบบอยู่นี้ไปใช้ส่งแจ้งเตือนลูกค้าทาง LINE แทนการ์ดมาตรฐานของระบบค่ะ:
+                            </p>
+                            
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.4rem; margin-bottom: 0.5rem;">
+                                <button
+                                    type="button"
+                                    onclick={() => setAsStatusCard('brewing')}
+                                    style="padding: 0.4rem 0.5rem; font-size: 0.78rem; font-weight: 700; background: {settings.lineOa.customStatusCards?.['brewing']?.enabled ? '#0d9488' : '#ffffff'}; color: {settings.lineOa.customStatusCards?.['brewing']?.enabled ? '#ffffff' : '#0d9488'}; border: 1.5px solid #0d9488; border-radius: 6px; cursor: pointer;"
+                                    title="ตั้งเป็นการ์ดแจ้งเตือนเมื่อสถานะเป็น: กำลังชง"
+                                >
+                                    🍵 กำลังชง {settings.lineOa.customStatusCards?.['brewing']?.enabled ? '✓' : ''}
+                                </button>
+                                <button
+                                    type="button"
+                                    onclick={() => setAsStatusCard('ready_to_ship')}
+                                    style="padding: 0.4rem 0.5rem; font-size: 0.78rem; font-weight: 700; background: {settings.lineOa.customStatusCards?.['ready_to_ship']?.enabled ? '#059669' : '#ffffff'}; color: {settings.lineOa.customStatusCards?.['ready_to_ship']?.enabled ? '#ffffff' : '#059669'}; border: 1.5px solid #059669; border-radius: 6px; cursor: pointer;"
+                                    title="ตั้งเป็นการ์ดแจ้งเตือนเมื่อสถานะเป็น: ชงเสร็จพร้อมส่ง"
+                                >
+                                    ✨ ชงเสร็จ {settings.lineOa.customStatusCards?.['ready_to_ship']?.enabled ? '✓' : ''}
+                                </button>
+                                <button
+                                    type="button"
+                                    onclick={() => setAsStatusCard('delivering')}
+                                    style="padding: 0.4rem 0.5rem; font-size: 0.78rem; font-weight: 700; background: {settings.lineOa.customStatusCards?.['delivering']?.enabled ? '#0284c7' : '#ffffff'}; color: {settings.lineOa.customStatusCards?.['delivering']?.enabled ? '#ffffff' : '#0284c7'}; border: 1.5px solid #0284c7; border-radius: 6px; cursor: pointer;"
+                                    title="ตั้งเป็นการ์ดแจ้งเตือนเมื่อสถานะเป็น: กำลังนำส่ง"
+                                >
+                                    🛵 กำลังส่ง {settings.lineOa.customStatusCards?.['delivering']?.enabled ? '✓' : ''}
+                                </button>
+                                <button
+                                    type="button"
+                                    onclick={() => setAsStatusCard('completed')}
+                                    style="padding: 0.4rem 0.5rem; font-size: 0.78rem; font-weight: 700; background: {settings.lineOa.customStatusCards?.['completed']?.enabled ? '#166534' : '#ffffff'}; color: {settings.lineOa.customStatusCards?.['completed']?.enabled ? '#ffffff' : '#166534'}; border: 1.5px solid #166534; border-radius: 6px; cursor: pointer;"
+                                    title="ตั้งเป็นการ์ดแจ้งเตือนเมื่อสถานะเป็น: จัดส่งสำเร็จ"
+                                >
+                                    🎉 ส่งสำเร็จ {settings.lineOa.customStatusCards?.['completed']?.enabled ? '✓' : ''}
+                                </button>
+                                <button
+                                    type="button"
+                                    onclick={() => setAsStatusCard('cancelled')}
+                                    style="padding: 0.4rem 0.5rem; font-size: 0.78rem; font-weight: 700; background: {settings.lineOa.customStatusCards?.['cancelled']?.enabled ? '#dc2626' : '#ffffff'}; color: {settings.lineOa.customStatusCards?.['cancelled']?.enabled ? '#ffffff' : '#dc2626'}; border: 1.5px solid #dc2626; border-radius: 6px; cursor: pointer;"
+                                    title="ตั้งเป็นการ์ดแจ้งเตือนเมื่อสถานะเป็น: ยกเลิกออเดอร์"
+                                >
+                                    ❌ ยกเลิก {settings.lineOa.customStatusCards?.['cancelled']?.enabled ? '✓' : ''}
+                                </button>
+                            </div>
+
+                            {#if Object.values(settings.lineOa.customStatusCards || {}).some(c => c?.enabled)}
+                                <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; border-top: 1px dashed #cbd5e1; padding-top: 0.5rem; font-size: 0.72rem; color: #475569;">
+                                    <span>สลับกลับใช้การ์ดระบบ:</span>
+                                    {#each ['brewing', 'ready_to_ship', 'delivering', 'completed', 'cancelled'] as st}
+                                        {#if settings.lineOa.customStatusCards?.[st]?.enabled}
+                                            <button
+                                                type="button"
+                                                onclick={() => unsetStatusCard(st)}
+                                                style="padding: 0.15rem 0.45rem; font-size: 0.7rem; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; border-radius: 4px; cursor: pointer;"
+                                            >
+                                                รีเซ็ต {st === 'brewing' ? 'กำลังชง' : st === 'ready_to_ship' ? 'ชงเสร็จ' : st === 'delivering' ? 'กำลังส่ง' : st === 'completed' ? 'ส่งสำเร็จ' : 'ยกเลิก'}
+                                            </button>
+                                        {/if}
+                                    {/each}
+                                </div>
+                            {/if}
                         </div>
 
                         <!-- กล่องส่งข้อความ & Export -->
