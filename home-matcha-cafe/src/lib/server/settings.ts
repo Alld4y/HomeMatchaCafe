@@ -44,6 +44,7 @@ export interface LineOaSettings {
     channelAccessToken: string;
     botBasicId: string;
     adminLineUserId: string;
+    adminPhone?: string;
 
     // Auto replies
     autoReplyEnabled: boolean;
@@ -154,6 +155,7 @@ const DEFAULT_SETTINGS: StoreSettings = {
         channelAccessToken: '',
         botBasicId: '@719wvlgi',
         adminLineUserId: 'Uc04ed4f079c031e33621c131cec0ca27',
+        adminPhone: '',
         autoReplyEnabled: true,
         welcomeMessage: 'ยินดีต้อนรับสู่ Home Matcha Cafe 🍵✨\nคุณสามารถพิมพ์ "เมนู" เพื่อดูรายการเครื่องดื่ม, "สถานะ" เพื่อติดตามออเดอร์, "แต้ม" เพื่อเช็คคะแนนสะสม หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อรับแจ้งเตือนได้เลยค่ะ',
         useCustomWelcomeCard: false,
@@ -362,6 +364,7 @@ function normalizeSettings(parsed: any): StoreSettings {
             channelAccessToken: lineOaToken,
             botBasicId: String(parsedLineOa.botBasicId || defaultLineOa.botBasicId).trim(),
             adminLineUserId: String(parsedLineOa.adminLineUserId || defaultLineOa.adminLineUserId).trim(),
+            adminPhone: parsedLineOa.adminPhone ? String(parsedLineOa.adminPhone).trim() : '',
             autoReplyEnabled: parsedLineOa.autoReplyEnabled !== false,
             welcomeMessage: welcomeMsg,
             useCustomWelcomeCard: Boolean(parsedLineOa.useCustomWelcomeCard),

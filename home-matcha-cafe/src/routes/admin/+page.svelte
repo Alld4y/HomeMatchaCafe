@@ -91,6 +91,7 @@
         channelAccessToken: string;
         botBasicId: string;
         adminLineUserId: string;
+        adminPhone: string;
         autoReplyEnabled: boolean;
         welcomeMessage: string;
         useCustomWelcomeCard?: boolean;
@@ -181,6 +182,7 @@
             channelAccessToken: '',
             botBasicId: '@719wvlgi',
             adminLineUserId: 'Uc04ed4f079c031e33621c131cec0ca27',
+            adminPhone: '',
             autoReplyEnabled: true,
             welcomeMessage: 'ยินดีต้อนรับสู่ Home Matcha Cafe 🍵✨\nคุณสามารถพิมพ์ "เมนู" เพื่อดูรายการเครื่องดื่ม, "สถานะ" เพื่อติดตามออเดอร์, "แต้ม" เพื่อเช็คคะแนนสะสม หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อรับแจ้งเตือนได้เลยค่ะ',
             useCustomWelcomeCard: false,
@@ -1270,7 +1272,7 @@
         }
     }
 
-    async function sendLineTestPushMessage() {
+    async function sendLineTestPushMessage(statusType?: string) {
         if (!settings.lineOa.channelAccessToken) {
             swal.fire({
                 icon: 'warning',
@@ -1287,21 +1289,23 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     targetUserId: settings.lineOa.adminLineUserId,
-                    message: lineTestMessageInput
+                    targetPhone: settings.lineOa.adminPhone,
+                    message: lineTestMessageInput,
+                    statusType: statusType || undefined
                 })
             });
             const data = await res.json();
             if (data.success) {
                 swal.fire({
                     icon: 'success',
-                    title: 'ส่งข้อความสำเร็จ! 💬',
+                    title: statusType ? 'ยิงการ์ดสถานะสำเร็จ! 🍵' : 'ส่งข้อความสำเร็จ! 💬',
                     text: data.message,
                     confirmButtonColor: '#166534'
                 });
             } else {
                 swal.fire({
                     icon: 'error',
-                    title: 'ส่งข้อความไม่สำเร็จ',
+                    title: 'ส่งไม่สำเร็จ',
                     text: data.message || 'โปรดตรวจสอบ Channel Access Token อีกครั้งค่ะ',
                     confirmButtonColor: '#dc2626'
                 });
@@ -5193,6 +5197,32 @@
                         <span style="font-size: 0.75rem; color: #64748b;">ดูได้จาก "Your user ID" ที่ด้านล่างของแท็บ Basic settings</span>
                     </div>
 
+                    <!-- เบอร์โทรศัพท์แอดมิน (Admin Phone Number) -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                            <label for="lineAdminPhone" style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin: 0;">
+                                📱 เบอร์โทรศัพท์แอดมิน:
+                            </label>
+                            {#if settings.lineOa.adminPhone}
+                                <button
+                                    type="button"
+                                    onclick={() => copyToClipboard(settings.lineOa.adminPhone, 'คัดลอกเบอร์แอดมินแล้ว 📋')}
+                                    style="background: none; border: none; color: #0284c7; font-size: 0.75rem; font-weight: 700; cursor: pointer; text-decoration: underline;"
+                                >
+                                    📋 คัดลอกเบอร์
+                                </button>
+                            {/if}
+                        </div>
+                        <input
+                            id="lineAdminPhone"
+                            type="tel"
+                            bind:value={settings.lineOa.adminPhone}
+                            placeholder="เช่น 0812345678"
+                            style="width: 100%; padding: 0.6rem 0.8rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.88rem; font-weight: 600;"
+                        />
+                        <span style="font-size: 0.75rem; color: #64748b;">เบอร์แอดมินสำหรับผูกบัญชีรับแจ้งเตือน และยิงทดสอบสถานะ</span>
+                    </div>
+
                     <!-- Channel Access Token (Long-lived) -->
                     <div>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
@@ -5398,24 +5428,97 @@
                         ทดสอบยิงข้อความ Flex Message ไปยัง LINE แอดมินทันที เพื่อยืนยันว่า Access Token ถูกต้อง
                     </p>
 
+                    <!-- ปุ่มเทสส่งการ์ดแจ้งเตือนสถานะต่างๆ -->
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.75rem; margin-bottom: 0.75rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.45rem; flex-wrap: wrap; gap: 0.25rem;">
+                            <strong style="font-size: 0.82rem; color: #1e293b;">⚡ ทดสอบยิงการ์ดสถานะเข้า LINE แอดมิน:</strong>
+                            <span style="font-size: 0.7rem; color: #64748b;">(ยิงเข้าบัญชีที่ระบุไว้)</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); gap: 0.35rem;">
+                            <button
+                                type="button"
+                                disabled={isSendingLineTest}
+                                onclick={() => sendLineTestPushMessage('brewing')}
+                                style="padding: 0.35rem 0.45rem; font-size: 0.74rem; font-weight: 700; background: #f0fdfa; border: 1px solid #14b8a6; color: #0f766e; border-radius: 6px; cursor: pointer;"
+                                title="ยิงการ์ดทดสอบสถานะ: กำลังชง เข้า LINE แอดมิน"
+                            >
+                                🍵 กำลังชง
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isSendingLineTest}
+                                onclick={() => sendLineTestPushMessage('ready_to_ship')}
+                                style="padding: 0.35rem 0.45rem; font-size: 0.74rem; font-weight: 700; background: #ecfdf5; border: 1px solid #10b981; color: #065f46; border-radius: 6px; cursor: pointer;"
+                                title="ยิงการ์ดทดสอบสถานะ: ชงเสร็จพร้อมส่ง เข้า LINE แอดมิน"
+                            >
+                                ✨ ชงเสร็จ
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isSendingLineTest}
+                                onclick={() => sendLineTestPushMessage('delivering')}
+                                style="padding: 0.35rem 0.45rem; font-size: 0.74rem; font-weight: 700; background: #f0f9ff; border: 1px solid #38bdf8; color: #0284c7; border-radius: 6px; cursor: pointer;"
+                                title="ยิงการ์ดทดสอบสถานะ: กำลังนำส่ง เข้า LINE แอดมิน"
+                            >
+                                🛵 กำลังส่ง
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isSendingLineTest}
+                                onclick={() => sendLineTestPushMessage('completed')}
+                                style="padding: 0.35rem 0.45rem; font-size: 0.74rem; font-weight: 700; background: #f0fdf4; border: 1px solid #22c55e; color: #15803d; border-radius: 6px; cursor: pointer;"
+                                title="ยิงการ์ดทดสอบสถานะ: จัดส่งสำเร็จ เข้า LINE แอดมิน"
+                            >
+                                🎉 ส่งสำเร็จ
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isSendingLineTest}
+                                onclick={() => sendLineTestPushMessage('cancelled')}
+                                style="padding: 0.35rem 0.45rem; font-size: 0.74rem; font-weight: 700; background: #fef2f2; border: 1px solid #f87171; color: #991b1b; border-radius: 6px; cursor: pointer;"
+                                title="ยิงการ์ดทดสอบสถานะ: ยกเลิก เข้า LINE แอดมิน"
+                            >
+                                ❌ ยกเลิก
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isSendingLineTest}
+                                onclick={() => sendLineTestPushMessage('order_created')}
+                                style="padding: 0.35rem 0.45rem; font-size: 0.74rem; font-weight: 700; background: #f8fafc; border: 1px solid #94a3b8; color: #334155; border-radius: 6px; cursor: pointer;"
+                                title="ยิงการ์ดทดสอบสถานะ: รับออเดอร์ใหม่ เข้า LINE แอดมิน"
+                            >
+                                📝 รับออเดอร์
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isSendingLineTest}
+                                onclick={() => sendLineTestPushMessage('slip_approved')}
+                                style="padding: 0.35rem 0.45rem; font-size: 0.74rem; font-weight: 700; background: #f0fdf4; border: 1px solid #86efac; color: #166534; border-radius: 6px; cursor: pointer;"
+                                title="ยิงการ์ดทดสอบสถานะ: ตรวจสอบสลิปผ่าน เข้า LINE แอดมิน"
+                            >
+                                💳 อนุมัติสลิป
+                            </button>
+                        </div>
+                    </div>
+
                     <div style="display: flex; flex-direction: column; gap: 0.65rem;">
                         <textarea
                             bind:value={lineTestMessageInput}
-                            rows={3}
-                            placeholder="พิมพ์ข้อความทดสอบ..."
+                            rows={2}
+                            placeholder="พิมพ์ข้อความทดสอบทั่วไป..."
                             style="width: 100%; padding: 0.6rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; line-height: 1.4;"
                         ></textarea>
 
                         <button
                             type="button"
-                            onclick={sendLineTestPushMessage}
+                            onclick={() => sendLineTestPushMessage()}
                             disabled={isSendingLineTest}
                             style="padding: 0.65rem 1.25rem; background: #166534; color: #ffffff; border: none; border-radius: 8px; font-weight: 800; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;"
                         >
                             {#if isSendingLineTest}
                                 <span>⏳ กำลังยิงข้อความ...</span>
                             {:else}
-                                <span>🚀 ทดสอบส่งเข้า LINE แอดมิน</span>
+                                <span>🚀 ทดสอบส่งข้อความเข้า LINE แอดมิน</span>
                             {/if}
                         </button>
                     </div>

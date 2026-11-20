@@ -751,9 +751,17 @@ export async function notifyAdminLine(params: {
 }
 
 /**
- * ส่งข้อความทดสอบจากหน้าแอดมิน
+ * ส่งข้อความทดสอบจากหน้าแอดมิน (รองรับทั้งข้อความทั่วไป และการทดสอบยิงการ์ดแจ้งเตือนสถานะต่างๆ)
  */
-export async function sendLineTestMessage(targetUserId?: string, customMessage?: string): Promise<{ success: boolean; message: string }> {
+export async function sendLineTestMessage(
+    param1?: string | {
+        targetUserId?: string;
+        targetPhone?: string;
+        customMessage?: string;
+        statusType?: 'brewing' | 'ready_to_ship' | 'delivering' | 'completed' | 'cancelled' | 'order_created' | 'slip_approved';
+    },
+    legacyCustomMessage?: string
+): Promise<{ success: boolean; message: string }> {
     const settings = await getStoreSettings();
     const lineOa = settings.lineOa;
 
@@ -762,11 +770,107 @@ export async function sendLineTestMessage(targetUserId?: string, customMessage?:
         return { success: false, message: 'ยังไม่ได้ระบุ Channel Access Token ในการตั้งค่า LINE OA' };
     }
 
-    const to = targetUserId || lineOa.adminLineUserId;
-    if (!to) {
-        return { success: false, message: 'ไม่มี Admin User ID หรือผู้รับสำหรับทดสอบ' };
+    let targetUserId: string | undefined;
+    let targetPhone: string | undefined;
+    let customMessage: string | undefined;
+    let statusType: string | undefined;
+
+    if (typeof param1 === 'object' && param1 !== null) {
+        targetUserId = param1.targetUserId;
+        targetPhone = param1.targetPhone;
+        customMessage = param1.customMessage;
+        statusType = param1.statusType;
+    } else {
+        targetUserId = param1;
+        customMessage = legacyCustomMessage;
     }
 
+    let to = targetUserId || lineOa.adminLineUserId;
+    if (!to && targetPhone) {
+        to = (await getLineUserIdByPhone(targetPhone)) || '';
+    }
+    if (!to && lineOa.adminPhone) {
+        to = (await getLineUserIdByPhone(lineOa.adminPhone)) || '';
+    }
+
+    if (!to) {
+        return {
+            success: false,
+            message: 'ไม่พบ LINE User ID สำหรับรับข้อความทดสอบ (กรุณาระบุ Admin User ID หรือระบุเบอร์โทรแอดมินที่เคยพิมพ์ในแชท LINE OA ค่ะ)'
+        };
+    }
+
+    // กรณีทดสอบการ์ดแจ้งเตือนสถานะออเดอร์ (Status Card Test)
+    if (statusType) {
+        const statusMetaMap: Record<string, { title: string; body: string; name: string }> = {
+            order_created: {
+                name: 'รับออเดอร์ใหม่',
+                title: '📝 ได้รับคำสั่งซื้อเรียบร้อยแล้ว',
+                body: 'ทางร้านได้รับออเดอร์ #HM-TEST88 แล้วค่ะ กรุณาแนบสลิปเพื่อเริ่มคิวชงนะคะ'
+            },
+            slip_approved: {
+                name: 'อนุมัติสลิปแล้ว',
+                title: '💳 ตรวจสอบการชำระเงินสำเร็จ',
+                body: 'ยอดชำระได้รับการยืนยันแล้ว ออเดอร์ของคุณเข้าสู่คิวการชงเรียบร้อยค่ะ'
+            },
+            brewing: {
+                name: 'กำลังชง',
+                title: '🍵 บาริสต้ากำลังชงมัทฉะ',
+                body: 'บาริสต้ากำลังตั้งใจชงเครื่องดื่มมัทฉะแก้วพิเศษของคุณอย่างพิถีพิถัน'
+            },
+            ready_to_ship: {
+                name: 'ชงเสร็จพร้อมส่ง',
+                title: '✨ ชงเสร็จเรียบร้อยแล้ว',
+                body: 'เครื่องดื่มของคุณชงเสร็จแล้ว แพ็กเรียบร้อย พร้อมออกเดินทางค่ะ'
+            },
+            delivering: {
+                name: 'กำลังนำส่ง',
+                title: '🛵 กำลังนำส่งเครื่องดื่ม',
+                body: 'ไรเดอร์กำลังมุ่งหน้าไปส่งเครื่องดื่มเย็นๆ สดชื่นถึงมือคุณแล้วค่ะ'
+            },
+            completed: {
+                name: 'จัดส่งสำเร็จ',
+                title: '🎉 จัดส่งเครื่องดื่มสำเร็จแล้ว',
+                body: 'ขอบคุณที่อุดหนุน Home Matcha Cafe นะคะ หวังว่าจะถูกใจในรสชาติมัทฉะแท้ค่ะ 🍵'
+            },
+            cancelled: {
+                name: 'ยกเลิกออเดอร์',
+                title: '❌ ออเดอร์ถูกยกเลิก',
+                body: 'คำสั่งซื้อได้รับการยกเลิกแล้ว หากมีข้อสงสัยสามารถติดต่อแอดมินได้ตลอดค่ะ'
+            }
+        };
+
+        const meta = statusMetaMap[statusType] || {
+            name: statusType,
+            title: `📢 แจ้งเตือนสถานะ: ${statusType}`,
+            body: 'นี่คือข้อความทดสอบการแจ้งเตือนสถานะคำสั่งซื้อทาง LINE OA'
+        };
+
+        const ok = await sendLineStatusFlexMessage(token, to, {
+            title: meta.title,
+            body: meta.body,
+            eventType: statusType as any,
+            orderCode: 'HM-TEST88',
+            itemsSummary: 'Cold-Fermented Oat Milk Matcha Latte x1, Clear Matcha Cold Whisk x1',
+            totalPrice: 165,
+            url: '/order/test',
+            phone: targetPhone || lineOa.adminPhone || '0987654321'
+        });
+
+        if (ok) {
+            return {
+                success: true,
+                message: `ยิงการ์ดทดสอบสถานะ "${meta.name}" ไปยัง LINE แอดมินสำเร็จเรียบร้อยแล้วค่ะ! 🍵`
+            };
+        } else {
+            return {
+                success: false,
+                message: `ส่งการ์ดสถานะไม่สำเร็จ กรุณาตรวจสอบว่าบัญชี LINE แอดมินได้แอดเพื่อนกับ LINE OA หรือยังนะคะ`
+            };
+        }
+    }
+
+    // กรณีทดสอบข้อความทั่วไป
     const testBubble = {
         type: 'bubble',
         header: {
@@ -804,8 +908,8 @@ export async function sendLineTestMessage(targetUserId?: string, customMessage?:
 
     const ok = await sendLineRawFlexMessage(token, to, 'ข้อความทดสอบระบบ LINE OA Home Matcha Cafe', testBubble);
     if (ok) {
-        return { success: true, message: `ส่งข้อความทดสอบไปยัง ${to} สำเร็จ!` };
+        return { success: true, message: `ส่งข้อความทดสอบไปยัง LINE แอดมินสำเร็จแล้วค่ะ! (${to})` };
     } else {
-        return { success: false, message: 'ส่งข้อความไม่สำเร็จ กรุณาตรวจสอบ Channel Access Token ว่าถูกต้องและยังไม่หมดอายุ' };
+        return { success: false, message: 'ส่งข้อความไม่สำเร็จ กรุณาตรวจสอบว่าแอดมินกดแอดเพื่อนกับบอท LINE OA หรือยังนะคะ' };
     }
 }
