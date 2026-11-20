@@ -84,10 +84,12 @@ export const POST: RequestHandler = async ({ request }) => {
                         }
 
                         // ส่งการ์ดแจ้งเตือนลูกค้าใน LINE OA อัตโนมัติ (Event: ลูกค้าสมัครสมาชิกเสร็จแล้ว)
+                        const fullName = `${result.member.firstName} ${result.member.lastName}`.trim();
                         await sendCustomerNotification({
                             phone: cleanPhone,
+                            customerName: fullName,
                             title: '🎉 สมัครสมาชิกสำเร็จเรียบร้อยค่ะ',
-                            body: `ยินดีต้อนรับคุณ ${result.member.firstName} เข้าสู่ระบบสมาชิก Home Matcha Cafe รหัส PIN ของคุณคือ ${rawPin}`,
+                            body: `ยินดีต้อนรับคุณ ${fullName || result.member.firstName} เข้าสู่ระบบสมาชิก Home Matcha Cafe รหัส PIN ของคุณคือ ${rawPin}`,
                             eventType: 'member_registered',
                             pin: rawPin,
                             url: `/loyalty?phone=${cleanPhone}`

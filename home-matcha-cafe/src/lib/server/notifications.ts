@@ -113,6 +113,7 @@ export async function getSubscriptionsByPhone(phone: string): Promise<PushSubscr
 
 export interface CustomerNotificationPayload {
     phone: string;
+    customerName?: string;
     orderId?: string;
     orderCode?: string;
     title: string;
@@ -161,7 +162,7 @@ export async function sendCustomerNotification(payload: CustomerNotificationPayl
     lineOaSent: boolean;
     reason?: string;
 }> {
-    const { phone, title, body, url = '/loyalty', eventType, orderCode, itemsSummary, totalPrice, pin } = payload;
+    const { phone, customerName, title, body, url = '/loyalty', eventType, orderCode, itemsSummary, totalPrice, pin } = payload;
     if (!phone) {
         return { webPushSent: 0, lineOaSent: false, reason: 'ไม่มีเบอร์โทรลูกค้า' };
     }
@@ -172,6 +173,20 @@ export async function sendCustomerNotification(payload: CustomerNotificationPayl
     const lineOaSettings = settings.lineOa;
 
     let lineOaSuccess = false;
+
+    // ค้นหาชื่อลูกค้าจากระบบสมาชิกหากไม่ได้ส่งมา
+    let finalCustomerName = customerName;
+    if (!finalCustomerName && cleanPhone) {
+        try {
+            const memberRow = await pool.query(
+                `SELECT first_name, last_name FROM public.members WHERE phone = $1 LIMIT 1`,
+                [cleanPhone]
+            );
+            if (memberRow.rows.length > 0) {
+                finalCustomerName = `${memberRow.rows[0].first_name || ''} ${memberRow.rows[0].last_name || ''}`.trim();
+            }
+        } catch {}
+    }
 
     // ส่งผ่าน LINE Official Account 100%
     const isLineOaAllowed = lineOaSettings?.enabled && (
@@ -203,7 +218,8 @@ export async function sendCustomerNotification(payload: CustomerNotificationPayl
                         totalPrice,
                         url,
                         phone: cleanPhone,
-                        pin
+                        pin,
+                        customerName: finalCustomerName
                     }
                 );
             }
@@ -231,16 +247,19 @@ export async function sendLineStatusFlexMessage(
         url: string;
         phone?: string;
         pin?: string;
+        customerName?: string;
     }
 ): Promise<boolean> {
     if (!channelAccessToken || !toUserId) return false;
 
-    const { title, body, eventType, orderCode, itemsSummary, totalPrice, url, phone, pin } = params;
+    const { title, body, eventType, orderCode, itemsSummary, totalPrice, url, phone, pin, customerName } = params;
     let targetUrl = url;
     if (eventType === 'slip_approved' && (!targetUrl || !targetUrl.includes('/success'))) {
         targetUrl = `/success?orderCode=${encodeURIComponent(orderCode || '')}&phone=${encodeURIComponent(phone || '')}`;
     }
     const trackingUrl = targetUrl.startsWith('http') ? targetUrl : `https://homematchacafe.store${targetUrl}`;
+
+    const nameVal = customerName || '';
 
     // ตรวจสอบว่าแอดมินตั้งค่าการ์ดแจ้งเตือนสถานะออกแบบเอง (Custom Status Card) สำหรับสถานะนี้หรือไม่
     try {
@@ -249,9 +268,14 @@ export async function sendLineStatusFlexMessage(
         if (customCfg?.enabled && customCfg.bubble) {
             let rawJson = JSON.stringify(customCfg.bubble);
             rawJson = rawJson
+                .replace(/#\{orderCode\}/g, orderCode ? (orderCode.startsWith('#') ? orderCode : `#${orderCode}`) : '')
                 .replace(/\{orderCode\}/g, orderCode || '')
                 .replace(/\{itemsSummary\}/g, itemsSummary || '')
                 .replace(/\{totalPrice\}/g, totalPrice !== undefined ? `฿${totalPrice.toLocaleString()}` : '')
+                .replace(/คุณ\s*\{name\}/g, nameVal ? (nameVal.startsWith('คุณ') ? nameVal : `คุณ ${nameVal}`) : 'คุณลูกค้า')
+                .replace(/คุณ\s*\{customerName\}/g, nameVal ? (nameVal.startsWith('คุณ') ? nameVal : `คุณ ${nameVal}`) : 'คุณลูกค้า')
+                .replace(/\{name\}/g, nameVal || 'คุณลูกค้า')
+                .replace(/\{customerName\}/g, nameVal || 'คุณลูกค้า')
                 .replace(/\{url\}/g, trackingUrl)
                 .replace(/\{trackingUrl\}/g, trackingUrl)
                 .replace(/\{successUrl\}/g, trackingUrl)
@@ -261,7 +285,15 @@ export async function sendLineStatusFlexMessage(
                 .replace(/\{pin\}/g, pin || '')
                 .replace(/\{loyaltyUrl\}/g, phone ? `https://homematchacafe.store/loyalty?phone=${phone}` : 'https://homematchacafe.store/loyalty');
             const customBubble = JSON.parse(rawJson);
-            return sendLineRawFlexMessage(channelAccessToken, toUserId, `${title}: ${body}`, customBubble, { pin: pin || '' });
+            return sendLineRawFlexMessage(channelAccessToken, toUserId, `${title}: ${body}`, customBubble, {
+                customerName: nameVal,
+                name: nameVal,
+                pin: pin || '',
+                phone: phone || '',
+                orderCode: orderCode || '',
+                itemsSummary: itemsSummary || '',
+                totalPrice: totalPrice !== undefined ? `฿${totalPrice.toLocaleString()}` : ''
+            });
         }
     } catch (cfgErr) {
         console.warn('⚠️ Error checking custom status card:', cfgErr);
@@ -428,6 +460,32 @@ export async function sendLineStatusFlexMessage(
         }
     };
 
+    if (customerName) {
+        contents.body.contents.push({
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'sm',
+            contents: [
+                {
+                    type: 'text',
+                    text: eventType === 'member_registered' ? 'ชื่อสมาชิก:' : 'ชื่อลูกค้า:',
+                    size: 'sm',
+                    color: '#64748b',
+                    flex: 3
+                },
+                {
+                    type: 'text',
+                    text: customerName,
+                    size: 'sm',
+                    weight: 'bold',
+                    color: '#166534',
+                    flex: 4,
+                    align: 'end'
+                }
+            ]
+        });
+    }
+
     if (phone) {
         contents.body.contents.push({
             type: 'box',
@@ -587,6 +645,7 @@ export function sanitizeFlexBubble(bubble: any, fallbackPhone?: string, testVars
 
         str = str.replace(/\{phone\}/g, phone);
         str = str.replace(/\{pin\}/g, pin);
+        str = str.replace(/#\{orderCode\}/g, orderCode ? (orderCode.startsWith('#') ? orderCode : `#${orderCode}`) : '');
         str = str.replace(/\{orderCode\}/g, orderCode);
         str = str.replace(/\{itemsSummary\}/g, itemsSummary);
         str = str.replace(/\{totalPrice\}/g, totalPrice);
@@ -1001,6 +1060,7 @@ export async function sendLineTestMessage(
         const testPrice = testVars?.totalPrice ? Number(testVars.totalPrice.replace(/[^0-9.]/g, '')) || 165 : 165;
         const testPhone = targetPhone || lineOa.adminPhone || '0987654321';
         const testPin = testVars?.pin || '8899';
+        const testCustomerName = testVars?.customerName || testVars?.name || 'คุณลูกค้า';
         const testUrl = statusType === 'slip_approved'
             ? `/success?orderCode=${encodeURIComponent(testCode)}&phone=${encodeURIComponent(testPhone)}`
             : '/order/test';
@@ -1016,7 +1076,8 @@ export async function sendLineTestMessage(
                 totalPrice: testPrice,
                 url: testUrl,
                 phone: testPhone,
-                pin: testPin
+                pin: testPin,
+                customerName: testCustomerName
             });
             if (ok) successCount++;
         }

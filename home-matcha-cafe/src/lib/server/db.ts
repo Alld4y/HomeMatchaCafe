@@ -319,6 +319,7 @@ export async function createOrder(data: {
 
     sendCustomerNotification({
         phone: finalOrder.phone,
+        customerName: finalOrder.name,
         orderId: finalOrder.id,
         orderCode: finalOrder.order_id,
         title: '🍵 ได้รับคำสั่งซื้อของคุณแล้ว',
@@ -379,6 +380,7 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
     if (order.status === 'paid' && (prevStatus === 'pending' || order.needsManualReview)) {
         sendCustomerNotification({
             phone: order.phone,
+            customerName: order.name,
             orderId: order.id,
             orderCode: order.order_id,
             title: '🍵 ยืนยันรับยอดออเดอร์แล้ว',
@@ -394,6 +396,7 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
     if (order.status === 'brewing' && prevStatus !== 'brewing') {
         sendCustomerNotification({
             phone: order.phone,
+            customerName: order.name,
             orderId: order.id,
             orderCode: order.order_id,
             title: '🍵 กำลังชงเครื่องดื่มของคุณ',
@@ -409,6 +412,7 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
     if (order.status === 'ready_to_ship' && prevStatus !== 'ready_to_ship') {
         sendCustomerNotification({
             phone: order.phone,
+            customerName: order.name,
             orderId: order.id,
             orderCode: order.order_id,
             title: '📦 เครื่องดื่มชงเสร็จแล้ว',
@@ -424,6 +428,7 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
     if (order.status === 'delivering' && prevStatus !== 'delivering') {
         sendCustomerNotification({
             phone: order.phone,
+            customerName: order.name,
             orderId: order.id,
             orderCode: order.order_id,
             title: '🛵 เครื่องดื่มของคุณกำลังนำส่ง',
@@ -439,6 +444,7 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
     if (order.status === 'completed' && prevStatus !== 'completed') {
         sendCustomerNotification({
             phone: order.phone,
+            customerName: order.name,
             orderId: order.id,
             orderCode: order.order_id,
             title: '✅ จัดส่งสำเร็จเรียบร้อยแล้ว',
@@ -454,6 +460,7 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
     if (order.status === 'cancelled' && prevStatus !== 'cancelled') {
         sendCustomerNotification({
             phone: order.phone,
+            customerName: order.name,
             orderId: order.id,
             orderCode: order.order_id,
             title: '❌ ออเดอร์ถูกยกเลิก',
