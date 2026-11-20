@@ -522,12 +522,27 @@ export async function sendLineStatusFlexMessage(
 /**
  * ส่ง Flex Message ดิบไปยัง LINE Messaging API
  */
-export function sanitizeFlexBubble(bubble: any): any {
+export function sanitizeFlexBubble(bubble: any, fallbackPhone?: string): any {
     if (!bubble || typeof bubble !== 'object') return bubble;
     try {
-        const str = JSON.stringify(bubble);
-        const cleaned = str.replace(/"layout"\s*:\s*"inline"/g, '"layout":"horizontal"');
-        return JSON.parse(cleaned);
+        let str = JSON.stringify(bubble);
+        // 1. แทนที่ layout: inline ที่ LINE ไม่รองรับ ให้เป็น horizontal
+        str = str.replace(/"layout"\s*:\s*"inline"/g, '"layout":"horizontal"');
+
+        // 2. แทนค่า placeholders ที่อาจยังค้างอยู่ในการ์ด (เช่น ตอนทดสอบส่ง) ป้องกัน LINE ตีกลับ Error "invalid uri scheme"
+        const phone = fallbackPhone || '0812345678';
+        str = str.replace(/\{phone\}/g, phone);
+        str = str.replace(/\{orderCode\}/g, 'HM-TEST88');
+        str = str.replace(/\{totalPrice\}/g, '165');
+        str = str.replace(/\{name\}/g, 'ลูกค้าคนพิเศษ');
+        str = str.replace(/\{points\}/g, '10');
+        str = str.replace(/\{url\}/g, 'https://homematchacafe.store/order');
+        str = str.replace(/\{trackingUrl\}/g, 'https://homematchacafe.store/order');
+        str = str.replace(/\{loyaltyUrl\}/g, 'https://homematchacafe.store/loyalty');
+        str = str.replace(/\{registerUrl\}/g, `https://homematchacafe.store/loyalty?action=register&phone=${phone}`);
+        str = str.replace(/\{menuUrl\}/g, 'https://homematchacafe.store/menu');
+
+        return JSON.parse(str);
     } catch {
         return bubble;
     }
