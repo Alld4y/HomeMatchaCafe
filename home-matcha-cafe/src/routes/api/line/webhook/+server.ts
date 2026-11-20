@@ -257,14 +257,28 @@ export const POST: RequestHandler = async ({ request }) => {
                         UPDATE public.members
                         SET line_user_id = $1, updated_at = NOW()
                         WHERE phone = $2
-                        RETURNING name, stamps
+                        RETURNING first_name, last_name, points
                         `,
                         [userId, cleanDigits]
                     );
 
+                    // อัปเดต line_user_id ในตาราง order สำหรับออเดอร์ของเบอร์นี้
+                    try {
+                        await pool.query(
+                            `
+                            UPDATE public."order"
+                            SET line_user_id = $1, updated_at = NOW()
+                            WHERE phone = $2 AND (line_user_id IS NULL OR line_user_id = '')
+                            `,
+                            [userId, cleanDigits]
+                        );
+                    } catch {}
+
                     const isMember = memberUpdate.rows.length > 0;
-                    const memberName = isMember ? memberUpdate.rows[0].name : '';
-                    const memberStamps = isMember ? memberUpdate.rows[0].stamps : 0;
+                    const memberName = isMember
+                        ? `${memberUpdate.rows[0].first_name || ''} ${memberUpdate.rows[0].last_name || ''}`.trim()
+                        : '';
+                    const memberStamps = isMember ? Number(memberUpdate.rows[0].points || 0) : 0;
 
                     const linkedBubble = {
                         type: 'bubble',
@@ -338,6 +352,10 @@ export const POST: RequestHandler = async ({ request }) => {
                     continue;
                 } catch (linkErr) {
                     console.error('Error linking phone to line_user_id:', linkErr);
+                    await replyLineMessage(token, replyToken, [
+                        { type: 'text', text: `บันทึกเบอร์โทร ${cleanDigits} ผูกกับ LINE เรียบร้อยแล้วค่ะ! 🍵` }
+                    ]);
+                    continue;
                 }
             }
 

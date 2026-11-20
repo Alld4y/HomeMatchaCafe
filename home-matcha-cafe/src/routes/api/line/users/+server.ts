@@ -12,8 +12,8 @@ export const GET: RequestHandler = async () => {
                 lu.phone,
                 lu.created_at,
                 lu.updated_at,
-                m.name as member_name,
-                m.stamps as member_stamps
+                TRIM(CONCAT(m.first_name, ' ', m.last_name)) as member_name,
+                m.points as member_stamps
             FROM public.line_users lu
             LEFT JOIN public.members m ON lu.phone = m.phone
             ORDER BY lu.updated_at DESC
