@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { pool, ensurePgSchema } from './pgPool';
-import { awardStampsForCompletedOrder } from './members';
-import { sendCustomerNotification, notifyAdminLine } from './notifications';
+import { awardStampsForCompletedOrder, getMemberByPhone } from './members';
+import { sendCustomerNotification, notifyAdminLine, formatOrderItemsSummary } from './notifications';
 
 export interface OrderItem {
     id: string;
@@ -354,27 +354,58 @@ export async function createOrder(data: {
     }
     const finalOrder = await processCompletedOrderLoyalty(mapped, false);
 
-    // แจ้งเตือนแอดมินทาง LINE เมื่อมีออเดอร์ใหม่เข้ามา หรือเมื่อลูกค้าส่งสลิปเพื่อขอให้แอดมินตรวจสอบ
-    const itemsSummary = Array.isArray(finalOrder.basket)
-        ? finalOrder.basket.map(i => `${i.thaiName || i.name || 'เครื่องดื่ม'} x${i.quantity}`).join(', ')
-        : undefined;
+    // แจ้งเตือนทาง LINE (แอดมิน/ลูกค้า)
+    const itemsSummary = formatOrderItemsSummary(finalOrder.basket);
 
-    const isSlipReviewRequired = Boolean(finalOrder.needsManualReview || finalOrder.slipImage);
-    const adminEventType = isSlipReviewRequired ? 'slip_uploaded' : 'new_order';
+    if (finalOrder.status === 'paid') {
+        // ออเดอร์เข้าและรับยอดแล้วทันที (เช่น แลกแก้วฟรี 0 บาท หรือกรณีสถานะ paid)
+        sendCustomerNotification({
+            phone: finalOrder.phone,
+            customerName: finalOrder.name,
+            orderId: finalOrder.id,
+            orderCode: finalOrder.order_id,
+            title: '🍵 ยืนยันรับยอดออเดอร์แล้ว',
+            body: `ระบบรับยอดออเดอร์ ${finalOrder.order_id} เรียบร้อยแล้วค่ะ กำลังเตรียมคิวชงให้นะคะ`,
+            url: `/success?orderCode=${encodeURIComponent(finalOrder.order_id)}&phone=${encodeURIComponent(finalOrder.phone)}`,
+            eventType: 'slip_approved',
+            itemsSummary,
+            totalPrice: finalOrder.totalPrice
+        }).catch((e) => console.warn('Customer notification error on createOrder (paid):', e));
 
-    notifyAdminLine({
-        eventType: adminEventType,
-        orderCode: finalOrder.order_id,
-        customerName: finalOrder.name,
-        memberName: finalOrder.memberName || memberName,
-        phone: finalOrder.phone,
-        totalPrice: finalOrder.totalPrice,
-        itemsSummary,
-        deliveryDate: finalOrder.deliveryDate,
-        deliveryRound: finalOrder.deliveryRound,
-        reviewReason: finalOrder.reviewReason,
-        slipImageUrl: finalOrder.slipImage
-    }).catch(e => console.warn('Admin notification error in createOrder:', e));
+        notifyAdminLine({
+            eventType: 'order_paid',
+            orderCode: finalOrder.order_id,
+            customerName: finalOrder.name,
+            memberName: finalOrder.memberName || memberName,
+            phone: finalOrder.phone,
+            totalPrice: finalOrder.totalPrice,
+            address: finalOrder.address,
+            customerMessage: finalOrder.message,
+            itemsSummary,
+            deliveryDate: finalOrder.deliveryDate,
+            deliveryRound: finalOrder.deliveryRound
+        }).catch((e) => console.warn('Admin notification error in createOrder (paid):', e));
+    } else {
+        // ออเดอร์ที่รอแอดมินตรวจสอบสลิป หรือออเดอร์ใหม่รอดำเนินการ
+        const isSlipReviewRequired = Boolean(finalOrder.needsManualReview || finalOrder.slipImage);
+        const adminEventType = isSlipReviewRequired ? 'slip_uploaded' : 'new_order';
+
+        notifyAdminLine({
+            eventType: adminEventType,
+            orderCode: finalOrder.order_id,
+            customerName: finalOrder.name,
+            memberName: finalOrder.memberName || memberName,
+            phone: finalOrder.phone,
+            totalPrice: finalOrder.totalPrice,
+            address: finalOrder.address,
+            customerMessage: finalOrder.message,
+            itemsSummary,
+            deliveryDate: finalOrder.deliveryDate,
+            deliveryRound: finalOrder.deliveryRound,
+            reviewReason: finalOrder.reviewReason,
+            slipImageUrl: finalOrder.slipImage
+        }).catch((e) => console.warn('Admin notification error in createOrder:', e));
+    }
 
     return finalOrder;
 }
@@ -407,12 +438,10 @@ async function processCompletedOrderLoyalty(order: Order, wasAlreadyAwarded: boo
 function triggerOrderNotification(order: Order, prevStatus: string) {
     if (!order.phone) return;
 
-    const itemsSummary = Array.isArray(order.basket)
-        ? order.basket.map(i => `${i.thaiName || i.name || 'เครื่องดื่ม'} x${i.quantity}`).join(', ')
-        : undefined;
+    const itemsSummary = formatOrderItemsSummary(order.basket);
 
-    // 1. อนุมัติสลิป / รับยอด
-    if (order.status === 'paid' && (prevStatus === 'pending' || order.needsManualReview)) {
+    // 1. อนุมัติสลิป / รับยอด (ทั้งกรณีที่แอดมินกดยืนยัน หรือเปลี่ยนสถานะเป็น paid)
+    if (order.status === 'paid' && prevStatus !== 'paid') {
         sendCustomerNotification({
             phone: order.phone,
             customerName: order.name,
@@ -425,6 +454,21 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
             itemsSummary,
             totalPrice: order.totalPrice
         }).catch((e) => console.warn('Notification error:', e));
+
+        // แจ้งเตือนแอดมินทาง LINE เสมอเมื่อรับยอดแล้ว พร้อมรายละเอียดสิ่งที่ลูกค้าสั่งครบถ้วน
+        notifyAdminLine({
+            eventType: 'order_paid',
+            orderCode: order.order_id,
+            customerName: order.name,
+            memberName: order.memberName,
+            phone: order.phone,
+            totalPrice: order.totalPrice,
+            address: order.address,
+            customerMessage: order.message,
+            itemsSummary,
+            deliveryDate: order.deliveryDate,
+            deliveryRound: order.deliveryRound
+        }).catch((e) => console.warn('Admin notification error on order_paid:', e));
     }
 
     // 2. กำลังชง
@@ -527,6 +571,7 @@ export async function updateOrderStatus(id: string, status: Order['status']): Pr
         `
         UPDATE public."order"
         SET status = $2,
+            needs_manual_review = CASE WHEN $2 = 'paid' THEN FALSE ELSE needs_manual_review END,
             updated_at = NOW()
         WHERE order_id::text = $1 OR order_code = $1
         RETURNING *
@@ -536,6 +581,16 @@ export async function updateOrderStatus(id: string, status: Order['status']): Pr
 
     if (res.rows.length === 0) return null;
     const mapped = mapPgRowToOrder(res.rows[0]);
+    if (!mapped.memberName && mapped.phone) {
+        try {
+            const member = await getMemberByPhone(mapped.phone);
+            if (member?.fullName) {
+                mapped.memberName = member.fullName;
+            }
+        } catch {
+            // ignore
+        }
+    }
     const finalOrder = await processCompletedOrderLoyalty(mapped, wasAlreadyAwarded);
     triggerOrderNotification(finalOrder, prevStatus);
     return finalOrder;
@@ -566,6 +621,7 @@ export async function updateBulkOrderStatus(ids: string[], status: Order['status
         `
         UPDATE public."order"
         SET status = $2,
+            needs_manual_review = CASE WHEN $2 = 'paid' THEN FALSE ELSE needs_manual_review END,
             updated_at = NOW()
         WHERE (order_id::text = ANY($1::text[]) OR order_code = ANY($1::text[]))
           AND COALESCE(status, '') <> 'cancelled'
@@ -577,6 +633,16 @@ export async function updateBulkOrderStatus(ids: string[], status: Order['status
     const results: Order[] = [];
     for (const row of res.rows) {
         const mapped = mapPgRowToOrder(row);
+        if (!mapped.memberName && mapped.phone) {
+            try {
+                const member = await getMemberByPhone(mapped.phone);
+                if (member?.fullName) {
+                    mapped.memberName = member.fullName;
+                }
+            } catch {
+                // ignore
+            }
+        }
         const wasAwarded = awardedMap.get(String(row.order_id)) || false;
         const prevStatus = prevStatusMap.get(String(row.order_id)) || '';
         const processed = await processCompletedOrderLoyalty(mapped, wasAwarded);

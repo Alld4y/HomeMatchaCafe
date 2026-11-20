@@ -1,6 +1,7 @@
 import { setVapidDetails, sendNotification } from 'web-push';
 import { pool, ensurePgSchema, getEnvConfig } from './pgPool';
 import { getStoreSettings } from './settings';
+import { getMemberByPhone } from './members';
 
 // 🔔 VAPID Keys สำหรับ Web Push Notifications
 export const VAPID_PUBLIC_KEY =
@@ -802,15 +803,40 @@ export async function getAdminLineUserIds(): Promise<string[]> {
 }
 
 /**
- * แจ้งเตือนแอดมินทาง LINE เมื่อมีออเดอร์ใหม่ หรือมีการแนบสลิป (ส่งหาแอดมินทุกคน)
+ * แปลงรายการตะกร้าสินค้าให้เป็นข้อความสรุปรายละเอียด (ชื่อ, จำนวน, ระดับความหวาน, ท็อปปิ้ง, โน้ต) อย่างชัดเจน
+ */
+export function formatOrderItemsSummary(basket: any[]): string {
+    if (!Array.isArray(basket) || basket.length === 0) return 'ไม่มีรายการเครื่องดื่ม';
+    return basket.map(item => {
+        const name = item.thaiName || item.name || 'เครื่องดื่ม';
+        const qty = Number(item.quantity) || 1;
+        const details: string[] = [];
+        if (item.sweetness !== undefined && item.sweetness !== null && item.sweetness !== '') {
+            details.push(`หวาน ${item.sweetness}%`);
+        }
+        if (item.addonName) {
+            details.push(`+${item.addonName}`);
+        }
+        if (item.note && String(item.note).trim()) {
+            details.push(`โน้ต: ${String(item.note).trim()}`);
+        }
+        const detailStr = details.length > 0 ? ` (${details.join(', ')})` : '';
+        return `• ${name} x${qty}${detailStr}`;
+    }).join('\n');
+}
+
+/**
+ * แจ้งเตือนแอดมินทาง LINE เมื่อมีออเดอร์ใหม่, ลูกค้าแนบสลิป, หรือเมื่อออเดอร์ได้รับการยืนยันรับยอดแล้ว (ส่งหาแอดมินทุกคน)
  */
 export async function notifyAdminLine(params: {
-    eventType: 'new_order' | 'slip_uploaded';
+    eventType: 'new_order' | 'slip_uploaded' | 'order_paid';
     orderCode: string;
     customerName: string;
     memberName?: string;
     phone: string;
     totalPrice: number;
+    address?: string;
+    customerMessage?: string;
     itemsSummary?: string;
     deliveryDate?: string;
     deliveryRound?: string;
@@ -829,31 +855,171 @@ export async function notifyAdminLine(params: {
         return false;
     }
 
-    if (params.eventType === 'new_order' && !lineOa.notifyAdminOnNewOrder) {
+    if ((params.eventType === 'new_order' || params.eventType === 'order_paid') && !lineOa.notifyAdminOnNewOrder) {
         return false;
     }
     if (params.eventType === 'slip_uploaded' && !lineOa.notifyAdminOnSlipUploaded) {
         return false;
     }
 
-    const title = params.eventType === 'new_order' ? '🍵 มีออเดอร์ใหม่เข้ามา!' : '💳 ลูกค้าส่งสลิป (รอแอดมินตรวจ)!';
-    const altText = `${title} ออเดอร์ #${params.orderCode} (฿${params.totalPrice})`;
+    let title = '🍵 มีออเดอร์ใหม่เข้ามา!';
+    let headerTag = 'ADMIN: ออเดอร์ใหม่';
+    let headerBg = '#166534';
+    let btnLabel = 'เปิดจัดการออเดอร์ (Admin)';
+    let btnColor = '#166534';
 
-    const customerDisplayText = (params.memberName && params.memberName.trim() !== params.customerName.trim())
-        ? `${params.customerName} (สมาชิก: ${params.memberName})`
+    if (params.eventType === 'order_paid') {
+        title = '🍵 ยืนยันรับยอดแล้ว (พร้อมชง)';
+        headerTag = 'ADMIN: ออเดอร์รับยอดแล้ว';
+        headerBg = '#15803d'; // Green
+        btnLabel = 'เปิดจัดการออเดอร์ (Admin)';
+        btnColor = '#15803d';
+    } else if (params.eventType === 'slip_uploaded') {
+        title = '💳 ลูกค้าส่งสลิป (รอแอดมินตรวจ)';
+        headerTag = 'ADMIN: รอยืนยันสลิป';
+        headerBg = '#0284c7'; // Blue
+        btnLabel = '🔍 ตรวจสอบสลิปใน Admin';
+        btnColor = '#0284c7';
+    }
+
+    const altText = `${title} ออเดอร์ #${params.orderCode} (฿${params.totalPrice.toLocaleString()})`;
+
+    let memberName = params.memberName;
+    if (!memberName && params.phone) {
+        try {
+            const member = await getMemberByPhone(params.phone);
+            if (member?.fullName) {
+                memberName = member.fullName;
+            }
+        } catch {
+            // ignore
+        }
+    }
+
+    const customerDisplayText = (memberName && memberName.trim() !== params.customerName.trim())
+        ? `${params.customerName} (สมาชิก: ${memberName.trim()})`
         : params.customerName;
+
+    const bodyContents: any[] = [
+        {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+                { type: 'text', text: 'รหัส:', size: 'sm', color: '#64748b', flex: 2 },
+                { type: 'text', text: `#${params.orderCode}`, size: 'sm', weight: 'bold', color: '#1e293b', flex: 4, align: 'end' }
+            ]
+        },
+        {
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'xs',
+            contents: [
+                { type: 'text', text: 'ลูกค้า:', size: 'sm', color: '#64748b', flex: 2 },
+                { type: 'text', text: `${customerDisplayText} (${params.phone})`, size: 'sm', color: '#1e293b', flex: 4, align: 'end', wrap: true }
+            ]
+        },
+        {
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'xs',
+            contents: [
+                { type: 'text', text: 'ยอดชำระ:', size: 'sm', color: '#64748b', flex: 2 },
+                { type: 'text', text: `฿${params.totalPrice.toLocaleString()}`, size: 'sm', weight: 'bold', color: '#166534', flex: 4, align: 'end' }
+            ]
+        }
+    ];
+
+    if (params.deliveryDate || params.deliveryRound) {
+        bodyContents.push({
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'xs',
+            contents: [
+                { type: 'text', text: 'รอบส่ง:', size: 'sm', color: '#64748b', flex: 2 },
+                { type: 'text', text: `${params.deliveryDate || ''} ${params.deliveryRound || ''}`.trim(), size: 'xs', color: '#1e293b', flex: 4, align: 'end', wrap: true }
+            ]
+        });
+    }
+
+    if (params.address && params.address.trim()) {
+        bodyContents.push({
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'xs',
+            contents: [
+                { type: 'text', text: 'สถานที่ส่ง:', size: 'sm', color: '#64748b', flex: 2 },
+                { type: 'text', text: params.address.trim(), size: 'xs', color: '#1e293b', flex: 4, align: 'end', wrap: true }
+            ]
+        });
+    }
+
+    if (params.customerMessage && params.customerMessage.trim()) {
+        bodyContents.push({
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'xs',
+            contents: [
+                { type: 'text', text: 'โน้ตลูกค้า:', size: 'sm', color: '#64748b', flex: 2 },
+                { type: 'text', text: params.customerMessage.trim(), size: 'xs', color: '#b45309', flex: 4, align: 'end', wrap: true }
+            ]
+        });
+    }
+
+    if (params.reviewReason) {
+        bodyContents.push({
+            type: 'box',
+            layout: 'vertical',
+            margin: 'sm',
+            paddingAll: '8px',
+            backgroundColor: '#fef2f2',
+            cornerRadius: '6px',
+            contents: [
+                { type: 'text', text: `⚠️ ตรวจสลิป: ${params.reviewReason}`, size: 'xs', color: '#b91c1c', wrap: true, weight: 'bold' }
+            ]
+        });
+    }
+
+    if (params.itemsSummary) {
+        bodyContents.push({
+            type: 'box',
+            layout: 'vertical',
+            margin: 'md',
+            paddingAll: '10px',
+            backgroundColor: '#f8fafc',
+            cornerRadius: '8px',
+            borderWidth: '1px',
+            borderColor: '#e2e8f0',
+            contents: [
+                {
+                    type: 'text',
+                    text: '📋 รายการที่สั่ง:',
+                    size: 'xs',
+                    weight: 'bold',
+                    color: '#0f172a'
+                },
+                {
+                    type: 'text',
+                    text: params.itemsSummary,
+                    size: 'xs',
+                    color: '#334155',
+                    wrap: true,
+                    margin: 'xs'
+                }
+            ]
+        });
+    }
 
     const bubble: any = {
         type: 'bubble',
         header: {
             type: 'box',
             layout: 'vertical',
-            backgroundColor: params.eventType === 'new_order' ? '#166534' : '#0284c7',
+            backgroundColor: headerBg,
             paddingAll: '16px',
             contents: [
                 {
                     type: 'text',
-                    text: 'ADMIN NOTIFICATION',
+                    text: headerTag,
                     weight: 'bold',
                     size: 'xs',
                     color: '#dcfce7'
@@ -872,34 +1038,7 @@ export async function notifyAdminLine(params: {
             type: 'box',
             layout: 'vertical',
             paddingAll: '16px',
-            contents: [
-                {
-                    type: 'box',
-                    layout: 'horizontal',
-                    contents: [
-                        { type: 'text', text: 'รหัส:', size: 'sm', color: '#64748b', flex: 2 },
-                        { type: 'text', text: `#${params.orderCode}`, size: 'sm', weight: 'bold', color: '#1e293b', flex: 4, align: 'end' }
-                    ]
-                },
-                {
-                    type: 'box',
-                    layout: 'horizontal',
-                    margin: 'xs',
-                    contents: [
-                        { type: 'text', text: 'ลูกค้า:', size: 'sm', color: '#64748b', flex: 2 },
-                        { type: 'text', text: `${customerDisplayText} (${params.phone})`, size: 'sm', color: '#1e293b', flex: 4, align: 'end', wrap: true }
-                    ]
-                },
-                {
-                    type: 'box',
-                    layout: 'horizontal',
-                    margin: 'xs',
-                    contents: [
-                        { type: 'text', text: 'ยอดชำระ:', size: 'sm', color: '#64748b', flex: 2 },
-                        { type: 'text', text: `฿${params.totalPrice.toLocaleString()}`, size: 'sm', weight: 'bold', color: '#166534', flex: 4, align: 'end' }
-                    ]
-                }
-            ]
+            contents: bodyContents
         },
         footer: {
             type: 'box',
@@ -909,56 +1048,16 @@ export async function notifyAdminLine(params: {
                 {
                     type: 'button',
                     style: 'primary',
-                    color: params.eventType === 'slip_uploaded' ? '#0284c7' : '#166534',
+                    color: btnColor,
                     action: {
                         type: 'uri',
-                        label: params.eventType === 'slip_uploaded' ? '🔍 ตรวจสอบสลิปใน Admin' : 'เปิดจัดการออเดอร์ (Admin)',
+                        label: btnLabel,
                         uri: 'https://homematchacafe.store/admin'
                     }
                 }
             ]
         }
     };
-
-    if (params.reviewReason) {
-        bubble.body.contents.push({
-            type: 'box',
-            layout: 'vertical',
-            margin: 'sm',
-            paddingAll: '8px',
-            backgroundColor: '#fef2f2',
-            cornerRadius: '6px',
-            contents: [
-                { type: 'text', text: `⚠️ ตรวจสลิป: ${params.reviewReason}`, size: 'xs', color: '#b91c1c', wrap: true, weight: 'bold' }
-            ]
-        });
-    }
-
-    if (params.deliveryDate || params.deliveryRound) {
-        bubble.body.contents.push({
-            type: 'box',
-            layout: 'horizontal',
-            margin: 'xs',
-            contents: [
-                { type: 'text', text: 'รอบส่ง:', size: 'sm', color: '#64748b', flex: 2 },
-                { type: 'text', text: `${params.deliveryDate || ''} ${params.deliveryRound || ''}`, size: 'xs', color: '#475569', flex: 4, align: 'end' }
-            ]
-        });
-    }
-
-    if (params.itemsSummary) {
-        bubble.body.contents.push({
-            type: 'box',
-            layout: 'vertical',
-            margin: 'md',
-            paddingAll: '10px',
-            backgroundColor: '#f1f5f9',
-            cornerRadius: '8px',
-            contents: [
-                { type: 'text', text: params.itemsSummary, size: 'xs', color: '#334155', wrap: true }
-            ]
-        });
-    }
 
     const results = await Promise.all(
         adminUserIds.map(uid => sendLineRawFlexMessage(lineOa.channelAccessToken, uid, altText, bubble))
@@ -974,7 +1073,7 @@ export async function sendLineTestMessage(
         targetUserId?: string;
         targetPhone?: string;
         customMessage?: string;
-        statusType?: 'brewing' | 'ready_to_ship' | 'delivering' | 'completed' | 'cancelled' | 'order_created' | 'slip_approved';
+        statusType?: 'brewing' | 'ready_to_ship' | 'delivering' | 'completed' | 'cancelled' | 'order_created' | 'slip_approved' | 'admin_order_paid' | 'admin_slip_uploaded';
         testVars?: Record<string, string>;
     },
     legacyCustomMessage?: string
@@ -1045,6 +1144,51 @@ export async function sendLineTestMessage(
 
     // กรณีทดสอบการ์ดแจ้งเตือนสถานะออเดอร์ (Status Card Test)
     if (statusType) {
+        if (statusType === 'admin_order_paid') {
+            const success = await notifyAdminLine({
+                eventType: 'order_paid',
+                orderCode: testVars?.orderCode || 'HM-TEST88',
+                customerName: testVars?.customerName || 'คุณนราวิชญ์',
+                memberName: testVars?.name || 'นราวิชญ์ อนุวงศ์',
+                phone: testVars?.phone || '0641163533',
+                totalPrice: Number(testVars?.totalPrice) || 120,
+                address: 'ตึกผู้ป่วยใน ชั้น 2',
+                customerMessage: 'ฝากวางไว้ที่เคาน์เตอร์พยาบาลค่ะ',
+                itemsSummary: testVars?.itemsSummary || '• มัทฉะลาเต้ x1 (หวาน 25%)\n• ชาไทยเย็น x1 (หวาน 50%, +เจลลี่)',
+                deliveryDate: '2026-11-21',
+                deliveryRound: 'รอบ 10:30 น.'
+            });
+            return {
+                success,
+                message: success
+                    ? 'ยิงการ์ดแจ้งเตือนแอดมิน: ออเดอร์รับยอดแล้ว (พร้อมรายการที่สั่ง) สำเร็จแล้วค่ะ'
+                    : 'ส่งการ์ดทดสอบไม่สำเร็จ กรุณาตรวจสอบการตั้งค่า Admin LINE หรือ Token ค่ะ'
+            };
+        }
+
+        if (statusType === 'admin_slip_uploaded') {
+            const success = await notifyAdminLine({
+                eventType: 'slip_uploaded',
+                orderCode: testVars?.orderCode || 'HM-TEST88',
+                customerName: testVars?.customerName || 'คุณนราวิชญ์',
+                memberName: testVars?.name || 'นราวิชญ์ อนุวงศ์',
+                phone: testVars?.phone || '0641163533',
+                totalPrice: Number(testVars?.totalPrice) || 120,
+                address: 'ตึกผู้ป่วยใน ชั้น 2',
+                customerMessage: 'ฝากวางไว้ที่เคาน์เตอร์พยาบาลค่ะ',
+                itemsSummary: testVars?.itemsSummary || '• มัทฉะลาเต้ x1 (หวาน 25%)\n• ชาไทยเย็น x1 (หวาน 50%, +เจลลี่)',
+                deliveryDate: '2026-11-21',
+                deliveryRound: 'รอบ 10:30 น.',
+                reviewReason: 'ยอดเงินหรือเวลาไม่ตรง รอแอดมินตรวจสอบ'
+            });
+            return {
+                success,
+                message: success
+                    ? 'ยิงการ์ดแจ้งเตือนแอดมิน: สลิปรอตรวจ (มีปุ่มตรวจสลิป) สำเร็จแล้วค่ะ'
+                    : 'ส่งการ์ดทดสอบไม่สำเร็จ กรุณาตรวจสอบการตั้งค่า Admin LINE หรือ Token ค่ะ'
+            };
+        }
+
         const statusMetaMap: Record<string, { title: string; body: string; name: string }> = {
             member_registered: {
                 name: 'ลูกค้าสมัครสมาชิกเสร็จแล้ว',

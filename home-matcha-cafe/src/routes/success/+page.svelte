@@ -259,7 +259,7 @@
                         {activeMember ? `คำสั่งซื้อของคุณ ${activeMember.fullName}` : `ใบเสร็จและสถานะคำสั่งซื้อ`}
                     </div>
                     <div style="font-size: 0.78rem; color: #64748b; word-break: break-word;">
-                        📱 {activePhone} {activeMember ? '· บัญชีสมาชิกของคุณ (แสดงเฉพาะของตนเอง)' : '· ติดตามสถานะคำสั่งซื้อ'}
+                        📱 {activePhone} {activeMember ? '· บัญชีสมาชิกของคุณ' : '· ติดตามสถานะคำสั่งซื้อ'}
                     </div>
                 </div>
             </div>
@@ -313,7 +313,7 @@
 
                 <div class="form-card" style="text-align: left; {isMatchedOrder ? 'border: 2px solid #16a34a; box-shadow: 0 4px 16px rgba(22, 163, 74, 0.18);' : ''}">
                     <!-- Order Header -->
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-light);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; padding-bottom: 0.75rem;">
                         <div>
                             <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                 <h3 style="margin: 0; font-size: 1.15rem; color: var(--matcha-deep);">
@@ -345,7 +345,7 @@
 
                     <!-- Progress Stepper (ถ้าไม่ถูกยกเลิก) -->
                     {#if order.status !== 'cancelled'}
-                        <div style="margin: 1.2rem 0; padding: 0.75rem 0.5rem; background: var(--matcha-tint); border-radius: var(--radius-lg); border: 1px solid var(--border-matcha);">
+                        <div style="margin: 0.75rem 0 1rem 0; padding: 0.75rem 0.5rem; background: var(--matcha-tint); border-radius: var(--radius-lg); border: 1px solid var(--border-matcha);">
                             <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.15rem; align-items: start;">
                                 {#each statusSteps as step, idx}
                                     <div style="display: flex; flex-direction: column; align-items: center; gap: 0.25rem; z-index: 2; min-width: 0; text-align: center;">
@@ -362,7 +362,7 @@
                     {/if}
 
                     <!-- รายละเอียดการจัดส่ง -->
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; font-size: 0.875rem; margin-bottom: 1.25rem; background: var(--bg-warm-light); padding: 0.85rem; border-radius: var(--radius-md);">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; font-size: 0.875rem; margin-top: 0.35rem; margin-bottom: 1.25rem; background: var(--bg-warm-light); padding: 0.85rem; border-radius: var(--radius-md);">
                         {#if order.deliveryDate || order.deliveryRound}
                             <div style="grid-column: 1 / -1; background: var(--matcha-tint); border: 1px solid var(--border-matcha); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: flex-start; gap: 0.45rem;">
                                 <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; width: 100%;">

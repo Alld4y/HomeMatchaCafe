@@ -5613,6 +5613,24 @@
                             >
                                 ✨ สมัครสมาชิก
                             </button>
+                            <button
+                                type="button"
+                                disabled={isSendingLineTest}
+                                onclick={() => sendLineTestPushMessage('admin_order_paid')}
+                                style="padding: 0.35rem 0.55rem; font-size: 0.74rem; font-weight: 700; background: #ecfdf5; border: 1.5px solid #10b981; color: #047857; border-radius: 6px; cursor: pointer;"
+                                title="ยิงการ์ดแจ้งเตือนแอดมิน: ออเดอร์รับยอดแล้ว (แสดงรายการเครื่องดื่มที่สั่ง)"
+                            >
+                                🔔 รับยอดแล้ว (แอดมิน)
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isSendingLineTest}
+                                onclick={() => sendLineTestPushMessage('admin_slip_uploaded')}
+                                style="padding: 0.35rem 0.55rem; font-size: 0.74rem; font-weight: 700; background: #f0f9ff; border: 1.5px solid #0284c7; color: #0369a1; border-radius: 6px; cursor: pointer;"
+                                title="ยิงการ์ดแจ้งเตือนแอดมิน: สลิปรอตรวจ (มีปุ่มตรวจสลิป)"
+                            >
+                                🔍 สลิปรอตรวจ (แอดมิน)
+                            </button>
                         </div>
                     </div>
 
