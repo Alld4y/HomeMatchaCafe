@@ -239,6 +239,7 @@
                     </div>
                 </div>
             </div>
+            <br>
 
             <!-- ข้อมูลการแจ้งเตือนทาง LINE OA 100% -->
             <div style="width: 100%; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 14px; padding: 0.9rem 1.15rem; display: flex; align-items: center; justify-content: space-between; gap: 0.85rem; flex-wrap: wrap; margin-bottom: 1.25rem; box-sizing: border-box;">
