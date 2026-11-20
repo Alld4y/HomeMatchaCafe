@@ -552,34 +552,130 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
     }
 }
 
-export async function updateOrderStatus(id: string, status: Order['status']): Promise<Order | null> {
+export interface UpdateOrderInput {
+    status?: Order['status'];
+    name?: string;
+    phone?: string;
+    address?: string;
+    message?: string;
+    deliveryDate?: string;
+    deliveryRound?: string;
+    deliveryRoundId?: string;
+    totalPrice?: number;
+    basket?: OrderItem[];
+    needsManualReview?: boolean;
+    reviewReason?: string;
+}
+
+export async function updateOrder(id: string, updates: UpdateOrderInput): Promise<Order | null> {
     await ensurePgSchema();
     const prevRes = await pool.query(
-        'SELECT status, points_awarded FROM public."order" WHERE order_id::text = $1 OR order_code = $1 LIMIT 1',
+        'SELECT * FROM public."order" WHERE order_id::text = $1 OR order_code = $1 LIMIT 1',
         [String(id)]
     );
     if (prevRes.rows.length === 0) return null;
-    const prevStatus = String(prevRes.rows[0].status || '');
-    const wasAlreadyAwarded = Boolean(prevRes.rows[0].points_awarded);
+    const prevRow = prevRes.rows[0];
+    const prevStatus = String(prevRow.status || '');
+    const wasAlreadyAwarded = Boolean(prevRow.points_awarded);
 
-    // ป้องกันการเปลี่ยนออเดอร์ที่ถูกยกเลิกไปแล้วให้เป็นจัดส่งสำเร็จ
-    if (prevStatus === 'cancelled' && status === 'completed') {
+    // ป้องกันการเปลี่ยนออเดอร์ที่ถูกยกเลิกไปแล้วให้เป็นจัดส่งสำเร็จโดยตรง
+    if (prevStatus === 'cancelled' && updates.status === 'completed') {
         return null;
     }
 
-    const res = await pool.query(
-        `
-        UPDATE public."order"
-        SET status = $2,
-            needs_manual_review = CASE WHEN $2 = 'paid' THEN FALSE ELSE needs_manual_review END,
-            updated_at = NOW()
-        WHERE order_id::text = $1 OR order_code = $1
-        RETURNING *
-        `,
-        [String(id), status]
-    );
+    const fields: string[] = [];
+    const values: any[] = [];
+    let paramIdx = 1;
 
+    if (updates.status !== undefined) {
+        fields.push(`status = $${paramIdx++}`);
+        values.push(updates.status);
+
+        if (updates.status === 'paid') {
+            fields.push(`needs_manual_review = FALSE`);
+        }
+    }
+
+    if (updates.name !== undefined) {
+        fields.push(`name = $${paramIdx++}`);
+        values.push(updates.name.trim());
+    }
+
+    if (updates.phone !== undefined) {
+        const cleanPhone = updates.phone.trim();
+        fields.push(`phone = $${paramIdx++}`);
+        values.push(cleanPhone);
+
+        try {
+            const memRes = await pool.query(
+                `SELECT (first_name || ' ' || last_name) AS full_name FROM public.members WHERE phone = $1 LIMIT 1`,
+                [cleanPhone.replace(/[^0-9]/g, '')]
+            );
+            if (memRes.rows.length > 0) {
+                fields.push(`member_name = $${paramIdx++}`);
+                values.push((memRes.rows[0].full_name || '').trim());
+            }
+        } catch {}
+    }
+
+    if (updates.address !== undefined) {
+        fields.push(`address = $${paramIdx++}`);
+        values.push(updates.address.trim());
+    }
+
+    if (updates.message !== undefined) {
+        fields.push(`message = $${paramIdx++}`);
+        values.push(updates.message.trim());
+    }
+
+    if (updates.deliveryDate !== undefined) {
+        fields.push(`delivery_date = $${paramIdx++}`);
+        values.push(updates.deliveryDate ? updates.deliveryDate.trim() : null);
+    }
+
+    if (updates.deliveryRound !== undefined) {
+        fields.push(`delivery_round = $${paramIdx++}`);
+        values.push(updates.deliveryRound ? updates.deliveryRound.trim() : null);
+    }
+
+    if (updates.deliveryRoundId !== undefined) {
+        fields.push(`delivery_round_id = $${paramIdx++}`);
+        values.push(updates.deliveryRoundId ? updates.deliveryRoundId.trim() : null);
+    }
+
+    if (updates.totalPrice !== undefined) {
+        fields.push(`total_price = $${paramIdx++}`);
+        values.push(Number(updates.totalPrice));
+    }
+
+    if (updates.basket !== undefined && Array.isArray(updates.basket)) {
+        fields.push(`basket = $${paramIdx++}`);
+        values.push(JSON.stringify(updates.basket));
+    }
+
+    if (updates.needsManualReview !== undefined) {
+        fields.push(`needs_manual_review = $${paramIdx++}`);
+        values.push(Boolean(updates.needsManualReview));
+    }
+
+    if (updates.reviewReason !== undefined) {
+        fields.push(`review_reason = $${paramIdx++}`);
+        values.push(updates.reviewReason);
+    }
+
+    fields.push(`updated_at = NOW()`);
+
+    values.push(String(id));
+    const query = `
+        UPDATE public."order"
+        SET ${fields.join(', ')}
+        WHERE order_id::text = $${paramIdx} OR order_code = $${paramIdx}
+        RETURNING *
+    `;
+
+    const res = await pool.query(query, values);
     if (res.rows.length === 0) return null;
+
     const mapped = mapPgRowToOrder(res.rows[0]);
     if (!mapped.memberName && mapped.phone) {
         try {
@@ -587,13 +683,18 @@ export async function updateOrderStatus(id: string, status: Order['status']): Pr
             if (member?.fullName) {
                 mapped.memberName = member.fullName;
             }
-        } catch {
-            // ignore
-        }
+        } catch {}
     }
+
     const finalOrder = await processCompletedOrderLoyalty(mapped, wasAlreadyAwarded);
-    triggerOrderNotification(finalOrder, prevStatus);
+    if (updates.status && updates.status !== prevStatus) {
+        triggerOrderNotification(finalOrder, prevStatus);
+    }
     return finalOrder;
+}
+
+export async function updateOrderStatus(id: string, status: Order['status']): Promise<Order | null> {
+    return updateOrder(id, { status });
 }
 
 export async function updateBulkOrderStatus(ids: string[], status: Order['status']): Promise<Order[]> {

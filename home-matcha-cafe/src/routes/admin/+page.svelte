@@ -501,6 +501,136 @@
         }
     }
 
+    // ✏️ State & Functions สำหรับ Modal แก้ไขคำสั่งซื้อ
+    let isEditOrderModalOpen = $state(false);
+    let editingOrder = $state<AdminOrder | null>(null);
+    let editOrderStatus = $state<AdminOrder['status']>('paid');
+    let editOrderName = $state('');
+    let editOrderPhone = $state('');
+    let editOrderAddress = $state('');
+    let editOrderMessage = $state('');
+    let editOrderDeliveryDate = $state('');
+    let editOrderDeliveryRound = $state('');
+    let editOrderDeliveryRoundId = $state('');
+    let editOrderTotalPrice = $state<number>(0);
+    let editOrderBasket = $state<any[]>([]);
+    let isSavingOrderEdit = $state(false);
+    let editOrderAddDrinkMenuId = $state('');
+
+    function openEditOrderModal(order: AdminOrder) {
+        editingOrder = order;
+        editOrderStatus = order.status;
+        editOrderName = order.name || '';
+        editOrderPhone = order.phone || '';
+        editOrderAddress = order.address || '';
+        editOrderMessage = order.message || '';
+        editOrderDeliveryDate = order.deliveryDate || '';
+        editOrderDeliveryRound = order.deliveryRound || '';
+        editOrderDeliveryRoundId = order.deliveryRoundId || '';
+        editOrderTotalPrice = Number(order.totalPrice || 0);
+        editOrderBasket = JSON.parse(JSON.stringify(order.basket || []));
+        editOrderAddDrinkMenuId = menuItems.length > 0 ? menuItems[0].id : '';
+        isEditOrderModalOpen = true;
+    }
+
+    function recalculateEditOrderTotal() {
+        const sum = editOrderBasket.reduce((acc, it) => acc + (Number(it.price || 0) * Number(it.quantity || 1)), 0);
+        editOrderTotalPrice = sum;
+    }
+
+    function addDrinkToEditOrder() {
+        if (!editOrderAddDrinkMenuId && menuItems.length > 0) {
+            editOrderAddDrinkMenuId = menuItems[0].id;
+        }
+        const item = menuItems.find((m: any) => m.id === editOrderAddDrinkMenuId) || menuItems[0];
+        if (!item) return;
+        editOrderBasket = [
+            ...editOrderBasket,
+            {
+                id: item.id,
+                thaiName: item.thaiName || item.name,
+                englishName: item.englishName || item.id,
+                name: item.thaiName || item.name,
+                price: Number(item.price || 55),
+                basePrice: Number(item.price || 55),
+                quantity: 1,
+                sweetness: 50,
+                note: ''
+            }
+        ];
+        recalculateEditOrderTotal();
+    }
+
+    function removeDrinkFromEditOrder(idx: number) {
+        editOrderBasket = editOrderBasket.filter((_, i) => i !== idx);
+        recalculateEditOrderTotal();
+    }
+
+    async function saveOrderEdit() {
+        if (!editingOrder) return;
+        if (!editOrderName.trim()) {
+            swal.fire({ icon: 'warning', title: 'กรุณาระบุชื่อผู้สั่ง', confirmButtonColor: '#166534' });
+            return;
+        }
+        if (!editOrderPhone.trim()) {
+            swal.fire({ icon: 'warning', title: 'กรุณาระบุเบอร์โทรศัพท์', confirmButtonColor: '#166534' });
+            return;
+        }
+        if (editOrderBasket.length === 0) {
+            swal.fire({ icon: 'warning', title: 'ต้องมีรายการเครื่องดื่มอย่างน้อย 1 แก้ว', confirmButtonColor: '#166534' });
+            return;
+        }
+
+        isSavingOrderEdit = true;
+        try {
+            const res = await fetch(`/api/orders/${editingOrder.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    status: editOrderStatus,
+                    name: editOrderName.trim(),
+                    phone: editOrderPhone.trim(),
+                    address: editOrderAddress.trim(),
+                    message: editOrderMessage.trim(),
+                    deliveryDate: editOrderDeliveryDate || null,
+                    deliveryRound: editOrderDeliveryRound || null,
+                    deliveryRoundId: editOrderDeliveryRoundId || null,
+                    totalPrice: Number(editOrderTotalPrice || 0),
+                    basket: editOrderBasket
+                })
+            });
+
+            if (res.ok) {
+                const result = await res.json();
+                const idx = orders.findIndex((o) => o.id === editingOrder?.id || o.order_id === editingOrder?.order_id);
+                if (idx > -1 && result.order) {
+                    orders[idx] = result.order;
+                }
+                await loadMembers();
+                window.dispatchEvent(new CustomEvent('orders-updated'));
+                isEditOrderModalOpen = false;
+                editingOrder = null;
+
+                swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'บันทึกการแก้ไขคำสั่งซื้อเรียบร้อยแล้ว',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            } else {
+                const errData = await res.json();
+                swal.fire('เกิดข้อผิดพลาด', errData.message || 'ไม่สามารถแก้ไขได้', 'error');
+            }
+        } catch (e: any) {
+            console.error(e);
+            swal.fire('ขัดข้อง', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', 'error');
+        } finally {
+            isSavingOrderEdit = false;
+        }
+    }
+
     // รายการเมนูสำหรับเลือกเมนูบ่ม (อัปเดตตามรายการเมนูจริงอัตโนมัติ)
     let availableDrinks = $derived(
         menuItems.length > 0
@@ -4317,6 +4447,14 @@
                                         ยกเลิก
                                     </button>
                                 {/if}
+                                <button
+                                    type="button"
+                                    onclick={() => openEditOrderModal(order)}
+                                    style="padding: 0.45rem 0.85rem; font-size: 0.82rem; background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 6px; font-weight: 700; color: #334155; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;"
+                                    title="แก้ไขข้อมูล สถานะ วันส่ง หรือรายการแก้ว"
+                                >
+                                    ✏️ แก้ไข
+                                </button>
                             </div>
                         </div>
 
@@ -4944,6 +5082,14 @@
                                                         <option value="completed">ส่งสำเร็จ</option>
                                                         <option value="cancelled">ยกเลิก</option>
                                                     </select>
+                                                    <button
+                                                        type="button"
+                                                        onclick={() => openEditOrderModal(order)}
+                                                        style="padding: 0.35rem 0.75rem; font-size: 0.78rem; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 8px; font-weight: 700; color: #334155; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;"
+                                                        title="แก้ไขข้อมูล สถานะ วันส่ง หรือรายการแก้ว"
+                                                    >
+                                                        ✏️ แก้ไข
+                                                    </button>
                                                 </div>
                                             </div>
 
@@ -8809,6 +8955,368 @@
                         style="flex: 1; padding: 0.8rem; border-radius: 12px; font-weight: 700;"
                     >
                         ยกเลิก
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- ✏️ Modal แก้ไขข้อมูล & สถานะคำสั่งซื้อ (สำหรับแอดมิน) -->
+    {#if isEditOrderModalOpen && editingOrder}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+            style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 1rem; overflow-y: auto;"
+            onclick={() => (isEditOrderModalOpen = false)}
+        >
+            <div
+                style="background: #ffffff; border-radius: 24px; max-width: 680px; width: 100%; padding: 1.5rem 1.75rem; text-align: left; box-shadow: 0 25px 60px rgba(0,0,0,0.3); max-height: 92vh; overflow-y: auto; box-sizing: border-box;"
+                onclick={(e) => e.stopPropagation()}
+            >
+                <!-- Modal Header -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.85rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.3rem; color: #14532d; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                            <span>✏️ แก้ไขคำสั่งซื้อ {editingOrder.order_id || editingOrder.id}</span>
+                        </h3>
+                        <p style="margin: 0.25rem 0 0 0; font-size: 0.82rem; color: #64748b;">
+                            แก้ไขสถานะออเดอร์, วันที่ส่ง, ข้อมูลผู้สั่ง, สถานที่จัดส่ง และรายการเครื่องดื่ม
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onclick={() => (isEditOrderModalOpen = false)}
+                        style="background: #f1f5f9; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 1.1rem; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+                        title="ปิดหน้าต่าง"
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+                    <!-- 1. สถานะออเดอร์ (Order Status) -->
+                    <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 1rem;">
+                        <span style="font-weight: 800; font-size: 0.92rem; color: #1e293b; display: block; margin-bottom: 0.65rem;">
+                            🚦 1. สถานะคำสั่งซื้อ (Order Status)
+                        </span>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.45rem;">
+                            {#each [
+                                { id: 'pending', label: '🔔 รอตรวจสลิป', color: '#d97706', bg: '#fef3c7' },
+                                { id: 'paid', label: '💳 รับยอดแล้ว', color: '#166534', bg: '#dcfce7' },
+                                { id: 'brewing', label: '🍵 กำลังชง', color: '#15803d', bg: '#dcfce7' },
+                                { id: 'ready_to_ship', label: '✨ ชงเสร็จ (รอส่ง)', color: '#0369a1', bg: '#e0f2fe' },
+                                { id: 'delivering', label: '🛵 กำลังส่ง', color: '#b45309', bg: '#fef3c7' },
+                                { id: 'completed', label: '✅ ส่งสำเร็จ', color: '#166534', bg: '#dcfce7' },
+                                { id: 'cancelled', label: '🚫 ยกเลิก', color: '#991b1b', bg: '#fee2e2' }
+                            ] as st}
+                                <button
+                                    type="button"
+                                    onclick={() => (editOrderStatus = st.id as any)}
+                                    style="padding: 0.55rem 0.65rem; border-radius: 10px; font-size: 0.82rem; font-weight: 800; cursor: pointer; transition: all 0.15s; border: 2px solid {editOrderStatus === st.id ? st.color : '#e2e8f0'}; background: {editOrderStatus === st.id ? st.bg : '#ffffff'}; color: {editOrderStatus === st.id ? st.color : '#64748b'}; text-align: center;"
+                                >
+                                    {st.label}
+                                </button>
+                            {/each}
+                        </div>
+                    </div>
+
+                    <!-- 2. วันที่ส่ง & รอบส่ง (Delivery Schedule) -->
+                    <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 1rem;">
+                        <span style="font-weight: 800; font-size: 0.92rem; color: #1e293b; display: block; margin-bottom: 0.75rem;">
+                            🚚 2. วันที่จัดส่ง &amp; รอบส่ง
+                        </span>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.85rem;">
+                            <div>
+                                <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">
+                                    📅 วันที่จัดส่ง:
+                                </label>
+                                <div style="display: flex; gap: 0.35rem; align-items: center;">
+                                    <input
+                                        type="date"
+                                        bind:value={editOrderDeliveryDate}
+                                        class="form-input"
+                                        style="flex: 1; padding: 0.55rem 0.75rem; font-size: 0.88rem;"
+                                    />
+                                    <button
+                                        type="button"
+                                        onclick={() => (editOrderDeliveryDate = todayDateStr)}
+                                        style="padding: 0.55rem 0.65rem; font-size: 0.76rem; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 8px; font-weight: 700; cursor: pointer; white-space: nowrap;"
+                                    >
+                                        วันนี้
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">
+                                    ⏰ รอบจัดส่ง / เวลาส่ง:
+                                </label>
+                                <input
+                                    type="text"
+                                    bind:value={editOrderDeliveryRound}
+                                    placeholder="เช่น รอบเช้า, รอบเที่ยง หรือระบุเวลา 11:30"
+                                    class="form-input"
+                                    style="width: 100%; padding: 0.55rem 0.75rem; font-size: 0.88rem; box-sizing: border-box;"
+                                />
+                                <!-- Preset Pills -->
+                                <div style="display: flex; gap: 0.3rem; flex-wrap: wrap; margin-top: 0.4rem;">
+                                    <button
+                                        type="button"
+                                        onclick={() => { editOrderDeliveryRound = 'รอบเช้า (07:00–08:00 น.)'; editOrderDeliveryRoundId = 'morning'; }}
+                                        style="font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 6px; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; cursor: pointer;"
+                                    >
+                                        🌅 รอบเช้า
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onclick={() => { editOrderDeliveryRound = 'รอบเที่ยง (12:30–13:00 น.)'; editOrderDeliveryRoundId = 'noon'; }}
+                                        style="font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 6px; background: #fef3c7; color: #b45309; border: 1px solid #fde68a; cursor: pointer;"
+                                    >
+                                        ☀️ รอบเที่ยง
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onclick={() => { editOrderDeliveryRound = 'รอบรวม (09:00–13:00 น.)'; editOrderDeliveryRoundId = 'allday'; }}
+                                        style="font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 6px; background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; cursor: pointer;"
+                                    >
+                                        🌿 รอบรวม
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onclick={() => { editOrderDeliveryRound = 'รับหน้าร้าน / เสิร์ฟทันที'; editOrderDeliveryRoundId = 'walkin'; }}
+                                        style="font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 6px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; cursor: pointer;"
+                                    >
+                                        🚶 รับหน้าร้าน
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. ข้อมูลผู้รับ & สถานที่จัดส่ง -->
+                    <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 1rem;">
+                        <span style="font-weight: 800; font-size: 0.92rem; color: #1e293b; display: block; margin-bottom: 0.75rem;">
+                            👤 3. ข้อมูลผู้รับ &amp; สถานที่จัดส่ง
+                        </span>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.85rem; margin-bottom: 0.85rem;">
+                            <div>
+                                <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">
+                                    ชื่อผู้สั่ง / ลูกค้า:
+                                </label>
+                                <input
+                                    type="text"
+                                    bind:value={editOrderName}
+                                    class="form-input"
+                                    style="width: 100%; padding: 0.55rem 0.75rem; font-size: 0.88rem; box-sizing: border-box;"
+                                />
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">
+                                    เบอร์โทรศัพท์:
+                                </label>
+                                <input
+                                    type="tel"
+                                    bind:value={editOrderPhone}
+                                    class="form-input"
+                                    style="width: 100%; padding: 0.55rem 0.75rem; font-size: 0.88rem; box-sizing: border-box;"
+                                />
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 0.85rem;">
+                            <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">
+                                สถานที่จัดส่ง / ตึก / แผนก / ห้อง:
+                            </label>
+                            <textarea
+                                bind:value={editOrderAddress}
+                                class="form-input"
+                                rows="2"
+                                style="width: 100%; padding: 0.55rem 0.75rem; font-size: 0.88rem; box-sizing: border-box;"
+                                placeholder="ระบุตึก แผนก หรือห้องจัดส่ง"
+                            ></textarea>
+                        </div>
+
+                        <div>
+                            <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #475569; margin-bottom: 0.35rem;">
+                                ข้อความถึงร้าน / หมายเหตุ:
+                            </label>
+                            <input
+                                type="text"
+                                bind:value={editOrderMessage}
+                                class="form-input"
+                                style="width: 100%; padding: 0.55rem 0.75rem; font-size: 0.88rem; box-sizing: border-box;"
+                                placeholder="เช่น แยกน้ำแข็ง, โทรหาก่อนส่ง"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- 4. รายการเครื่องดื่มที่สั่ง & ยอดเงินรวม -->
+                    <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                            <span style="font-weight: 800; font-size: 0.92rem; color: #1e293b;">
+                                🍵 4. รายการเครื่องดื่มในออเดอร์ ({editOrderBasket.length} แก้ว)
+                            </span>
+                            <button
+                                type="button"
+                                onclick={recalculateEditOrderTotal}
+                                style="font-size: 0.75rem; font-weight: 700; background: #f0fdf4; color: #166534; border: 1px solid #86efac; border-radius: 6px; padding: 0.2rem 0.55rem; cursor: pointer;"
+                            >
+                                🔄 คำนวณยอดเงินตามแก้ว
+                            </button>
+                        </div>
+
+                        <!-- รายการแก้วแต่ละใบ -->
+                        <div style="display: flex; flex-direction: column; gap: 0.65rem; margin-bottom: 0.85rem;">
+                            {#each editOrderBasket as item, idx}
+                                <div style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.45rem;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
+                                        <div style="display: flex; align-items: center; gap: 0.4rem; min-width: 0;">
+                                            <span style="background: #1e293b; color: #fff; font-size: 0.72rem; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 4px;">
+                                                #{idx + 1}
+                                            </span>
+                                            <input
+                                                type="text"
+                                                bind:value={item.thaiName}
+                                                placeholder="ชื่อเครื่องดื่ม"
+                                                class="form-input"
+                                                style="padding: 0.35rem 0.5rem; font-size: 0.88rem; font-weight: 700; color: #166534; max-width: 220px;"
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onclick={() => removeDrinkFromEditOrder(idx)}
+                                            style="background: #fee2e2; color: #dc2626; border: none; border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 700; cursor: pointer;"
+                                            title="ลบแก้วนี้"
+                                        >
+                                            🗑️ ลบ
+                                        </button>
+                                    </div>
+
+                                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                                        <!-- ความหวาน -->
+                                        <div style="display: flex; align-items: center; gap: 0.3rem;">
+                                            <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">หวาน:</span>
+                                            <select
+                                                bind:value={item.sweetness}
+                                                class="form-select"
+                                                style="padding: 0.25rem 0.5rem; font-size: 0.78rem; border-radius: 6px;"
+                                            >
+                                                <option value={0}>0% ไม่หวาน</option>
+                                                <option value={25}>25% หวานน้อยมาก</option>
+                                                <option value={50}>50% หวานน้อย</option>
+                                                <option value={75}>75% หวานปานกลาง</option>
+                                                <option value={100}>100% หวานปกติ</option>
+                                            </select>
+                                        </div>
+
+                                        <!-- ท็อปปิ้ง / Addon -->
+                                        <div style="display: flex; align-items: center; gap: 0.3rem;">
+                                            <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">ท็อปปิ้ง:</span>
+                                            <input
+                                                type="text"
+                                                bind:value={item.addonName}
+                                                placeholder="เช่น เพิ่มช็อต (+10฿)"
+                                                class="form-input"
+                                                style="padding: 0.25rem 0.5rem; font-size: 0.78rem; max-width: 130px;"
+                                            />
+                                        </div>
+
+                                        <!-- ราคาต่อแก้ว -->
+                                        <div style="display: flex; align-items: center; gap: 0.3rem;">
+                                            <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">ราคา:</span>
+                                            <input
+                                                type="number"
+                                                bind:value={item.price}
+                                                oninput={recalculateEditOrderTotal}
+                                                class="form-input"
+                                                style="width: 65px; padding: 0.25rem 0.4rem; font-size: 0.78rem; font-weight: 700; text-align: right;"
+                                            />
+                                            <span style="font-size: 0.75rem; color: #64748b;">฿</span>
+                                        </div>
+
+                                        <!-- จำนวน -->
+                                        <div style="display: flex; align-items: center; gap: 0.25rem; margin-left: auto;">
+                                            <button
+                                                type="button"
+                                                onclick={() => { if (item.quantity > 1) { item.quantity--; recalculateEditOrderTotal(); } }}
+                                                style="width: 24px; height: 24px; border: 1px solid #cbd5e1; border-radius: 4px; background: #f8fafc; font-weight: 800; cursor: pointer;"
+                                            >-</button>
+                                            <span style="font-size: 0.85rem; font-weight: 800; min-width: 20px; text-align: center;">{item.quantity}</span>
+                                            <button
+                                                type="button"
+                                                onclick={() => { item.quantity++; recalculateEditOrderTotal(); }}
+                                                style="width: 24px; height: 24px; border: 1px solid #cbd5e1; border-radius: 4px; background: #f8fafc; font-weight: 800; cursor: pointer;"
+                                            >+</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- โน้ตเฉพาะแก้ว -->
+                                    <input
+                                        type="text"
+                                        bind:value={item.note}
+                                        placeholder="โน้ตเพิ่มเติมสำหรับแก้วนี้..."
+                                        class="form-input"
+                                        style="width: 100%; padding: 0.3rem 0.5rem; font-size: 0.75rem; box-sizing: border-box;"
+                                    />
+                                </div>
+                            {/each}
+                        </div>
+
+                        <!-- เพิ่มแก้วใหม่จากเมนู -->
+                        <div style="display: flex; gap: 0.45rem; align-items: center; padding-top: 0.65rem; border-top: 1px dashed #cbd5e1;">
+                            <select
+                                bind:value={editOrderAddDrinkMenuId}
+                                class="form-select"
+                                style="flex: 1; padding: 0.45rem 0.65rem; font-size: 0.82rem;"
+                            >
+                                {#each menuItems as m}
+                                    <option value={m.id}>{m.thaiName} ({m.price}฿)</option>
+                                {/each}
+                            </select>
+                            <button
+                                type="button"
+                                onclick={addDrinkToEditOrder}
+                                style="padding: 0.45rem 0.95rem; background: #166534; color: #ffffff; border: none; border-radius: 8px; font-size: 0.82rem; font-weight: 800; cursor: pointer; white-space: nowrap;"
+                            >
+                                ➕ เพิ่มแก้ว
+                            </button>
+                        </div>
+
+                        <!-- ยอดเงินรวมทั้งสิ้น -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding: 0.75rem; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px;">
+                            <span style="font-weight: 800; font-size: 0.95rem; color: #14532d;">
+                                💰 ยอดเงินรวมทั้งสิ้น:
+                            </span>
+                            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                <input
+                                    type="number"
+                                    bind:value={editOrderTotalPrice}
+                                    class="form-input"
+                                    style="width: 100px; padding: 0.35rem 0.5rem; font-size: 1.15rem; font-weight: 800; color: #14532d; text-align: right;"
+                                />
+                                <span style="font-weight: 800; color: #14532d; font-size: 0.95rem;">บาท</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Actions -->
+                <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+                    <button
+                        type="button"
+                        onclick={saveOrderEdit}
+                        disabled={isSavingOrderEdit || editOrderBasket.length === 0}
+                        style="flex: 2; padding: 0.85rem; background: #166534; color: #ffffff; border: none; border-radius: 12px; font-weight: 800; font-size: 1rem; cursor: {isSavingOrderEdit || editOrderBasket.length === 0 ? 'not-allowed' : 'pointer'}; opacity: {isSavingOrderEdit || editOrderBasket.length === 0 ? '0.6' : '1'}; display: flex; align-items: center; justify-content: center; gap: 0.4rem; box-shadow: 0 4px 14px rgba(22, 101, 52, 0.3);"
+                    >
+                        {isSavingOrderEdit ? '⏳ กำลังบันทึก...' : '💾 บันทึกการแก้ไขคำสั่งซื้อ'}
+                    </button>
+                    <button
+                        type="button"
+                        onclick={() => (isEditOrderModalOpen = false)}
+                        class="btn-matcha-outline"
+                        style="flex: 1; padding: 0.85rem; border-radius: 12px; font-weight: 700;"
+                    >
+                        ✕ ยกเลิก
                     </button>
                 </div>
             </div>
