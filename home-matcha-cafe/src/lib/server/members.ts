@@ -1,5 +1,6 @@
 import { pool, ensurePgSchema } from './pgPool';
 import { getStoreSettings } from './settings';
+import { fetchLineUserProfile } from './notifications';
 
 export interface Member {
     id: number;
@@ -13,6 +14,8 @@ export interface Member {
     cardStartedAt: string | null;
     cardExpiresAt: string | null;
     isCardExpired: boolean;
+    pictureUrl: string | null;
+    lineUserId: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -38,6 +41,8 @@ function mapRowToMember(row: any): Member {
         cardStartedAt: row.card_started_at ? new Date(row.card_started_at).toISOString() : null,
         cardExpiresAt: expIso,
         isCardExpired,
+        pictureUrl: row.picture_url || null,
+        lineUserId: row.line_user_id || null,
         createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
         updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : new Date().toISOString()
     };
@@ -50,9 +55,20 @@ export async function getMemberByPhone(phone: string): Promise<Member | null> {
 
     const res = await pool.query(
         `
-        SELECT *
-        FROM public.members
-        WHERE phone = $1
+        SELECT m.*,
+               COALESCE(NULLIF(m.picture_url, ''), lu.picture_url) AS picture_url,
+               COALESCE(NULLIF(m.line_user_id, ''), lu.line_user_id) AS line_user_id,
+               lu.picture_url AS line_pic,
+               lu.line_user_id AS line_uid
+        FROM public.members m
+        LEFT JOIN LATERAL (
+            SELECT picture_url, line_user_id, updated_at
+            FROM public.line_users lu
+            WHERE lu.phone = m.phone OR (m.line_user_id IS NOT NULL AND m.line_user_id <> '' AND lu.line_user_id = m.line_user_id)
+            ORDER BY lu.updated_at DESC NULLS LAST
+            LIMIT 1
+        ) lu ON true
+        WHERE m.phone = $1
         LIMIT 1
         `,
         [cleaned]
@@ -60,6 +76,43 @@ export async function getMemberByPhone(phone: string): Promise<Member | null> {
     if (res.rows.length === 0) return null;
 
     const row = res.rows[0];
+
+    // ซิงค์ picture_url และ line_user_id กลับลงตาราง members อัตโนมัติหากยังว่างอยู่
+    if (row.picture_url && (!row.picture_url_in_table || !row.line_user_id)) {
+        pool.query(
+            `UPDATE public.members 
+             SET picture_url = COALESCE(NULLIF(picture_url, ''), $1),
+                 line_user_id = COALESCE(NULLIF(line_user_id, ''), $2),
+                 updated_at = NOW()
+             WHERE id = $3`,
+            [row.picture_url, row.line_user_id, row.id]
+        ).catch(() => {});
+    }
+
+    // หากมี line_user_id แต่ยังไม่มี picture_url ให้ดึงสดจาก LINE
+    if (!row.picture_url && row.line_user_id) {
+        try {
+            const settings = await getStoreSettings();
+            const token = settings.lineOa?.channelAccessToken;
+            if (token) {
+                const profile = await fetchLineUserProfile(token, row.line_user_id);
+                if (profile?.pictureUrl) {
+                    row.picture_url = profile.pictureUrl;
+                    pool.query(
+                        `UPDATE public.members SET picture_url = $1, updated_at = NOW() WHERE id = $2`,
+                        [profile.pictureUrl, row.id]
+                    ).catch(() => {});
+                    pool.query(
+                        `UPDATE public.line_users SET picture_url = $1, updated_at = NOW() WHERE line_user_id = $2`,
+                        [profile.pictureUrl, row.line_user_id]
+                    ).catch(() => {});
+                }
+            }
+        } catch (fetchErr) {
+            console.warn('⚠️ Error fetching live LINE profile:', fetchErr);
+        }
+    }
+
     // หากบัตรหมดอายุแล้วและยังมีแต้มค้าง ให้รีเซ็ตแต้มในฐานข้อมูลเป็น 0 อัตโนมัติ
     if (row.card_expires_at && new Date(row.card_expires_at).getTime() < Date.now() && Number(row.points) > 0) {
         const updated = await pool.query(
@@ -74,7 +127,10 @@ export async function getMemberByPhone(phone: string): Promise<Member | null> {
             `,
             [row.id]
         );
-        return mapRowToMember(updated.rows[0]);
+        const updatedRow = updated.rows[0];
+        updatedRow.picture_url = row.picture_url;
+        updatedRow.line_user_id = row.line_user_id;
+        return mapRowToMember(updatedRow);
     }
 
     return mapRowToMember(row);
@@ -83,9 +139,18 @@ export async function getMemberByPhone(phone: string): Promise<Member | null> {
 export async function getAllMembers(): Promise<Member[]> {
     await ensurePgSchema();
     const res = await pool.query(`
-        SELECT *
-        FROM public.members
-        ORDER BY updated_at DESC, id DESC
+        SELECT m.*,
+               COALESCE(NULLIF(m.picture_url, ''), lu.picture_url) AS picture_url,
+               COALESCE(NULLIF(m.line_user_id, ''), lu.line_user_id) AS line_user_id
+        FROM public.members m
+        LEFT JOIN LATERAL (
+            SELECT picture_url, line_user_id
+            FROM public.line_users lu
+            WHERE lu.phone = m.phone OR (m.line_user_id IS NOT NULL AND m.line_user_id <> '' AND lu.line_user_id = m.line_user_id)
+            ORDER BY lu.updated_at DESC NULLS LAST
+            LIMIT 1
+        ) lu ON true
+        ORDER BY m.updated_at DESC, m.id DESC
     `);
     return res.rows.map(mapRowToMember);
 }
@@ -113,6 +178,13 @@ export async function registerMember(data: {
         return { success: false, message: 'เบอร์โทรศัพท์นี้เคยสมัครสมาชิกไว้แล้ว กรุณาเลือกเข้าสู่ระบบค่ะ' };
     }
 
+    // ค้นหาว่าเบอร์นี้เคยมีใน line_users หรือไม่
+    const lineRes = await pool.query(
+        `SELECT line_user_id, picture_url FROM public.line_users WHERE phone = $1 ORDER BY updated_at DESC LIMIT 1`,
+        [cleanedPhone]
+    );
+    const existingLineUser = lineRes.rows[0] || null;
+
     const res = await pool.query(
         `
         INSERT INTO public.members (
@@ -125,13 +197,22 @@ export async function registerMember(data: {
             total_free_redeemed,
             card_started_at,
             card_expires_at,
+            picture_url,
+            line_user_id,
             created_at,
             updated_at
         )
-        VALUES ($1, $2, $3, $4, 0, 0, 0, NULL, NULL, NOW(), NOW())
+        VALUES ($1, $2, $3, $4, 0, 0, 0, NULL, NULL, $5, $6, NOW(), NOW())
         RETURNING *
         `,
-        [data.firstName.trim(), data.lastName.trim(), cleanedPhone, data.pin.trim()]
+        [
+            data.firstName.trim(),
+            data.lastName.trim(),
+            cleanedPhone,
+            data.pin.trim(),
+            existingLineUser?.picture_url || null,
+            existingLineUser?.line_user_id || null
+        ]
     );
 
     return {

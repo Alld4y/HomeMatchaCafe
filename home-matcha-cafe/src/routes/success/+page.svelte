@@ -6,10 +6,12 @@
 
     const memberCtx = getContext<any>('memberData');
     let member = $derived(memberCtx?.member || null);
+    let guestMember = $state<any>(null);
+    const activeMember = $derived(member || guestMember);
 
     const queryPhone = $derived((page.url.searchParams.get('phone') || '').trim().replace(/[^0-9]/g, ''));
     const queryOrderCode = $derived((page.url.searchParams.get('orderCode') || page.url.searchParams.get('orderId') || '').trim());
-    const activePhone = $derived(member?.phone || queryPhone);
+    const activePhone = $derived(activeMember?.phone || queryPhone);
 
     interface OrderRecord {
         id: string;
@@ -147,6 +149,20 @@
         }
     });
 
+    $effect(() => {
+        const ph = queryPhone;
+        if (!member && ph) {
+            fetch(`/api/members?phone=${encodeURIComponent(ph)}`)
+                .then((r) => r.json())
+                .then((d) => {
+                    if (d.success && d.member) {
+                        guestMember = d.member;
+                    }
+                })
+                .catch(() => {});
+        }
+    });
+
     function copyOrderId(id: string) {
         navigator.clipboard.writeText(id);
         const toast = swal.mixin({
@@ -231,15 +247,19 @@
         <!-- สภาพที่ 2: ล็อกอินแล้ว หรือเปิดจากลิงก์แจ้งเตือน (มี queryPhone) -->
         <div style="width: 100%; max-width: 720px; margin-bottom: 1.25rem; background: #ffffff; border: 1.5px solid #dcfce7; border-radius: 14px; padding: 0.85rem 1.15rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03); box-sizing: border-box;">
             <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0; flex: 1 1 240px;">
-                <div style="width: 42px; height: 42px; min-width: 42px; min-height: 42px; flex-shrink: 0; aspect-ratio: 1 / 1; border-radius: 50%; background: linear-gradient(135deg, #15803d, #22c55e); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.15rem; box-shadow: 0 3px 8px rgba(21, 128, 61, 0.25);">
-                    {member ? (member.firstName ? member.firstName.charAt(0) : '🍵') : '🧾'}
+                <div style="width: 42px; height: 42px; min-width: 42px; min-height: 42px; flex-shrink: 0; aspect-ratio: 1 / 1; border-radius: 50%; background: linear-gradient(135deg, #15803d, #22c55e); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.15rem; box-shadow: 0 3px 8px rgba(21, 128, 61, 0.25); overflow: hidden;">
+                    {#if activeMember?.pictureUrl}
+                        <img src={activeMember.pictureUrl} alt={activeMember.fullName} style="width: 100%; height: 100%; object-fit: cover;" />
+                    {:else}
+                        {activeMember ? (activeMember.firstName ? activeMember.firstName.charAt(0) : '🍵') : '🧾'}
+                    {/if}
                 </div>
                 <div style="min-width: 0; flex: 1;">
                     <div style="font-size: 0.95rem; font-weight: 800; color: #14532d; word-break: break-word;">
-                        {member ? `คำสั่งซื้อของคุณ ${member.fullName}` : `ใบเสร็จและสถานะคำสั่งซื้อ`}
+                        {activeMember ? `คำสั่งซื้อของคุณ ${activeMember.fullName}` : `ใบเสร็จและสถานะคำสั่งซื้อ`}
                     </div>
                     <div style="font-size: 0.78rem; color: #64748b; word-break: break-word;">
-                        📱 {activePhone} {member ? '· บัญชีสมาชิกของคุณ (แสดงเฉพาะของตนเอง)' : '· ติดตามสถานะคำสั่งซื้อ'}
+                        📱 {activePhone} {activeMember ? '· บัญชีสมาชิกของคุณ (แสดงเฉพาะของตนเอง)' : '· ติดตามสถานะคำสั่งซื้อ'}
                     </div>
                 </div>
             </div>

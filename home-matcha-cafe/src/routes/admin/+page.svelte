@@ -7446,7 +7446,20 @@
                                     {@const isExpired = member.cardExpiresAt && new Date(member.cardExpiresAt).getTime() < Date.now()}
                                     <tr style="border-bottom: 1px solid #f1f5f9;">
                                         <td style="padding: 0.85rem 0.75rem; font-weight: 700; color: #1e293b;">
-                                            {member.fullName}
+                                            <div style="display: flex; align-items: center; gap: 0.55rem;">
+                                                {#if member.pictureUrl}
+                                                    <img
+                                                        src={member.pictureUrl}
+                                                        alt={member.fullName}
+                                                        style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0;"
+                                                    />
+                                                {:else}
+                                                    <div style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; border-radius: 50%; background: linear-gradient(135deg, #e2e8f0, #cbd5e1); color: #475569; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 800; flex-shrink: 0;">
+                                                        {(member.firstName || 'M').charAt(0).toUpperCase()}
+                                                    </div>
+                                                {/if}
+                                                <span>{member.fullName}</span>
+                                            </div>
                                         </td>
                                         <td style="padding: 0.85rem 0.75rem; font-family: monospace; font-size: 0.95rem; font-weight: 700; color: #334155;">
                                             {member.phone}

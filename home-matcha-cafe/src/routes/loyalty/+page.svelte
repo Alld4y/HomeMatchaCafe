@@ -120,10 +120,15 @@
                         </div>
                     </div>
 
-                    <div class="member-meta-bar">
-                        <div style="min-width: 0;">
-                            <p style="margin: 0; font-size: 0.72rem; opacity: 0.85;">ชื่อสมาชิก</p>
-                            <p style="margin: 0; font-size: 0.95rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">คุณ {member.fullName}</p>
+                    <div class="member-meta-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+                        <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0;">
+                            {#if member.pictureUrl}
+                                <img src={member.pictureUrl} alt={member.fullName} style="width: 38px; height: 38px; min-width: 38px; min-height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255, 255, 255, 0.85); flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.15);" />
+                            {/if}
+                            <div style="min-width: 0;">
+                                <p style="margin: 0; font-size: 0.72rem; opacity: 0.85;">ชื่อสมาชิก</p>
+                                <p style="margin: 0; font-size: 0.95rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">คุณ {member.fullName}</p>
+                            </div>
                         </div>
                         <div style="text-align: right; flex-shrink: 0;">
                             <p style="margin: 0; font-size: 0.72rem; opacity: 0.85;">เบอร์โทรศัพท์</p>

@@ -33,6 +33,8 @@
         cardStartedAt: string | null;
         cardExpiresAt: string | null;
         isCardExpired: boolean;
+        pictureUrl?: string | null;
+        lineUserId?: string | null;
         createdAt?: string;
         updatedAt?: string;
     }
@@ -860,7 +862,11 @@
             <div class="fab-stamp-badge">
                 {currentMember.points}/{loyaltySettings.stampsRequired}
             </div>
-            <span class="fab-icon">🍵</span>
+            {#if currentMember.pictureUrl}
+                <img src={currentMember.pictureUrl} alt="Avatar" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1.5px solid #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.2); flex-shrink: 0;" />
+            {:else}
+                <span class="fab-icon">🍵</span>
+            {/if}
             <span class="fab-label">{currentMember.firstName.slice(0, 8)}</span>
         {:else}
             <span class="fab-icon">👤</span>
@@ -905,8 +911,12 @@
                 <!-- Overview Tab -->
                 <div class="tab-content-fade">
                     <div style="text-align: center; margin-bottom: 1rem;">
-                        <div class="profile-avatar-circle">
-                            {(currentMember.firstName || 'M').charAt(0).toUpperCase()}
+                        <div class="profile-avatar-circle" style="overflow: hidden;">
+                            {#if currentMember.pictureUrl}
+                                <img src={currentMember.pictureUrl} alt={currentMember.fullName} style="width: 100%; height: 100%; object-fit: cover;" />
+                            {:else}
+                                {(currentMember.firstName || 'M').charAt(0).toUpperCase()}
+                            {/if}
                         </div>
                         <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--matcha-deep);">
                             คุณ {currentMember.fullName}
@@ -992,8 +1002,12 @@
                 <!-- Profile Settings Tab (Professional) -->
                 <div class="tab-content-fade">
                     <div class="profile-edit-hero">
-                        <div class="profile-avatar-circle small">
-                            {(editFirstName || currentMember.firstName || 'M').charAt(0).toUpperCase()}
+                        <div class="profile-avatar-circle small" style="overflow: hidden;">
+                            {#if currentMember.pictureUrl}
+                                <img src={currentMember.pictureUrl} alt={currentMember.fullName} style="width: 100%; height: 100%; object-fit: cover;" />
+                            {:else}
+                                {(editFirstName || currentMember.firstName || 'M').charAt(0).toUpperCase()}
+                            {/if}
                         </div>
                         <div class="profile-hero-info">
                             <h4 class="profile-edit-title">โปรไฟล์สมาชิก (Profile)</h4>

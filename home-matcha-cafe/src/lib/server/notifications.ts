@@ -155,6 +155,24 @@ export async function getLineUserIdByPhone(phone: string): Promise<string | null
 }
 
 /**
+ * ดึงโปรไฟล์ผู้ใช้จาก LINE Messaging API
+ */
+export async function fetchLineUserProfile(channelAccessToken: string, userId: string): Promise<{ displayName?: string; pictureUrl?: string; statusMessage?: string } | null> {
+    if (!channelAccessToken || !userId) return null;
+    try {
+        const res = await fetch(`https://api.line.me/v2/bot/profile/${userId}`, {
+            headers: { Authorization: `Bearer ${channelAccessToken}` }
+        });
+        if (res.ok) {
+            return await res.json();
+        }
+    } catch (e) {
+        console.warn('Could not fetch LINE profile:', e);
+    }
+    return null;
+}
+
+/**
  * ส่งการแจ้งเตือนไปยังลูกค้าผ่าน LINE Official Account 100%
  */
 export async function sendCustomerNotification(payload: CustomerNotificationPayload): Promise<{

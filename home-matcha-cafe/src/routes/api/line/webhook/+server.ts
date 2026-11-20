@@ -2,6 +2,7 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import crypto from 'crypto';
 import { getStoreSettings } from '$lib/server/settings';
 import { pool, ensurePgSchema } from '$lib/server/pgPool';
+import { fetchLineUserProfile } from '$lib/server/notifications';
 
 /**
  * ตรวจสอบความถูกต้องของ LINE Webhook Signature ด้วย HMAC-SHA256
@@ -48,24 +49,6 @@ async function replyLineMessage(channelAccessToken: string, replyToken: string, 
         console.error('❌ LINE Reply Exception:', e);
         return false;
     }
-}
-
-/**
- * ดึงโปรไฟล์ผู้ใช้จาก LINE
- */
-async function fetchLineUserProfile(channelAccessToken: string, userId: string): Promise<{ displayName?: string; pictureUrl?: string; statusMessage?: string } | null> {
-    if (!channelAccessToken || !userId) return null;
-    try {
-        const res = await fetch(`https://api.line.me/v2/bot/profile/${userId}`, {
-            headers: { Authorization: `Bearer ${channelAccessToken}` }
-        });
-        if (res.ok) {
-            return await res.json();
-        }
-    } catch (e) {
-        console.warn('Could not fetch LINE profile:', e);
-    }
-    return null;
 }
 
 export const GET: RequestHandler = async () => {
@@ -135,6 +118,13 @@ export const POST: RequestHandler = async ({ request }) => {
                     `,
                     [userId, displayName, pictureUrl, statusMessage]
                 );
+
+                if (userId && pictureUrl) {
+                    await pool.query(
+                        `UPDATE public.members SET picture_url = $1, updated_at = NOW() WHERE line_user_id = $2`,
+                        [pictureUrl, userId]
+                    ).catch(() => {});
+                }
             } catch (dbErr) {
                 console.error('Error saving follow line user:', dbErr);
             }
@@ -257,15 +247,17 @@ export const POST: RequestHandler = async ({ request }) => {
                         [userId, displayName, pictureUrl, cleanDigits]
                     );
 
-                    // อัปเดต line_user_id ในตาราง members
+                    // อัปเดต line_user_id และ picture_url ในตาราง members
                     const memberUpdate = await pool.query(
                         `
                         UPDATE public.members
-                        SET line_user_id = $1, updated_at = NOW()
-                        WHERE phone = $2
+                        SET line_user_id = $1,
+                            picture_url = COALESCE(NULLIF($2, ''), picture_url),
+                            updated_at = NOW()
+                        WHERE phone = $3
                         RETURNING first_name, last_name, points
                         `,
-                        [userId, cleanDigits]
+                        [userId, pictureUrl, cleanDigits]
                     );
 
                     // อัปเดต line_user_id ในตาราง order สำหรับออเดอร์ของเบอร์นี้
