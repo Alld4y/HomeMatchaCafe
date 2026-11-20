@@ -244,7 +244,8 @@ export async function sendCustomerNotification(payload: CustomerNotificationPayl
                         orderCode,
                         itemsSummary,
                         totalPrice,
-                        url
+                        url,
+                        phone: cleanPhone
                     }
                 );
             }
@@ -270,11 +271,12 @@ export async function sendLineStatusFlexMessage(
         itemsSummary?: string;
         totalPrice?: number;
         url: string;
+        phone?: string;
     }
 ): Promise<boolean> {
     if (!channelAccessToken || !toUserId) return false;
 
-    const { title, body, eventType, orderCode, itemsSummary, totalPrice, url } = params;
+    const { title, body, eventType, orderCode, itemsSummary, totalPrice, url, phone } = params;
     const trackingUrl = url.startsWith('http') ? url : `https://homematchacafe.store${url}`;
 
     // ตรวจสอบว่าแอดมินตั้งค่าการ์ดแจ้งเตือนสถานะออกแบบเอง (Custom Status Card) สำหรับสถานะนี้หรือไม่
@@ -290,7 +292,9 @@ export async function sendLineStatusFlexMessage(
                 .replace(/\{url\}/g, trackingUrl)
                 .replace(/\{trackingUrl\}/g, trackingUrl)
                 .replace(/\{title\}/g, title)
-                .replace(/\{body\}/g, body);
+                .replace(/\{body\}/g, body)
+                .replace(/\{phone\}/g, phone || '')
+                .replace(/\{loyaltyUrl\}/g, phone ? `https://homematchacafe.store/loyalty?phone=${phone}` : 'https://homematchacafe.store/loyalty');
             const customBubble = JSON.parse(rawJson);
             return sendLineRawFlexMessage(channelAccessToken, toUserId, `${title}: ${body}`, customBubble);
         }

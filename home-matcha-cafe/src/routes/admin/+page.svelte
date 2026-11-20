@@ -2000,6 +2000,36 @@
         }
     }
 
+    function copyToClipboard(text: string, title: string = 'คัดลอกสำเร็จแล้ว 📋') {
+        if (!text) return;
+        navigator.clipboard.writeText(text);
+        swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title,
+            showConfirmButton: false,
+            timer: 1500
+        });
+    }
+
+    function insertVariableToBlock(block: any, field: string, variable: string) {
+        if (!block) return;
+        if (!block[field]) {
+            block[field] = variable;
+        } else {
+            block[field] = `${block[field]} ${variable}`;
+        }
+    }
+
+    function insertVariableToPhoneEvent(eventKey: 'existing' | 'new', variable: string) {
+        if (eventKey === 'existing') {
+            settings.lineOa.phoneLinkedExistingMessage = (settings.lineOa.phoneLinkedExistingMessage || '') + (settings.lineOa.phoneLinkedExistingMessage ? ' ' : '') + variable;
+        } else {
+            settings.lineOa.phoneLinkedNewMessage = (settings.lineOa.phoneLinkedNewMessage || '') + (settings.lineOa.phoneLinkedNewMessage ? ' ' : '') + variable;
+        }
+    }
+
     function getStatusName(status: string) {
         switch (status) {
             case 'pending': return 'รอตรวจสลิป';
@@ -5138,9 +5168,20 @@
 
                     <!-- Admin User ID -->
                     <div>
-                        <label for="lineAdminUserId" style="display: block; font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-bottom: 0.35rem;">
-                            Admin User ID (สำหรับรับแจ้งเตือน):
-                        </label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                            <label for="lineAdminUserId" style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin: 0;">
+                                Admin User ID (สำหรับรับแจ้งเตือน):
+                            </label>
+                            {#if settings.lineOa.adminLineUserId}
+                                <button
+                                    type="button"
+                                    onclick={() => copyToClipboard(settings.lineOa.adminLineUserId, 'คัดลอก Admin LINE ID แล้ว 📋')}
+                                    style="background: none; border: none; color: #0284c7; font-size: 0.75rem; font-weight: 700; cursor: pointer; text-decoration: underline;"
+                                >
+                                    📋 คัดลอก ID
+                                </button>
+                            {/if}
+                        </div>
                         <input
                             id="lineAdminUserId"
                             type="text"
@@ -5530,9 +5571,17 @@
                             <!-- ข้อความตัวอักษร -->
                             <div style="margin-bottom: 0.65rem;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                                    <label for="phoneLinkedExistingMsg" style="font-size: 0.8rem; font-weight: 700; color: #1e293b;">
+                                    <label for="phoneLinkedExistingMsg" style="font-size: 0.8rem; font-weight: 700; color: #1e293b; margin: 0;">
                                         ข้อความตอบกลับ:
                                     </label>
+                                    <span style="font-size: 0.7rem; color: #64748b;">กดเลือกตัวแปร:</span>
+                                </div>
+                                <div style="display: flex; gap: 0.25rem; flex-wrap: wrap; margin-bottom: 0.35rem;">
+                                    <button type="button" onclick={() => insertVariableToPhoneEvent('existing', '{name}')} style="padding: 0.15rem 0.45rem; font-size: 0.72rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 4px; cursor: pointer; font-weight: 700;">+{'{name}'} (ชื่อ)</button>
+                                    <button type="button" onclick={() => insertVariableToPhoneEvent('existing', '{points}')} style="padding: 0.15rem 0.45rem; font-size: 0.72rem; background: #fff7ed; border: 1px solid #fed7aa; color: #c2410c; border-radius: 4px; cursor: pointer; font-weight: 700;">+{'{points}'} (แต้ม)</button>
+                                    <button type="button" onclick={() => insertVariableToPhoneEvent('existing', '{phone}')} style="padding: 0.15rem 0.45rem; font-size: 0.72rem; background: #fdf2f8; border: 1px solid #fbcfe8; color: #9d174d; border-radius: 4px; cursor: pointer; font-weight: 700;">+{'{phone}'} (เบอร์)</button>
+                                    <button type="button" onclick={() => insertVariableToPhoneEvent('existing', '{loyaltyUrl}')} style="padding: 0.15rem 0.45rem; font-size: 0.72rem; background: #e0f2fe; border: 1px solid #bae6fd; color: #0369a1; border-radius: 4px; cursor: pointer; font-weight: 700;">+{'{loyaltyUrl}'} (ลิงก์บัตร)</button>
+                                    <button type="button" onclick={() => insertVariableToPhoneEvent('existing', '{menuUrl}')} style="padding: 0.15rem 0.45rem; font-size: 0.72rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 4px; cursor: pointer; font-weight: 700;">+{'{menuUrl}'} (ลิงก์เมนู)</button>
                                 </div>
                                 <textarea
                                     id="phoneLinkedExistingMsg"
@@ -5610,9 +5659,15 @@
                             <!-- ข้อความตัวอักษร -->
                             <div style="margin-bottom: 0.65rem;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                                    <label for="phoneLinkedNewMsg" style="font-size: 0.8rem; font-weight: 700; color: #1e293b;">
+                                    <label for="phoneLinkedNewMsg" style="font-size: 0.8rem; font-weight: 700; color: #1e293b; margin: 0;">
                                         ข้อความตอบกลับ:
                                     </label>
+                                    <span style="font-size: 0.7rem; color: #64748b;">กดเลือกตัวแปร:</span>
+                                </div>
+                                <div style="display: flex; gap: 0.25rem; flex-wrap: wrap; margin-bottom: 0.35rem;">
+                                    <button type="button" onclick={() => insertVariableToPhoneEvent('new', '{phone}')} style="padding: 0.15rem 0.45rem; font-size: 0.72rem; background: #fdf2f8; border: 1px solid #fbcfe8; color: #9d174d; border-radius: 4px; cursor: pointer; font-weight: 700;">+{'{phone}'} (เบอร์ที่พิมพ์)</button>
+                                    <button type="button" onclick={() => insertVariableToPhoneEvent('new', '{registerUrl}')} style="padding: 0.15rem 0.45rem; font-size: 0.72rem; background: #fdf2f8; border: 1px solid #f472b6; color: #831843; border-radius: 4px; cursor: pointer; font-weight: 700;">+{'{registerUrl}'} (ลิงก์สมัครสมาชิก)</button>
+                                    <button type="button" onclick={() => insertVariableToPhoneEvent('new', '{menuUrl}')} style="padding: 0.15rem 0.45rem; font-size: 0.72rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 4px; cursor: pointer; font-weight: 700;">+{'{menuUrl}'} (ลิงก์เมนู)</button>
                                 </div>
                                 <textarea
                                     id="phoneLinkedNewMsg"
@@ -5811,24 +5866,42 @@
                             </button>
                         </div>
 
-                        {#if settings.lineOa.useCustomWelcomeCard || settings.lineOa.useCustomMemberCard || settings.lineOa.useCustomRegisterCard}
+                        {#if settings.lineOa.useCustomWelcomeCard || settings.lineOa.useCustomMemberCard || settings.lineOa.useCustomRegisterCard || Object.values(settings.lineOa.customStatusCards || {}).some(c => c?.enabled)}
                             <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; border-top: 1px dashed #e2e8f0; padding-top: 0.4rem;">
-                                <span style="font-size: 0.74rem; color: #1e293b; font-weight: 700;">📂 การ์ดที่บันทึกไว้:</span>
+                                <span style="font-size: 0.74rem; color: #1e293b; font-weight: 800;">📂 ดึงการ์ดที่เซฟไว้กลับมาแก้ไข:</span>
                                 {#if settings.lineOa.useCustomWelcomeCard}
                                     <button type="button" onclick={loadSavedWelcomeCard} style="padding: 0.2rem 0.5rem; font-size: 0.72rem; font-weight: 800; background: #ffffff; border: 1px solid #166534; color: #166534; border-radius: 6px; cursor: pointer;">
-                                        การ์ดต้อนรับ
+                                        👋 การ์ดต้อนรับ
                                     </button>
                                 {/if}
                                 {#if settings.lineOa.useCustomMemberCard}
                                     <button type="button" onclick={loadSavedMemberCard} style="padding: 0.2rem 0.5rem; font-size: 0.72rem; font-weight: 800; background: #ffffff; border: 1px solid #15803d; color: #15803d; border-radius: 6px; cursor: pointer;">
-                                        การ์ดสมาชิกเดิม
+                                        🟢 การ์ดสมาชิกเดิม
                                     </button>
                                 {/if}
                                 {#if settings.lineOa.useCustomRegisterCard}
                                     <button type="button" onclick={loadSavedRegisterCard} style="padding: 0.2rem 0.5rem; font-size: 0.72rem; font-weight: 800; background: #ffffff; border: 1px solid #be185d; color: #be185d; border-radius: 6px; cursor: pointer;">
-                                        การ์ดชวนสมัคร
+                                        ✨ การ์ดชวนสมัคร
                                     </button>
                                 {/if}
+                                {#each [
+                                    { key: 'brewing', label: '🍵 กำลังชง' },
+                                    { key: 'ready_to_ship', label: '✨ ชงเสร็จ' },
+                                    { key: 'delivering', label: '🛵 กำลังส่ง' },
+                                    { key: 'completed', label: '🎉 ส่งสำเร็จ' },
+                                    { key: 'cancelled', label: '❌ ยกเลิก' }
+                                ] as st}
+                                    {#if settings.lineOa.customStatusCards?.[st.key]?.enabled}
+                                        <button
+                                            type="button"
+                                            onclick={() => loadSavedStatusCard(st.key)}
+                                            style="padding: 0.2rem 0.5rem; font-size: 0.72rem; font-weight: 800; background: #f0fdfa; border: 1.5px solid #0d9488; color: #0f766e; border-radius: 6px; cursor: pointer;"
+                                            title="ดึงการ์ดสถานะ {st.label} ที่บันทึกไว้กลับมาแก้ไขใน Designer"
+                                        >
+                                            {st.label} (ที่เซฟไว้)
+                                        </button>
+                                    {/if}
+                                {/each}
                             </div>
                         {/if}
                     </div>
@@ -5974,45 +6047,60 @@
                                             </div>
                                         </div>
                                     {:else if block.type === 'tag'}
-                                        <div style="display: flex; gap: 0.4rem; align-items: center;">
-                                            <input
-                                                type="text"
-                                                class="form-input"
-                                                bind:value={block.tagText}
-                                                placeholder="ข้อความป้าย เช่น 🍵 เมนูใหม่แนะนำ"
-                                                style="font-size: 0.82rem; padding: 0.35rem 0.65rem;"
-                                            />
-                                            <input
-                                                type="color"
-                                                bind:value={block.tagBg}
-                                                title="สีพื้นหลังป้าย"
-                                                style="width: 38px; height: 34px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;"
-                                            />
-                                            <input
-                                                type="color"
-                                                bind:value={block.tagColor}
-                                                title="สีตัวอักษรป้าย"
-                                                style="width: 38px; height: 34px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;"
-                                            />
+                                        <div>
+                                            <div style="display: flex; gap: 0.4rem; align-items: center;">
+                                                <input
+                                                    type="text"
+                                                    class="form-input"
+                                                    bind:value={block.tagText}
+                                                    placeholder="ข้อความป้าย เช่น 🍵 เมนูใหม่แนะนำ"
+                                                    style="font-size: 0.82rem; padding: 0.35rem 0.65rem;"
+                                                />
+                                                <input
+                                                    type="color"
+                                                    bind:value={block.tagBg}
+                                                    title="สีพื้นหลังป้าย"
+                                                    style="width: 38px; height: 34px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;"
+                                                />
+                                                <input
+                                                    type="color"
+                                                    bind:value={block.tagColor}
+                                                    title="สีตัวอักษรป้าย"
+                                                    style="width: 38px; height: 34px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;"
+                                                />
+                                            </div>
+                                            <div style="display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.3rem;">
+                                                <span style="font-size: 0.68rem; color: #64748b;">กดเลือกตัวแปร:</span>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'tagText', '{orderCode}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 4px; cursor: pointer;">+{'{orderCode}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'tagText', '{name}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 4px; cursor: pointer;">+{'{name}'}</button>
+                                            </div>
                                         </div>
                                     {:else if block.type === 'title'}
-                                        <div style="display: flex; gap: 0.4rem; align-items: center;">
-                                            <input
-                                                type="text"
-                                                class="form-input"
-                                                bind:value={block.titleText}
-                                                placeholder="หัวข้อการ์ด เช่น Cold-Fermented Matcha Oat Latte"
-                                                style="font-size: 0.85rem; font-weight: 700; padding: 0.4rem 0.65rem;"
-                                            />
-                                            <select
-                                                class="form-input"
-                                                bind:value={block.titleSize}
-                                                style="width: 100px; font-size: 0.8rem; padding: 0.4rem 0.5rem;"
-                                            >
-                                                <option value="md">ขนาดปกติ</option>
-                                                <option value="lg">ขนาดใหญ่</option>
-                                                <option value="xl">ใหญ่พิเศษ</option>
-                                            </select>
+                                        <div>
+                                            <div style="display: flex; gap: 0.4rem; align-items: center;">
+                                                <input
+                                                    type="text"
+                                                    class="form-input"
+                                                    bind:value={block.titleText}
+                                                    placeholder="หัวข้อการ์ด เช่น Cold-Fermented Matcha Oat Latte"
+                                                    style="font-size: 0.85rem; font-weight: 700; padding: 0.4rem 0.65rem;"
+                                                />
+                                                <select
+                                                    class="form-input"
+                                                    bind:value={block.titleSize}
+                                                    style="width: 100px; font-size: 0.8rem; padding: 0.4rem 0.5rem;"
+                                                >
+                                                    <option value="md">ขนาดปกติ</option>
+                                                    <option value="lg">ขนาดใหญ่</option>
+                                                    <option value="xl">ใหญ่พิเศษ</option>
+                                                </select>
+                                            </div>
+                                            <div style="display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.3rem;">
+                                                <span style="font-size: 0.68rem; color: #64748b;">กดเลือกตัวแปร:</span>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'titleText', '{orderCode}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 4px; cursor: pointer;">+{'{orderCode}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'titleText', '{name}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 4px; cursor: pointer;">+{'{name}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'titleText', '{phone}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fdf2f8; border: 1px solid #fbcfe8; color: #9d174d; border-radius: 4px; cursor: pointer;">+{'{phone}'}</button>
+                                            </div>
                                         </div>
                                     {:else if block.type === 'body'}
                                         <div>
@@ -6023,6 +6111,16 @@
                                                 placeholder="รายละเอียดข้อความ หรือคำโปรยสินค้า..."
                                                 style="font-size: 0.82rem; padding: 0.4rem 0.65rem; line-height: 1.45;"
                                             ></textarea>
+                                            <div style="display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.3rem;">
+                                                <span style="font-size: 0.68rem; color: #64748b;">กดเลือกตัวแปร:</span>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'bodyText', '{orderCode}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 4px; cursor: pointer;">+{'{orderCode}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'bodyText', '{itemsSummary}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #e0f2fe; border: 1px solid #bae6fd; color: #0369a1; border-radius: 4px; cursor: pointer;">+{'{itemsSummary}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'bodyText', '{totalPrice}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fefce8; border: 1px solid #fde047; color: #854d0e; border-radius: 4px; cursor: pointer;">+{'{totalPrice}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'bodyText', '{name}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 4px; cursor: pointer;">+{'{name}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'bodyText', '{phone}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fdf2f8; border: 1px solid #fbcfe8; color: #9d174d; border-radius: 4px; cursor: pointer;">+{'{phone}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'bodyText', '{points}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fff7ed; border: 1px solid #fed7aa; color: #c2410c; border-radius: 4px; cursor: pointer;">+{'{points}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'bodyText', '{url}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #f5f3ff; border: 1px solid #ddd6fe; color: #6d28d9; border-radius: 4px; cursor: pointer;">+{'{url}'}</button>
+                                            </div>
                                         </div>
                                     {:else if block.type === 'highlight'}
                                         <div>
@@ -6033,18 +6131,30 @@
                                                 placeholder="ข้อความเน้น เช่น ✨ ราคาพิเศษ 65.- หรือ ซื้อ 2 ฟรี 1"
                                                 style="font-size: 0.85rem; font-weight: 700; color: #92400e; padding: 0.4rem 0.65rem; background: #fffdf5; border-color: #fde047;"
                                             />
+                                            <div style="display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.3rem;">
+                                                <span style="font-size: 0.68rem; color: #64748b;">กดเลือกตัวแปร:</span>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'highlightText', '{totalPrice}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fefce8; border: 1px solid #fde047; color: #854d0e; border-radius: 4px; cursor: pointer;">+{'{totalPrice}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'highlightText', '{points}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fff7ed; border: 1px solid #fed7aa; color: #c2410c; border-radius: 4px; cursor: pointer;">+{'{points}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'highlightText', '{orderCode}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 4px; cursor: pointer;">+{'{orderCode}'}</button>
+                                            </div>
                                         </div>
                                     {:else if block.type === 'button'}
                                         <div style="display: flex; flex-direction: column; gap: 0.45rem; background: #ffffff; padding: 0.65rem; border-radius: 8px; border: 1px solid #e2e8f0;">
                                             <div style="display: grid; grid-template-columns: 1fr 140px; gap: 0.4rem;">
                                                 <div>
-                                                    <span style="font-size: 0.72rem; color: #64748b; font-weight: 600;">ข้อความบนปุ่ม (Label):</span>
+                                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                        <span style="font-size: 0.72rem; color: #64748b; font-weight: 600;">ข้อความบนปุ่ม (Label):</span>
+                                                        <div style="display: flex; gap: 0.2rem;">
+                                                            <button type="button" onclick={() => insertVariableToBlock(block, 'buttonLabel', '{orderCode}')} style="font-size: 0.65rem; padding: 0.05rem 0.3rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 3px; cursor: pointer;">+{'{orderCode}'}</button>
+                                                            <button type="button" onclick={() => insertVariableToBlock(block, 'buttonLabel', '{totalPrice}')} style="font-size: 0.65rem; padding: 0.05rem 0.3rem; background: #fefce8; border: 1px solid #fde047; color: #854d0e; border-radius: 3px; cursor: pointer;">+{'{totalPrice}'}</button>
+                                                        </div>
+                                                    </div>
                                                     <input
                                                         type="text"
                                                         class="form-input"
                                                         bind:value={block.buttonLabel}
                                                         placeholder="เช่น 🍵 สั่งเครื่องดื่มทันที"
-                                                        style="font-size: 0.82rem; padding: 0.35rem 0.6rem; font-weight: 700;"
+                                                        style="font-size: 0.82rem; padding: 0.35rem 0.6rem; font-weight: 700; margin-top: 0.15rem;"
                                                     />
                                                 </div>
                                                 <div>
@@ -6088,6 +6198,12 @@
                                                         </button>
                                                         <button type="button" onclick={() => (block.buttonUrl = 'https://homematchacafe.store/order')} style="font-size: 0.68rem; padding: 0.15rem 0.35rem; background: #f0f9ff; border: 1px solid #bae6fd; color: #0284c7; border-radius: 4px; cursor: pointer;">
                                                             /order
+                                                        </button>
+                                                        <button type="button" onclick={() => insertVariableToBlock(block, 'buttonUrl', '{phone}')} style="font-size: 0.68rem; padding: 0.15rem 0.35rem; background: #fdf2f8; border: 1px solid #fbcfe8; color: #9d174d; border-radius: 4px; cursor: pointer;" title="แทรกตัวแปรเบอร์โทร">
+                                                            +{'{phone}'}
+                                                        </button>
+                                                        <button type="button" onclick={() => insertVariableToBlock(block, 'buttonUrl', '{orderCode}')} style="font-size: 0.68rem; padding: 0.15rem 0.35rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 4px; cursor: pointer;" title="แทรกตัวแปรรหัสออเดอร์">
+                                                            +{'{orderCode}'}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -6376,47 +6492,35 @@
                                 เลือกสถานะที่ต้องการนำการ์ดที่กำลังออกแบบอยู่นี้ไปใช้ส่งแจ้งเตือนลูกค้าทาง LINE แทนการ์ดมาตรฐานของระบบค่ะ:
                             </p>
                             
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.4rem; margin-bottom: 0.5rem;">
-                                <button
-                                    type="button"
-                                    onclick={() => setAsStatusCard('brewing')}
-                                    style="padding: 0.4rem 0.5rem; font-size: 0.78rem; font-weight: 700; background: {settings.lineOa.customStatusCards?.['brewing']?.enabled ? '#0d9488' : '#ffffff'}; color: {settings.lineOa.customStatusCards?.['brewing']?.enabled ? '#ffffff' : '#0d9488'}; border: 1.5px solid #0d9488; border-radius: 6px; cursor: pointer;"
-                                    title="ตั้งเป็นการ์ดแจ้งเตือนเมื่อสถานะเป็น: กำลังชง"
-                                >
-                                    🍵 กำลังชง {settings.lineOa.customStatusCards?.['brewing']?.enabled ? '✓' : ''}
-                                </button>
-                                <button
-                                    type="button"
-                                    onclick={() => setAsStatusCard('ready_to_ship')}
-                                    style="padding: 0.4rem 0.5rem; font-size: 0.78rem; font-weight: 700; background: {settings.lineOa.customStatusCards?.['ready_to_ship']?.enabled ? '#059669' : '#ffffff'}; color: {settings.lineOa.customStatusCards?.['ready_to_ship']?.enabled ? '#ffffff' : '#059669'}; border: 1.5px solid #059669; border-radius: 6px; cursor: pointer;"
-                                    title="ตั้งเป็นการ์ดแจ้งเตือนเมื่อสถานะเป็น: ชงเสร็จพร้อมส่ง"
-                                >
-                                    ✨ ชงเสร็จ {settings.lineOa.customStatusCards?.['ready_to_ship']?.enabled ? '✓' : ''}
-                                </button>
-                                <button
-                                    type="button"
-                                    onclick={() => setAsStatusCard('delivering')}
-                                    style="padding: 0.4rem 0.5rem; font-size: 0.78rem; font-weight: 700; background: {settings.lineOa.customStatusCards?.['delivering']?.enabled ? '#0284c7' : '#ffffff'}; color: {settings.lineOa.customStatusCards?.['delivering']?.enabled ? '#ffffff' : '#0284c7'}; border: 1.5px solid #0284c7; border-radius: 6px; cursor: pointer;"
-                                    title="ตั้งเป็นการ์ดแจ้งเตือนเมื่อสถานะเป็น: กำลังนำส่ง"
-                                >
-                                    🛵 กำลังส่ง {settings.lineOa.customStatusCards?.['delivering']?.enabled ? '✓' : ''}
-                                </button>
-                                <button
-                                    type="button"
-                                    onclick={() => setAsStatusCard('completed')}
-                                    style="padding: 0.4rem 0.5rem; font-size: 0.78rem; font-weight: 700; background: {settings.lineOa.customStatusCards?.['completed']?.enabled ? '#166534' : '#ffffff'}; color: {settings.lineOa.customStatusCards?.['completed']?.enabled ? '#ffffff' : '#166534'}; border: 1.5px solid #166534; border-radius: 6px; cursor: pointer;"
-                                    title="ตั้งเป็นการ์ดแจ้งเตือนเมื่อสถานะเป็น: จัดส่งสำเร็จ"
-                                >
-                                    🎉 ส่งสำเร็จ {settings.lineOa.customStatusCards?.['completed']?.enabled ? '✓' : ''}
-                                </button>
-                                <button
-                                    type="button"
-                                    onclick={() => setAsStatusCard('cancelled')}
-                                    style="padding: 0.4rem 0.5rem; font-size: 0.78rem; font-weight: 700; background: {settings.lineOa.customStatusCards?.['cancelled']?.enabled ? '#dc2626' : '#ffffff'}; color: {settings.lineOa.customStatusCards?.['cancelled']?.enabled ? '#ffffff' : '#dc2626'}; border: 1.5px solid #dc2626; border-radius: 6px; cursor: pointer;"
-                                    title="ตั้งเป็นการ์ดแจ้งเตือนเมื่อสถานะเป็น: ยกเลิกออเดอร์"
-                                >
-                                    ❌ ยกเลิก {settings.lineOa.customStatusCards?.['cancelled']?.enabled ? '✓' : ''}
-                                </button>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem; margin-bottom: 0.5rem;">
+                                {#each [
+                                    { key: 'brewing', name: '🍵 กำลังชง', color: '#0d9488' },
+                                    { key: 'ready_to_ship', name: '✨ ชงเสร็จ', color: '#059669' },
+                                    { key: 'delivering', name: '🛵 กำลังส่ง', color: '#0284c7' },
+                                    { key: 'completed', name: '🎉 ส่งสำเร็จ', color: '#166534' },
+                                    { key: 'cancelled', name: '❌ ยกเลิก', color: '#dc2626' }
+                                ] as stItem}
+                                    <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                        <button
+                                            type="button"
+                                            onclick={() => setAsStatusCard(stItem.key as any)}
+                                            style="padding: 0.4rem 0.5rem; font-size: 0.78rem; font-weight: 700; background: {settings.lineOa.customStatusCards?.[stItem.key]?.enabled ? stItem.color : '#ffffff'}; color: {settings.lineOa.customStatusCards?.[stItem.key]?.enabled ? '#ffffff' : stItem.color}; border: 1.5px solid {stItem.color}; border-radius: 6px; cursor: pointer;"
+                                            title="ตั้งการ์ดที่กำลังออกแบบอยู่นี้เป็น: {stItem.name}"
+                                        >
+                                            {stItem.name} {settings.lineOa.customStatusCards?.[stItem.key]?.enabled ? '✓' : ''}
+                                        </button>
+                                        {#if settings.lineOa.customStatusCards?.[stItem.key]?.enabled}
+                                            <button
+                                                type="button"
+                                                onclick={() => loadSavedStatusCard(stItem.key)}
+                                                style="padding: 0.2rem 0.4rem; font-size: 0.7rem; font-weight: 700; background: #f0fdfa; color: #0d9488; border: 1px dashed #0d9488; border-radius: 4px; cursor: pointer; text-align: center;"
+                                                title="ดึงการ์ดนี้กลับมาแก้ไขใน Designer"
+                                            >
+                                                📂 ดึงมาแก้ไข
+                                            </button>
+                                        {/if}
+                                    </div>
+                                {/each}
                             </div>
 
                             {#if Object.values(settings.lineOa.customStatusCards || {}).some(c => c?.enabled)}
@@ -6440,9 +6544,15 @@
                         <!-- กล่องส่งข้อความ & Export -->
                         <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 1rem;">
                             <div style="margin-bottom: 0.65rem;">
-                                <span style="font-size: 0.75rem; color: #475569; font-weight: 700; display: block; margin-bottom: 0.25rem;">
-                                    ข้อความแจ้งเตือน (Alt Text บนหน้าจอมือถือ):
-                                </span>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                    <span style="font-size: 0.75rem; color: #475569; font-weight: 700;">
+                                        ข้อความแจ้งเตือน (Alt Text บนหน้าจอมือถือ):
+                                    </span>
+                                    <div style="display: flex; gap: 0.2rem;">
+                                        <button type="button" onclick={() => (designerAltText = (designerAltText || '') + (designerAltText ? ' ' : '') + '{orderCode}')} style="font-size: 0.65rem; padding: 0.05rem 0.3rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 3px; cursor: pointer;">+{'{orderCode}'}</button>
+                                        <button type="button" onclick={() => (designerAltText = (designerAltText || '') + (designerAltText ? ' ' : '') + '{totalPrice}')} style="font-size: 0.65rem; padding: 0.05rem 0.3rem; background: #fefce8; border: 1px solid #fde047; color: #854d0e; border-radius: 3px; cursor: pointer;">+{'{totalPrice}'}</button>
+                                    </div>
+                                </div>
                                 <input
                                     type="text"
                                     class="form-input"
@@ -6676,7 +6786,17 @@
                                             </div>
                                         </td>
                                         <td style="padding: 0.65rem 0.85rem; font-family: monospace; font-size: 0.78rem; color: #64748b;">
-                                            {u.line_user_id.slice(0, 10)}...{u.line_user_id.slice(-6)}
+                                            <div style="display: flex; align-items: center; gap: 0.45rem;">
+                                                <span title={u.line_user_id}>{u.line_user_id.slice(0, 10)}...{u.line_user_id.slice(-6)}</span>
+                                                <button
+                                                    type="button"
+                                                    onclick={() => copyToClipboard(u.line_user_id, 'คัดลอก LINE User ID สำเร็จแล้ว 📋')}
+                                                    style="padding: 0.15rem 0.45rem; font-size: 0.7rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; color: #334155; display: inline-flex; align-items: center; gap: 0.2rem;"
+                                                    title="คลิกเพื่อคัดลอก LINE User ID ทั้งหมด"
+                                                >
+                                                    📋 คัดลอก
+                                                </button>
+                                            </div>
                                         </td>
                                         <td style="padding: 0.65rem 0.85rem; font-weight: 700; color: #166534;">
                                             {u.phone || '-'}
