@@ -133,8 +133,8 @@ const DEFAULT_SETTINGS: StoreSettings = {
         botBasicId: '@719wvlgi',
         adminLineUserId: 'Uc04ed4f079c031e33621c131cec0ca27',
         autoReplyEnabled: true,
-        welcomeMessage: 'ยินดีต้อนรับสู่ Home Matcha Cafe 🍵✨\nกรุณาพิมพ์เบอร์โทรศัพท์ 10 หลัก (เช่น 0812345678) เพื่อผูกบัญชีรับแจ้งเตือนสถานะออเดอร์ได้เลยค่ะ',
-        defaultReplyMessage: 'กรุณาพิมพ์เบอร์โทรศัพท์ 10 หลัก (เช่น 0812345678) เพื่อเชื่อมต่อรับแจ้งเตือนสถานะออเดอร์นะคะ 🍵',
+        welcomeMessage: 'ยินดีต้อนรับสู่ Home Matcha Cafe 🍵✨\nคุณสามารถพิมพ์ "เมนู" เพื่อดูรายการเครื่องดื่ม, "สถานะ" เพื่อติดตามออเดอร์, "แต้ม" เพื่อเช็คคะแนนสะสม หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อรับแจ้งเตือนได้เลยค่ะ',
+        defaultReplyMessage: 'ขออภัยค่ะ หากต้องการดูรายการเครื่องดื่ม พิมพ์ "เมนู" หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อระบบสมาชิกและรับแจ้งเตือนสถานะออเดอร์นะคะ 🍵',
         keywordReplies: [
             {
                 id: 'kw-1',
@@ -283,15 +283,13 @@ function normalizeSettings(parsed: any): StoreSettings {
         })).filter((k: LineOaKeywordReply) => k.keyword.length > 0)
         : defaultLineOa.keywordReplies;
 
-    let welcomeMsg = typeof parsedLineOa.welcomeMessage === 'string' && parsedLineOa.welcomeMessage.trim() ? parsedLineOa.welcomeMessage : defaultLineOa.welcomeMessage;
-    if (welcomeMsg.includes('พิมพ์ "เมนู"') || welcomeMsg.includes('หรือพิมพ์ "เมนู"') || welcomeMsg.includes('พิมพ์เมนู')) {
-        welcomeMsg = defaultLineOa.welcomeMessage;
-    }
+    const welcomeMsg = typeof parsedLineOa.welcomeMessage === 'string' && parsedLineOa.welcomeMessage.trim()
+        ? parsedLineOa.welcomeMessage
+        : defaultLineOa.welcomeMessage;
 
-    let defaultReplyMsg = typeof parsedLineOa.defaultReplyMessage === 'string' && parsedLineOa.defaultReplyMessage.trim() ? parsedLineOa.defaultReplyMessage : defaultLineOa.defaultReplyMessage;
-    if (defaultReplyMsg.includes('พิมพ์ "เมนู"') || defaultReplyMsg.includes('พิมพ์เมนู')) {
-        defaultReplyMsg = defaultLineOa.defaultReplyMessage;
-    }
+    const defaultReplyMsg = typeof parsedLineOa.defaultReplyMessage === 'string' && parsedLineOa.defaultReplyMessage.trim()
+        ? parsedLineOa.defaultReplyMessage
+        : defaultLineOa.defaultReplyMessage;
 
     return {
         ...DEFAULT_SETTINGS,

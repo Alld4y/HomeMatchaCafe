@@ -162,8 +162,8 @@
             botBasicId: '@719wvlgi',
             adminLineUserId: 'Uc04ed4f079c031e33621c131cec0ca27',
             autoReplyEnabled: true,
-            welcomeMessage: 'ยินดีต้อนรับสู่ Home Matcha Cafe 🍵✨\nกรุณาพิมพ์เบอร์โทรศัพท์ 10 หลัก (เช่น 0812345678) เพื่อผูกบัญชีรับแจ้งเตือนสถานะออเดอร์ได้เลยค่ะ',
-            defaultReplyMessage: 'กรุณาพิมพ์เบอร์โทรศัพท์ 10 หลัก (เช่น 0812345678) เพื่อเชื่อมต่อรับแจ้งเตือนสถานะออเดอร์นะคะ 🍵',
+            welcomeMessage: 'ยินดีต้อนรับสู่ Home Matcha Cafe 🍵✨\nคุณสามารถพิมพ์ "เมนู" เพื่อดูรายการเครื่องดื่ม, "สถานะ" เพื่อติดตามออเดอร์, "แต้ม" เพื่อเช็คคะแนนสะสม หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อรับแจ้งเตือนได้เลยค่ะ',
+            defaultReplyMessage: 'ขออภัยค่ะ หากต้องการดูรายการเครื่องดื่ม พิมพ์ "เมนู" หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อระบบสมาชิกและรับแจ้งเตือนสถานะออเดอร์นะคะ 🍵',
             keywordReplies: [
                 { id: 'kw-1', keyword: 'เมนู', matchType: 'exact', replyType: 'flex_menu', replyText: 'รายการเครื่องดื่ม Home Matcha Cafe', enabled: true },
                 { id: 'kw-2', keyword: 'สั่งซื้อ', matchType: 'contains', replyType: 'flex_menu', replyText: 'สั่งซื้อเครื่องดื่มได้ที่ https://homematchacafe.store', enabled: true },

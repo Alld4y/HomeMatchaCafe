@@ -172,7 +172,7 @@ export const POST: RequestHandler = async ({ request }) => {
                                 contents: [
                                     {
                                         type: 'text',
-                                        text: '💡 กรุณาพิมพ์เบอร์โทรศัพท์ 10 หลัก (เช่น 0812345678) เพื่อผูกบัญชีรับการแจ้งเตือนสถานะออเดอร์นะคะ 🍵',
+                                        text: '💡 พิมพ์ "เมนู" เพื่อดูรายการเครื่องดื่ม หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อผูกบัญชีรับแจ้งเตือนสถานะออเดอร์นะคะ 🍵',
                                         size: 'xs',
                                         color: '#166534',
                                         wrap: true
@@ -226,7 +226,8 @@ export const POST: RequestHandler = async ({ request }) => {
             const cleanDigits = rawText.replace(/[^0-9]/g, '');
 
             // ตรวจสอบกรณีพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมโยงบัญชีสมาชิก
-            if (/^0[689]\d{8}$/.test(cleanDigits) || (cleanDigits.length === 10 && cleanDigits.startsWith('0'))) {
+            const isPurePhone = (/^0[689]\d{8}$/.test(cleanDigits) || (cleanDigits.length === 10 && cleanDigits.startsWith('0'))) && rawText.replace(/[-\s]/g, '') === cleanDigits;
+            if (isPurePhone) {
                 try {
                     // ดึงโปรไฟล์มาบันทึกคู่กับเบอร์
                     let displayName = '';
@@ -524,9 +525,9 @@ export const POST: RequestHandler = async ({ request }) => {
                     }
 
                     // replyType === 'text'
-                    if (matchedKeyword.replyText) {
+                    if (matchedKeyword.replyType === 'text') {
                         await replyLineMessage(token, replyToken, [
-                            { type: 'text', text: matchedKeyword.replyText }
+                            { type: 'text', text: matchedKeyword.replyText || 'ขออภัยค่ะ ยังไม่ได้ระบุข้อความตอบกลับ' }
                         ]);
                         continue;
                     }
