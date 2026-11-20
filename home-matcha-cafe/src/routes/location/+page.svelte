@@ -18,6 +18,22 @@
     let storeSettings = $state<any>(null);
     let selectedDateStr = $state<string>('');
     let selectedRoundId = $state<string>('morning');
+    let preferredDeliveryTime = $state<string>('');
+
+    function getSuggestedTimes(round: any): string[] {
+        if (!round) return [];
+        const isAllday = round.id === 'allday' || (round.timeSlot && round.timeSlot.includes('09:00') && round.timeSlot.includes('13:00'));
+        if (isAllday) {
+            return ['09:30 น.', '10:00 น.', '10:30 น.', '11:00 น.', '11:30 น.', '12:00 น.', '12:30 น.', '13:00 น.'];
+        }
+        if (round.id === 'morning' || (round.timeSlot && round.timeSlot.includes('07:00'))) {
+            return ['07:00 น.', '07:15 น.', '07:30 น.', '07:45 น.', '08:00 น.'];
+        }
+        if (round.id === 'noon' || (round.timeSlot && round.timeSlot.includes('12:30'))) {
+            return ['12:30 น.', '12:45 น.', '13:00 น.'];
+        }
+        return ['ตรงเวลาเริ่มรอบ', 'ช่วงกลางรอบ', 'ช่วงท้ายรอบ'];
+    }
 
     const hospitalPresets = [
         'ตึกผู้ป่วยใน (IPD) ชั้น 2',
@@ -128,6 +144,7 @@
                 sellerMessage = parsed.message || '';
                 if (parsed.deliveryDate) selectedDateStr = parsed.deliveryDate;
                 if (parsed.deliveryRoundId) selectedRoundId = parsed.deliveryRoundId;
+                if (parsed.preferredDeliveryTime) preferredDeliveryTime = parsed.preferredDeliveryTime;
             } catch (e) {
                 console.error(e);
             }
@@ -327,6 +344,7 @@
                             <span style="color: #6b7280; font-size: 0.8rem;">🚚 คุณกำลังสั่งล่วงหน้าสำหรับ:</span><br/>
                             <strong style="color: #166534; font-size: 1.05rem;">👉 ${targetFormatted}</strong><br/>
                             <span style="color: #15803d; font-weight: 700;">⏰ ${chosenRound.name} (${chosenRound.timeSlot})</span>
+                            ${preferredDeliveryTime.trim() ? `<br/><span style="color: #0284c7; font-weight: 700; font-size: 0.88rem;">📍 ระบุเวลานัดส่ง: ${preferredDeliveryTime.trim()}</span>` : ''}
                         </div>
 
                         <div style="background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 10px; padding: 0.65rem 0.85rem; margin-bottom: 0.5rem;">
@@ -361,6 +379,10 @@
         errorMessage = '';
         isSubmitting = true;
 
+        const customDeliveryRound = preferredDeliveryTime.trim()
+            ? `${chosenRound.name} (${chosenRound.timeSlot}) · นัดส่ง ${preferredDeliveryTime.trim()}`
+            : `${chosenRound.name} (${chosenRound.timeSlot})`;
+
         const customerData = {
             name: trimmedName,
             phone: trimmedPhone,
@@ -368,8 +390,9 @@
             message: sellerMessage.trim(),
             totalPrice: cart.total,
             deliveryDate: selectedDateStr,
-            deliveryRound: `${chosenRound.name} (${chosenRound.timeSlot})`,
-            deliveryRoundId: chosenRound.id
+            deliveryRound: customDeliveryRound,
+            deliveryRoundId: chosenRound.id,
+            preferredDeliveryTime: preferredDeliveryTime.trim()
         };
 
         // บันทึกลง LocalStorage
@@ -536,6 +559,68 @@
                             </div>
                         {/each}
                     </div>
+
+                    <!-- ระบุเวลาที่ต้องการให้จัดส่งสำหรับรอบที่เลือก -->
+                    {#if selectedRoundId}
+                        {@const currentRoundObj = (selectedDayInfo?.availableRounds || storeSettings?.deliveryRounds || []).find((r: any) => r.id === selectedRoundId)}
+                        {#if currentRoundObj && getRoundAvailability(currentRoundObj, selectedDateStr).available}
+                            <div style="margin-top: 1rem; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px; padding: 0.85rem 1rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; flex-wrap: wrap; gap: 0.25rem;">
+                                    <label class="form-label" for="customPreferredTime" style="margin-bottom: 0; color: #166534; font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 0.35rem;">
+                                        <span>⏰ นัดเวลาจัดส่งที่ต้องการ</span>
+                                        <span style="font-size: 0.75rem; color: #15803d; font-weight: normal;">(ระบุเวลาหรือเลือกเวลาสะดวกรับ)</span>
+                                    </label>
+                                    <span style="font-size: 0.75rem; color: #166534; font-weight: 700; background: #dcfce7; padding: 0.15rem 0.55rem; border-radius: 999px;">
+                                        ช่วงรอบ: {currentRoundObj.timeSlot}
+                                    </span>
+                                </div>
+                                <p style="margin: 0 0 0.5rem 0; font-size: 0.78rem; color: #374151;">
+                                    คุณสามารถแตะเลือกเวลาที่สะดวกรับเครื่องดื่ม หรือพิมพ์เวลาเฉพาะเจาะจงได้ค่ะ:
+                                </p>
+                                <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.65rem;">
+                                    {#each getSuggestedTimes(currentRoundObj) as t}
+                                        <button
+                                            type="button"
+                                            onclick={() => (preferredDeliveryTime = preferredDeliveryTime === t ? '' : t)}
+                                            style="
+                                                padding: 0.3rem 0.65rem;
+                                                font-size: 0.8rem;
+                                                font-weight: 700;
+                                                border-radius: 8px;
+                                                border: 1.5px solid {preferredDeliveryTime === t ? 'var(--matcha-primary)' : '#bbf7d0'};
+                                                background: {preferredDeliveryTime === t ? 'var(--matcha-primary)' : '#ffffff'};
+                                                color: {preferredDeliveryTime === t ? '#ffffff' : '#166534'};
+                                                cursor: pointer;
+                                                transition: all 0.15s ease;
+                                            "
+                                        >
+                                            {preferredDeliveryTime === t ? '✓ ' : ''}{t}
+                                        </button>
+                                    {/each}
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="font-size: 0.8rem; color: #475569; font-weight: 600; white-space: nowrap;">หรือพิมพ์ระบุ:</span>
+                                    <input
+                                        id="customPreferredTime"
+                                        type="text"
+                                        class="form-input"
+                                        bind:value={preferredDeliveryTime}
+                                        placeholder="เช่น 10:15 น., ช่วง 10:00–10:30 น."
+                                        style="font-size: 0.85rem; padding: 0.35rem 0.65rem; border-color: #86efac; background: #ffffff;"
+                                    />
+                                    {#if preferredDeliveryTime}
+                                        <button
+                                            type="button"
+                                            onclick={() => (preferredDeliveryTime = '')}
+                                            style="padding: 0.35rem 0.55rem; font-size: 0.75rem; color: #ef4444; background: #fee2e2; border: none; border-radius: 6px; cursor: pointer; white-space: nowrap; font-weight: 600;"
+                                        >
+                                            ล้างเวลา
+                                        </button>
+                                    {/if}
+                                </div>
+                            </div>
+                        {/if}
+                    {/if}
                 </div>
             </div>
 

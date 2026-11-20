@@ -169,7 +169,7 @@
                 { id: 'kw-2', keyword: 'สั่งซื้อ', matchType: 'contains', replyType: 'flex_menu', replyText: 'สั่งซื้อเครื่องดื่มได้ที่ https://homematchacafe.store', enabled: true },
                 { id: 'kw-3', keyword: 'สถานะ', matchType: 'contains', replyType: 'flex_status', replyText: 'ตรวจสอบสถานะออเดอร์ของคุณ', enabled: true },
                 { id: 'kw-4', keyword: 'แต้ม', matchType: 'contains', replyType: 'flex_loyalty', replyText: 'ตรวจสอบคะแนนสะสมและแลกแก้วฟรี', enabled: true },
-                { id: 'kw-5', keyword: 'เวลาส่ง', matchType: 'contains', replyType: 'text', replyText: '🍵 รอบจัดส่งของร้าน:\n- รอบเช้า: 07:00–08:00 น.\n- รอบเที่ยง: 12:30–13:00 น.\n(วันหยุดเสาร์-อาทิตย์ รอบรวม 09:00–13:00 น.)', enabled: true }
+                { id: 'kw-5', keyword: 'เวลาส่ง', matchType: 'contains', replyType: 'text', replyText: '🍵 รอบจัดส่งของร้าน:\n- รอบเช้า: 07:00–08:00 น.\n- รอบเที่ยง: 12:30–13:00 น.\n(วันหยุด/เสาร์-อาทิตย์ รอบสาย–บ่าย: 09:00–13:00 น.)', enabled: true }
             ],
             notifyOnOrderCreated: true,
             notifyOnSlipApproved: true,
@@ -184,7 +184,7 @@
         deliveryRounds: [
             { id: 'morning', name: 'รอบเช้า', timeSlot: '07:00–08:00 น.', cutoffTime: '06:00', allowFermented: true, isAllDayOpen: false, enabled: true },
             { id: 'noon', name: 'รอบเที่ยง', timeSlot: '12:30–13:00 น.', cutoffTime: '11:30', allowFermented: true, isAllDayOpen: false, enabled: true },
-            { id: 'allday', name: 'รอบรวมเช้า-บ่าย', timeSlot: '09:00–13:00 น.', cutoffTime: '13:00', allowFermented: true, isAllDayOpen: true, enabled: true }
+            { id: 'allday', name: 'รอบสาย–บ่าย', timeSlot: '09:00–13:00 น.', cutoffTime: '13:00', allowFermented: true, isAllDayOpen: true, enabled: true }
         ],
         calendar: {}
     });
@@ -612,7 +612,8 @@
         const counts: Record<string, number> = {};
         const brewTargetOrders = liveOrders.filter((o) => o.status === 'paid' || o.status === 'brewing');
         for (const order of brewTargetOrders) {
-            const roundName = (order.deliveryRound || 'รอบปกติ').trim();
+            const rawRound = (order.deliveryRound || 'รอบปกติ').trim();
+            const roundName = rawRound.split('·')[0].trim();
             const cups = (order.basket || []).reduce((sum, it) => sum + Math.max(1, Number(it.quantity) || 1), 0);
             counts[roundName] = (counts[roundName] || 0) + cups;
         }
@@ -625,7 +626,11 @@
         if (selectedRoundFilter === 'all') {
             return brewTargetOrders;
         }
-        return brewTargetOrders.filter((o) => (o.deliveryRound || 'รอบปกติ').trim() === selectedRoundFilter);
+        return brewTargetOrders.filter((o) => {
+            const rawRound = (o.deliveryRound || 'รอบปกติ').trim();
+            const roundName = rawRound.split('·')[0].trim();
+            return roundName === selectedRoundFilter;
+        });
     });
 
     let filteredTotalCups = $derived(
@@ -658,7 +663,7 @@
 
         for (const order of activeSummaryOrders) {
             if (!order.basket || !Array.isArray(order.basket)) continue;
-            const roundName = (order.deliveryRound || 'รอบปกติ').trim();
+            const roundName = (order.deliveryRound || 'รอบปกติ').split('·')[0].trim();
             const dateStr = (order.deliveryDate || '').trim();
 
             for (const item of order.basket) {
@@ -3245,9 +3250,17 @@
                                     📍 {order.address}
                                 </p>
                                 {#if order.deliveryRound}
+                                    {@const parts = order.deliveryRound.split('·')}
                                     <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: #0284c7; font-weight: 700;">
-                                        🚚 รอบส่ง: {order.deliveryRound} (วันที่ {order.deliveryDate || '-'})
+                                        🚚 รอบส่ง: {parts[0].trim()} (วันที่ {order.deliveryDate || '-'})
                                     </p>
+                                    {#if parts[1]}
+                                        <p style="margin: 0.25rem 0 0 0;">
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #ecfdf5; color: #065f46; border: 1.5px solid #6ee7b7; padding: 0.15rem 0.55rem; border-radius: 8px; font-size: 0.78rem; font-weight: 800;">
+                                                ⏰ {parts[1].trim()}
+                                            </span>
+                                        </p>
+                                    {/if}
                                 {/if}
                                 {#if order.message}
                                     <p style="margin: 0.35rem 0 0 0; font-size: 0.8rem; color: var(--amber-tag); background: #fef3c7; padding: 0.3rem 0.5rem; border-radius: 6px; display: inline-block;">
@@ -3441,9 +3454,16 @@
                                         คุณ {order.name}
                                     </strong>
                                 </div>
-                                <span style="font-size: 0.75rem; background: #dcfce7; color: #166534; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 6px;">
-                                    {order.deliveryRound || 'รอบปกติ'}
-                                </span>
+                                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.2rem;">
+                                    <span style="font-size: 0.75rem; background: #dcfce7; color: #166534; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 6px;">
+                                        {(order.deliveryRound || 'รอบปกติ').split('·')[0].trim()}
+                                    </span>
+                                    {#if (order.deliveryRound || '').includes('·')}
+                                        <span style="font-size: 0.72rem; background: #fef08a; color: #854d0e; font-weight: 800; padding: 0.15rem 0.45rem; border-radius: 6px; border: 1px solid #fde047; white-space: nowrap;">
+                                            ⏰ {(order.deliveryRound || '').split('·')[1].trim()}
+                                        </span>
+                                    {/if}
+                                </div>
                             </div>
 
                             <!-- เนื้อหาการ์ด: ที่อยู่ + เบอร์โทร + รายการเมนูและรายละเอียด -->

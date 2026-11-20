@@ -89,7 +89,7 @@ const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 
 const ALLDAY_ROUND_DEFAULT: DeliveryRound = {
     id: 'allday',
-    name: 'รอบรวมเช้า-บ่าย',
+    name: 'รอบสาย–บ่าย',
     timeSlot: '09:00–13:00 น.',
     cutoffTime: '13:00',
     allowFermented: true,
@@ -173,7 +173,7 @@ const DEFAULT_SETTINGS: StoreSettings = {
                 keyword: 'เวลาส่ง',
                 matchType: 'contains',
                 replyType: 'text',
-                replyText: '🍵 รอบจัดส่งของร้าน Home Matcha Cafe:\n- รอบเช้า: 07:00–08:00 น.\n- รอบเที่ยง: 12:30–13:00 น.\n(วันหยุดเสาร์-อาทิตย์ รอบรวม 09:00–13:00 น.)',
+                replyText: '🍵 รอบจัดส่งของร้าน Home Matcha Cafe:\n- รอบเช้า: 07:00–08:00 น.\n- รอบเที่ยง: 12:30–13:00 น.\n(วันหยุด/เสาร์-อาทิตย์ รอบสาย–บ่าย: 09:00–13:00 น.)',
                 enabled: true
             }
         ],
@@ -260,7 +260,8 @@ function normalizeSettings(parsed: any): StoreSettings {
     }
     rounds = rounds.map(r => {
         if (r.id === 'allday') {
-            return { ...ALLDAY_ROUND_DEFAULT, ...r, isAllDayOpen: true, allowFermented: true };
+            const name = (!r.name || r.name === 'รอบรวมเช้า-บ่าย' || r.name === 'รอบรวม') ? ALLDAY_ROUND_DEFAULT.name : r.name;
+            return { ...ALLDAY_ROUND_DEFAULT, ...r, name, isAllDayOpen: true, allowFermented: true };
         }
         return { ...r, allowFermented: true };
     });
@@ -278,7 +279,9 @@ function normalizeSettings(parsed: any): StoreSettings {
             keyword: String(k.keyword || '').trim(),
             matchType: k.matchType === 'exact' ? 'exact' : 'contains',
             replyType: ['text', 'flex_menu', 'flex_status', 'flex_loyalty'].includes(k.replyType) ? k.replyType : 'text',
-            replyText: String(k.replyText || ''),
+            replyText: String(k.replyText || '')
+                .replace('รอบรวม 09:00–13:00 น.', 'รอบสาย–บ่าย: 09:00–13:00 น.')
+                .replace('รอบรวมเช้า-บ่าย', 'รอบสาย–บ่าย'),
             enabled: k.enabled !== false
         })).filter((k: LineOaKeywordReply) => k.keyword.length > 0)
         : defaultLineOa.keywordReplies;
