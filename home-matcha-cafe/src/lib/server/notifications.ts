@@ -522,6 +522,17 @@ export async function sendLineStatusFlexMessage(
 /**
  * ส่ง Flex Message ดิบไปยัง LINE Messaging API
  */
+export function sanitizeFlexBubble(bubble: any): any {
+    if (!bubble || typeof bubble !== 'object') return bubble;
+    try {
+        const str = JSON.stringify(bubble);
+        const cleaned = str.replace(/"layout"\s*:\s*"inline"/g, '"layout":"horizontal"');
+        return JSON.parse(cleaned);
+    } catch {
+        return bubble;
+    }
+}
+
 export async function sendLineRawFlexMessage(
     channelAccessToken: string,
     toUserId: string,
@@ -531,6 +542,7 @@ export async function sendLineRawFlexMessage(
     if (!channelAccessToken || !toUserId) return false;
 
     try {
+        const safeContents = sanitizeFlexBubble(flexContents);
         const res = await fetch('https://api.line.me/v2/bot/message/push', {
             method: 'POST',
             headers: {
@@ -543,7 +555,7 @@ export async function sendLineRawFlexMessage(
                     {
                         type: 'flex',
                         altText: altText.slice(0, 400),
-                        contents: flexContents
+                        contents: safeContents
                     }
                 ]
             })
@@ -572,6 +584,7 @@ export async function sendLineBroadcastFlexMessage(
     if (!channelAccessToken) return false;
 
     try {
+        const safeContents = sanitizeFlexBubble(flexContents);
         const res = await fetch('https://api.line.me/v2/bot/message/broadcast', {
             method: 'POST',
             headers: {
@@ -583,7 +596,7 @@ export async function sendLineBroadcastFlexMessage(
                     {
                         type: 'flex',
                         altText: (altText || 'Home Matcha Cafe').slice(0, 400),
-                        contents: flexContents
+                        contents: safeContents
                     }
                 ]
             })

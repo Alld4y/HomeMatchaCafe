@@ -179,10 +179,12 @@ export async function ensurePgSchema(): Promise<void> {
                     line_user_id TEXT PRIMARY KEY,
                     display_name TEXT,
                     picture_url TEXT,
+                    status_message TEXT,
                     phone TEXT,
                     created_at TIMESTAMPTZ DEFAULT NOW(),
                     updated_at TIMESTAMPTZ DEFAULT NOW()
                 );
+                ALTER TABLE public.line_users ADD COLUMN IF NOT EXISTS status_message TEXT;
                 CREATE INDEX IF NOT EXISTS idx_line_users_phone ON public.line_users(phone);
             `);
 

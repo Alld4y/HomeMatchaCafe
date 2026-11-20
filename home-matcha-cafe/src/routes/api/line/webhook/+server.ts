@@ -25,6 +25,9 @@ function verifyLineSignature(body: string, channelSecret: string, signature: str
 async function replyLineMessage(channelAccessToken: string, replyToken: string, messages: any[]): Promise<boolean> {
     if (!channelAccessToken || !replyToken || !messages.length) return false;
     try {
+        const cleanedMessages = JSON.parse(
+            JSON.stringify(messages).replace(/"layout"\s*:\s*"inline"/g, '"layout":"horizontal"')
+        );
         const res = await fetch('https://api.line.me/v2/bot/message/reply', {
             method: 'POST',
             headers: {
@@ -33,7 +36,7 @@ async function replyLineMessage(channelAccessToken: string, replyToken: string, 
             },
             body: JSON.stringify({
                 replyToken,
-                messages
+                messages: cleanedMessages
             })
         });
         if (!res.ok) {

@@ -1665,14 +1665,15 @@
             if (b.type === 'tag' && b.tagText) {
                 bodyContents.push({
                     type: 'box',
-                    layout: 'inline',
+                    layout: 'horizontal',
                     contents: [
                         {
                             type: 'text',
                             text: b.tagText,
                             size: 'xs',
                             weight: 'bold',
-                            color: b.tagColor || '#166534'
+                            color: b.tagColor || '#166534',
+                            flex: 0
                         }
                     ],
                     backgroundColor: b.tagBg || '#dcfce7',
