@@ -939,7 +939,6 @@
             {#if currentMember.pictureUrl}
                 <div class="fab-avatar-full-wrap">
                     <img src={currentMember.pictureUrl} alt={currentMember.firstName} class="fab-avatar-full-img" />
-                    <div class="fab-avatar-name-overlay">{currentMember.firstName.slice(0, 8)}</div>
                 </div>
             {:else}
                 <span class="fab-icon">🍵</span>
@@ -1599,24 +1598,7 @@
         height: 100%;
         object-fit: cover;
         display: block;
-    }
-
-    .fab-avatar-name-overlay {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: linear-gradient(to top, rgba(16, 44, 18, 0.96) 0%, rgba(16, 44, 18, 0.65) 60%, transparent 100%);
-        color: #ffffff;
-        font-size: 0.62rem;
-        font-weight: 800;
-        text-align: center;
-        padding: 8px 2px 2px 2px;
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        pointer-events: none;
+        border-radius: 50%;
     }
 
     .floating-member-fab:hover {
@@ -1736,17 +1718,26 @@
         transform: scale(1.05);
     }
 
+    .profile-modal-card,
+    .profile-modal-body,
+    .member-modal-card {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+    }
+
+    .profile-modal-card::-webkit-scrollbar,
+    .profile-modal-body::-webkit-scrollbar,
+    .member-modal-card::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+
     .profile-modal-body {
         flex: 1;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-        -ms-overflow-style: none;
         padding-right: 0;
-    }
-
-    .profile-modal-body::-webkit-scrollbar {
-        display: none;
     }
 
     .profile-tabs-header {

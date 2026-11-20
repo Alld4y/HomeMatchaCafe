@@ -4271,7 +4271,7 @@
                                     <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.2rem;">
                                         สั่งเมื่อ: <strong>{formatTime(order.createdAt)}</strong>
                                         {#if order.deliveryDate}
-                                            · 🚚 วันส่ง: <strong>{order.deliveryDate}</strong> ({order.deliveryRound || 'รอบปกติ'})
+                                            · 🚚 วันส่ง: <strong>{formatThaiDateDisplay(order.deliveryDate)}</strong> ({order.deliveryRound || 'รอบปกติ'})
                                         {/if}
                                     </span>
                                 </div>
@@ -4949,7 +4949,7 @@
                                                 </div>
                                                 <div><strong>สถานที่จัดส่ง:</strong> {order.address}</div>
                                                 <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: 0.82rem; color: #475569; align-items: center;">
-                                                    <span>📅 วันที่ส่ง: <strong>{order.deliveryDate || order.createdAt.slice(0, 10)}</strong></span>
+                                                    <span>📅 วันที่ส่ง: <strong>{formatThaiDateDisplay(order.deliveryDate || order.createdAt.slice(0, 10))}</strong></span>
                                                     <span>⏰ รอบส่ง: <strong>{(order.deliveryRound || 'รอบปกติ').split('·')[0].trim()}</strong></span>
                                                     {#if (order.deliveryRound || '').includes('·')}
                                                         <span style="background: #fef08a; color: #854d0e; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 6px; border: 1px solid #fde047;">

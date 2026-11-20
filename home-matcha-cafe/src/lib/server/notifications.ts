@@ -930,13 +930,26 @@ export async function notifyAdminLine(params: {
     ];
 
     if (params.deliveryDate || params.deliveryRound) {
+        let dateFormatted = params.deliveryDate || '';
+        if (params.deliveryDate && params.deliveryDate.includes('-')) {
+            try {
+                const [y, m, d] = params.deliveryDate.split('-').map(Number);
+                if (y && m && d) {
+                    const dt = new Date(y, m - 1, d);
+                    dateFormatted = dt.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+                }
+            } catch {
+                // ignore
+            }
+        }
+        const deliveryText = [dateFormatted, params.deliveryRound].filter(Boolean).join(' ');
         bodyContents.push({
             type: 'box',
             layout: 'horizontal',
             margin: 'xs',
             contents: [
                 { type: 'text', text: 'รอบส่ง:', size: 'sm', color: '#64748b', flex: 2 },
-                { type: 'text', text: `${params.deliveryDate || ''} ${params.deliveryRound || ''}`.trim(), size: 'xs', color: '#1e293b', flex: 4, align: 'end', wrap: true }
+                { type: 'text', text: deliveryText || 'รอบปกติ', size: 'xs', color: '#1e293b', flex: 4, align: 'end', wrap: true }
             ]
         });
     }

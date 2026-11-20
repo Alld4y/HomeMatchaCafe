@@ -43,6 +43,9 @@
         null
     );
 
+    let todayInfo = $derived(scheduleDays[0] || null);
+    let todayRounds = $derived(todayInfo?.availableRounds || []);
+
     const highlights = [
         {
             icon: '🍵',
@@ -175,10 +178,26 @@
                 
             </div>
         {:else if storeStatus === 'open'}
-               <div class="store-notice-banner" style="background: #fffbeb; border: 1.5px solid var(--border-matcha); border-radius: 14px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-align: center;">
+            <div class="store-notice-banner" style="background: #fffbeb; border: 1.5px solid var(--border-matcha); border-radius: 14px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-align: center; flex-wrap: wrap;">
                 <span class="pulse-dot" style="background: #16a34a; flex-shrink: 0;"></span>
-                <p style="margin: 0; color: var(--matcha-primary); font-size: 0.85rem; font-weight: 600;">
-                    <strong>รอบเช้า</strong> 07:00–08:00 | <strong>รอบเที่ยง</strong> 12:30–13:00 
+                <p style="margin: 0; color: var(--matcha-primary); font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 0.35rem; flex-wrap: wrap;">
+                    {#if todayRounds.length > 0}
+                        {#each todayRounds as r, idx}
+                            {#if idx > 0}
+                                <span style="color: #cbd5e1; margin: 0 0.15rem;">|</span>
+                            {/if}
+                            <span><strong>{r.name}</strong> {r.timeSlot}</span>
+                        {/each}
+                    {:else if activePreviewDay && activePreviewDay.availableRounds && activePreviewDay.availableRounds.length > 0}
+                        {#each activePreviewDay.availableRounds as r, idx}
+                            {#if idx > 0}
+                                <span style="color: #cbd5e1; margin: 0 0.15rem;">|</span>
+                            {/if}
+                            <span><strong>{r.name}</strong> {r.timeSlot}</span>
+                        {/each}
+                    {:else}
+                        <span>เปิดรับออเดอร์ตามปกติ</span>
+                    {/if}
                 </p>
             </div>
         {/if}
@@ -297,7 +316,10 @@
                 <div class="schedule-7col-grid">
                     {#each scheduleDays as day}
                         {@const isSelected = activePreviewDay?.dateStr === day.dateStr}
-                        {@const hasAllDay = day.availableRounds.some((r) => r.id === 'allday')}
+                        {@const rounds = day.availableRounds || []}
+                        {@const hasAllDay = rounds.some((r) => r.id === 'allday')}
+                        {@const isMorningOnly = rounds.length === 1 && rounds[0].id === 'morning'}
+                        {@const isNoonOnly = rounds.length === 1 && rounds[0].id === 'noon'}
                         <button
                             type="button"
                             onclick={() => (selectedPreviewDate = day.dateStr)}
@@ -322,7 +344,7 @@
                             <!-- สถานะ เปิด / ปิด -->
                             {#if day.isOpen}
                                 <span class="col-status-badge open">
-                                    {hasAllDay ? '9-13น.' : 'เปิด'}
+                                    {hasAllDay ? '9-13น.' : isMorningOnly ? 'เช้า' : isNoonOnly ? 'บ่าย' : 'เปิด'}
                                 </span>
                             {:else}
                                 <span class="col-status-badge closed">

@@ -54,6 +54,27 @@
         { key: 'completed', label: 'จัดส่งแล้ว', desc: 'เสร็จสิ้น' }
     ];
 
+    function formatDeliveryDateThai(dateStr?: string): string {
+        if (!dateStr || dateStr.trim() === '') return 'วันนี้';
+        try {
+            const parts = dateStr.trim().split('-');
+            if (parts.length !== 3) return dateStr;
+            const y = parseInt(parts[0], 10);
+            const m = parseInt(parts[1], 10);
+            const d = parseInt(parts[2], 10);
+            if (isNaN(y) || isNaN(m) || isNaN(d)) return dateStr;
+            const dt = new Date(y, m - 1, d);
+            return dt.toLocaleDateString('th-TH', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric'
+            });
+        } catch {
+            return dateStr;
+        }
+    }
+
     function getStepIndex(status: string): number {
         const map: Record<string, number> = {
             'pending': 0,
@@ -367,7 +388,7 @@
                             <div style="grid-column: 1 / -1; background: var(--matcha-tint); border: 1px solid var(--border-matcha); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: flex-start; gap: 0.45rem;">
                                 <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; width: 100%;">
                                     <span style="font-size: 0.75rem; color: var(--text-muted);">📅 วันที่จัดส่ง:</span>
-                                    <strong style="color: var(--matcha-deep); font-size: 0.9rem;">{order.deliveryDate || 'วันนี้'}</strong>
+                                    <strong style="color: var(--matcha-deep); font-size: 0.9rem;">{formatDeliveryDateThai(order.deliveryDate)}</strong>
                                 </div>
                                 <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; width: 100%;">
                                     <span style="font-size: 0.75rem; color: var(--text-muted);">🚚 รอบส่ง:</span>
