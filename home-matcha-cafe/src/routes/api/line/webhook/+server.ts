@@ -281,9 +281,10 @@ export const POST: RequestHandler = async ({ request }) => {
                     } catch {}
 
                     const isMember = memberUpdate.rows.length > 0;
-                    const memberName = isMember
+                    const memberDbName = isMember
                         ? `${memberUpdate.rows[0].first_name || ''} ${memberUpdate.rows[0].last_name || ''}`.trim()
                         : '';
+                    const memberName = memberDbName || displayName || 'ลูกค้า';
                     const memberStamps = isMember ? Number(memberUpdate.rows[0].points || 0) : 0;
 
                     // ตรวจสอบว่าเปิดส่งข้อความ/การ์ดหลังจากได้รับเบอร์โทรศัพท์ (Event ได้เบอร์) หรือไม่
@@ -300,7 +301,8 @@ export const POST: RequestHandler = async ({ request }) => {
                                 ? lineOa.phoneLinkedExistingMessage
                                 : defaultExistingMsg;
                             const formattedMsg = rawMsg
-                                .replace(/\{name\}/g, memberName || 'ลูกค้าคนพิเศษ')
+                                .replace(/คุณ\s*\{name\}/g, memberName.startsWith('คุณ') ? memberName : `คุณ ${memberName}`)
+                                .replace(/\{name\}/g, memberName)
                                 .replace(/\{points\}/g, String(memberStamps))
                                 .replace(/\{phone\}/g, cleanDigits)
                                 .replace(/\{loyaltyUrl\}/g, `https://homematchacafe.store/loyalty?phone=${cleanDigits}`)
@@ -319,7 +321,8 @@ export const POST: RequestHandler = async ({ request }) => {
                                     try {
                                         const rawJson = JSON.stringify(lineOa.memberCardBubble);
                                         const replacedJson = rawJson
-                                            .replace(/\{name\}/g, memberName || 'ลูกค้าคนพิเศษ')
+                                            .replace(/คุณ\s*\{name\}/g, memberName.startsWith('คุณ') ? memberName : `คุณ ${memberName}`)
+                                            .replace(/\{name\}/g, memberName)
                                             .replace(/\{points\}/g, String(memberStamps))
                                             .replace(/\{phone\}/g, cleanDigits)
                                             .replace(/\{loyaltyUrl\}/g, `https://homematchacafe.store/loyalty?phone=${cleanDigits}`)

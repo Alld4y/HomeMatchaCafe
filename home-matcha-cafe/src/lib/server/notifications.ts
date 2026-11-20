@@ -534,13 +534,15 @@ export function sanitizeFlexBubble(bubble: any, fallbackPhone?: string, testVars
         const orderCode = testVars?.orderCode || 'HM-TEST88';
         const itemsSummary = testVars?.itemsSummary || 'Cold-Fermented Oat Milk Matcha Latte x1, Clear Matcha Cold Whisk x1';
         const totalPrice = testVars?.totalPrice || '165';
-        const name = testVars?.customerName || testVars?.name || 'ลูกค้าคนพิเศษ';
+        const name = testVars?.customerName || testVars?.name || 'ลูกค้า';
         const points = testVars?.points || '10';
 
         str = str.replace(/\{phone\}/g, phone);
         str = str.replace(/\{orderCode\}/g, orderCode);
         str = str.replace(/\{itemsSummary\}/g, itemsSummary);
         str = str.replace(/\{totalPrice\}/g, totalPrice);
+        str = str.replace(/คุณ\s*\{name\}/g, name.startsWith('คุณ') ? name : `คุณ ${name}`);
+        str = str.replace(/คุณ\s*\{customerName\}/g, name.startsWith('คุณ') ? name : `คุณ ${name}`);
         str = str.replace(/\{name\}/g, name);
         str = str.replace(/\{customerName\}/g, name);
         str = str.replace(/\{points\}/g, points);
