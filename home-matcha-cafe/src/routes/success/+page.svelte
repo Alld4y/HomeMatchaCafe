@@ -229,16 +229,16 @@
         </div>
     {:else}
         <!-- สภาพที่ 2: ล็อกอินแล้ว หรือเปิดจากลิงก์แจ้งเตือน (มี queryPhone) -->
-        <div style="width: 100%; max-width: 720px; margin-bottom: 1.25rem; background: #ffffff; border: 1.5px solid #dcfce7; border-radius: 14px; padding: 0.85rem 1.15rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
-            <div style="display: flex; align-items: center; gap: 0.65rem;">
-                <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #15803d, #22c55e); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.1rem; box-shadow: 0 3px 8px rgba(21, 128, 61, 0.25);">
+        <div style="width: 100%; max-width: 720px; margin-bottom: 1.25rem; background: #ffffff; border: 1.5px solid #dcfce7; border-radius: 14px; padding: 0.85rem 1.15rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03); box-sizing: border-box;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0; flex: 1 1 240px;">
+                <div style="width: 42px; height: 42px; min-width: 42px; min-height: 42px; flex-shrink: 0; aspect-ratio: 1 / 1; border-radius: 50%; background: linear-gradient(135deg, #15803d, #22c55e); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.15rem; box-shadow: 0 3px 8px rgba(21, 128, 61, 0.25);">
                     {member ? (member.firstName ? member.firstName.charAt(0) : '🍵') : '🧾'}
                 </div>
-                <div>
-                    <div style="font-size: 0.95rem; font-weight: 800; color: #14532d;">
+                <div style="min-width: 0; flex: 1;">
+                    <div style="font-size: 0.95rem; font-weight: 800; color: #14532d; word-break: break-word;">
                         {member ? `คำสั่งซื้อของคุณ ${member.fullName}` : `ใบเสร็จและสถานะคำสั่งซื้อ`}
                     </div>
-                    <div style="font-size: 0.78rem; color: #64748b;">
+                    <div style="font-size: 0.78rem; color: #64748b; word-break: break-word;">
                         📱 {activePhone} {member ? '· บัญชีสมาชิกของคุณ (แสดงเฉพาะของตนเอง)' : '· ติดตามสถานะคำสั่งซื้อ'}
                     </div>
                 </div>
@@ -246,7 +246,7 @@
             <button
                 type="button"
                 onclick={() => fetchHistory(activePhone)}
-                style="background: #f0fdf4; border: 1.5px solid #86efac; color: #15803d; padding: 0.4rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.35rem;"
+                style="background: #f0fdf4; border: 1.5px solid #86efac; color: #15803d; padding: 0.4rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.35rem; flex-shrink: 0;"
             >
                 🔄 รีเฟรชสถานะ
             </button>
@@ -329,7 +329,7 @@
                             <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.15rem; align-items: start;">
                                 {#each statusSteps as step, idx}
                                     <div style="display: flex; flex-direction: column; align-items: center; gap: 0.25rem; z-index: 2; min-width: 0; text-align: center;">
-                                        <div style="width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; background: {idx <= currentStepIdx ? 'var(--matcha-primary)' : 'var(--bg-surface)'}; color: {idx <= currentStepIdx ? '#fff' : 'var(--text-muted)'}; border: 2px solid {idx <= currentStepIdx ? 'var(--matcha-primary)' : 'var(--border-light)'}; box-shadow: {idx === currentStepIdx ? '0 0 10px rgba(69, 111, 47, 0.4)' : 'none'};">
+                                        <div style="width: 24px; height: 24px; min-width: 24px; min-height: 24px; flex-shrink: 0; aspect-ratio: 1 / 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; background: {idx <= currentStepIdx ? 'var(--matcha-primary)' : 'var(--bg-surface)'}; color: {idx <= currentStepIdx ? '#fff' : 'var(--text-muted)'}; border: 2px solid {idx <= currentStepIdx ? 'var(--matcha-primary)' : 'var(--border-light)'}; box-shadow: {idx === currentStepIdx ? '0 0 10px rgba(69, 111, 47, 0.4)' : 'none'};">
                                             {idx <= currentStepIdx ? '✓' : idx + 1}
                                         </div>
                                         <span style="font-size: clamp(0.56rem, 1.8vw, 0.7rem); line-height: 1.2; font-weight: {idx === currentStepIdx ? '700' : '500'}; color: {idx === currentStepIdx ? 'var(--matcha-dark)' : 'var(--text-muted)'};">

@@ -1423,6 +1423,10 @@
         bottom: 1.25rem;
         width: 64px;
         height: 64px;
+        min-width: 64px;
+        min-height: 64px;
+        aspect-ratio: 1 / 1;
+        flex-shrink: 0;
         border-radius: 50%;
         border: 2.5px solid #ffffff;
         background: linear-gradient(135deg, #2d5a27, #4e843b);
@@ -1918,6 +1922,11 @@
         .floating-member-fab {
             width: 58px;
             height: 58px;
+            min-width: 58px;
+            min-height: 58px;
+            aspect-ratio: 1 / 1;
+            flex-shrink: 0;
+            border-radius: 50%;
             right: 0.95rem;
             bottom: 1.15rem;
         }
