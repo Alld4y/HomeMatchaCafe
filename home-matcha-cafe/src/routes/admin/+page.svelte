@@ -1415,6 +1415,8 @@
     let isSendingLineTest = $state(false);
     let webhookCopied = $state(false);
     let isLineTokenVisible = $state(false);
+    let lineOaSubTab = $state<'connection' | 'notifications' | 'bot' | 'designer' | 'users'>('connection');
+    let designerMobileTab = $state<'blocks' | 'preview'>('blocks');
 
     // Modal เพิ่ม/แก้ไข Keyword
     let editingKeywordModal = $state<{
@@ -5609,7 +5611,54 @@
                 </div>
             </div>
 
-            <!-- กล่องที่ 1: กุญแจ API & การเชื่อมต่อ Webhook -->
+            <!-- 📱 Sub-Navigation Bar สำหรับจัดหมวดหมู่ LINE OA -->
+            <div class="line-subtabs-bar">
+                <button
+                    type="button"
+                    class="line-subtab-btn {lineOaSubTab === 'connection' ? 'active' : ''}"
+                    onclick={() => (lineOaSubTab = 'connection')}
+                >
+                    <span class="subtab-icon">🔗</span>
+                    <span class="subtab-label">เชื่อมต่อ &amp; แอดมิน</span>
+                </button>
+                <button
+                    type="button"
+                    class="line-subtab-btn {lineOaSubTab === 'notifications' ? 'active' : ''}"
+                    onclick={() => (lineOaSubTab = 'notifications')}
+                >
+                    <span class="subtab-icon">🔔</span>
+                    <span class="subtab-label">แจ้งเตือนสถานะ</span>
+                </button>
+                <button
+                    type="button"
+                    class="line-subtab-btn {lineOaSubTab === 'bot' ? 'active' : ''}"
+                    onclick={() => (lineOaSubTab = 'bot')}
+                >
+                    <span class="subtab-icon">🤖</span>
+                    <span class="subtab-label">ตอบกลับ &amp; คีย์เวิร์ด</span>
+                </button>
+                <button
+                    type="button"
+                    class="line-subtab-btn {lineOaSubTab === 'designer' ? 'active' : ''}"
+                    onclick={() => (lineOaSubTab = 'designer')}
+                >
+                    <span class="subtab-icon">🎨</span>
+                    <span class="subtab-label">ออกแบบการ์ด</span>
+                </button>
+                <button
+                    type="button"
+                    class="line-subtab-btn {lineOaSubTab === 'users' ? 'active' : ''}"
+                    onclick={() => (lineOaSubTab = 'users')}
+                >
+                    <span class="subtab-icon">👥</span>
+                    <span class="subtab-label">สมาชิก &amp; ริชเมนู</span>
+                </button>
+            </div>
+
+            <!-- 1. หมวด: เชื่อมต่อ & แอดมิน -->
+            {#if lineOaSubTab === 'connection'}
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <!-- กล่องที่ 1: กุญแจ API & การเชื่อมต่อ Webhook -->
             <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 1px solid #cbd5e1;">
                 <h3 style="margin: 0 0 0.25rem 0; font-size: 1.15rem; color: #14532d; font-weight: 800;">
                     🔑 1. ข้อมูลการเชื่อมต่อ LINE Developers Console
@@ -5634,7 +5683,7 @@
                             type="text"
                             readonly
                             value="https://homematchacafe.store/api/line/webhook"
-                            style="flex: 1; min-width: 260px; padding: 0.6rem 0.85rem; background: #ffffff; border: 1.5px solid #94a3b8; border-radius: 8px; font-family: monospace; font-size: 0.92rem; color: #0f172a; font-weight: 600;"
+                            style="flex: 1; min-width: 0; width: 100%; padding: 0.6rem 0.85rem; background: #ffffff; border: 1.5px solid #94a3b8; border-radius: 8px; font-family: monospace; font-size: 0.92rem; color: #0f172a; font-weight: 600;"
                         />
                         <button
                             type="button"
@@ -5783,155 +5832,7 @@
                     </div>
                 </div>
             </div>
-
-            <!-- กล่องที่ 2: ตั้งค่าการแจ้งเตือนสถานะคำสั่งซื้อให้ลูกค้า -->
-            <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 1px solid #cbd5e1;">
-                <h3 style="margin: 0 0 0.25rem 0; font-size: 1.15rem; color: #14532d; font-weight: 800;">
-                    🔔 2. ตั้งค่าการแจ้งเตือนสถานะคำสั่งซื้อให้ลูกค้า
-                </h3>
-                <p style="margin: 0 0 1.25rem 0; font-size: 0.85rem; color: #64748b;">
-                    เลือกว่าต้องการให้ระบบส่งแจ้งเตือน Flex Message ทาง LINE ไปยังลูกค้าในขั้นตอนใดบ้าง
-                </p>
-
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0.85rem;">
-                    <!-- 1. ได้รับคำสั่งซื้อใหม่ -->
-                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
-                        <input
-                            type="checkbox"
-                            bind:checked={settings.lineOa.notifyOnOrderCreated}
-                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
-                        />
-                        <div>
-                            <strong style="font-size: 0.9rem; color: #1e293b;">🍵 ได้รับคำสั่งซื้อใหม่ (Order Created)</strong>
-                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
-                                ส่งสรุปรายการเครื่องดื่มและยอดรวมเมื่อลูกค้ากดยืนยันสั่งซื้อ
-                            </div>
-                        </div>
-                    </label>
-
-                    <!-- 2. อนุมัติสลิป / รับยอด -->
-                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
-                        <input
-                            type="checkbox"
-                            bind:checked={settings.lineOa.notifyOnSlipApproved}
-                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
-                        />
-                        <div>
-                            <strong style="font-size: 0.9rem; color: #1e293b;">💳 ตรวจสอบสลิป &amp; ยืนยันรับยอดแล้ว</strong>
-                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
-                                แจ้งเตือนเมื่อแอดมินกดตรวจสลิปผ่าน หรือระบบตรวจสอบสลิปสำเร็จ
-                            </div>
-                        </div>
-                    </label>
-
-                    <!-- 3. กำลังชง -->
-                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
-                        <input
-                            type="checkbox"
-                            bind:checked={settings.lineOa.notifyOnBrewing}
-                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
-                        />
-                        <div>
-                            <strong style="font-size: 0.9rem; color: #1e293b;">🍃 บาริสต้าเริ่มชงเครื่องดื่ม</strong>
-                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
-                                แจ้งเตือนเมื่อบาริสต้าเปลี่ยนสถานะเป็น "กำลังชง"
-                            </div>
-                        </div>
-                    </label>
-
-                    <!-- 4. ชงเสร็จแล้ว รอจัดส่ง -->
-                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
-                        <input
-                            type="checkbox"
-                            bind:checked={settings.lineOa.notifyOnReadyToShip}
-                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
-                        />
-                        <div>
-                            <strong style="font-size: 0.9rem; color: #1e293b;">📦 ชงเสร็จแล้ว แพ็กพร้อมส่ง</strong>
-                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
-                                แจ้งเตือนเมื่อเครื่องดื่มพร้อมจัดส่งตามรอบเวลา
-                            </div>
-                        </div>
-                    </label>
-
-                    <!-- 5. กำลังนำส่ง -->
-                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
-                        <input
-                            type="checkbox"
-                            bind:checked={settings.lineOa.notifyOnDelivering}
-                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
-                        />
-                        <div>
-                            <strong style="font-size: 0.9rem; color: #1e293b;">🛵 ไรเดอร์กำลังนำส่งถึงที่</strong>
-                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
-                                แจ้งเตือนให้ลูกค้าเตรียมตัวรับเครื่องดื่ม
-                            </div>
-                        </div>
-                    </label>
-
-                    <!-- 6. จัดส่งสำเร็จ -->
-                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
-                        <input
-                            type="checkbox"
-                            bind:checked={settings.lineOa.notifyOnCompleted}
-                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
-                        />
-                        <div>
-                            <strong style="font-size: 0.9rem; color: #1e293b;">🎉 จัดส่งสำเร็จ &amp; บันทึกแต้มสะสม</strong>
-                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
-                                แจ้งเตือนส่งมอบสำเร็จ พร้อมแสดงแต้มสะสมที่ได้รับ
-                            </div>
-                        </div>
-                    </label>
-
-                    <!-- 7. ยกเลิกออเดอร์ -->
-                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #fee2e2; border-radius: 10px; background: #fff5f5; cursor: pointer;">
-                        <input
-                            type="checkbox"
-                            bind:checked={settings.lineOa.notifyOnCancelled}
-                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #dc2626;"
-                        />
-                        <div>
-                            <strong style="font-size: 0.9rem; color: #991b1b;">❌ ออเดอร์ถูกยกเลิก (Order Cancelled)</strong>
-                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
-                                แจ้งเตือนลูกค้าเมื่อออเดอร์ถูกยกเลิก
-                            </div>
-                        </div>
-                    </label>
-
-                    <!-- 8. ได้รับเบอร์โทรศัพท์จากลูกค้า (Event ได้เบอร์) -->
-                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1.5px solid #fbcfe8; border-radius: 10px; background: #fdf2f8; cursor: pointer;">
-                        <input
-                            type="checkbox"
-                            bind:checked={settings.lineOa.notifyOnPhoneLinked}
-                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #be185d;"
-                        />
-                        <div>
-                            <strong style="font-size: 0.9rem; color: #831843;">📱 ได้รับเบอร์โทรศัพท์ (Event ได้เบอร์)</strong>
-                            <div style="font-size: 0.8rem; color: #9d174d; margin-top: 0.2rem;">
-                                ส่งการ์ดตอบกลับทันที (แจ้งผลเชื่อมต่อบัญชี / การ์ดชวนสมัครสมาชิก) เมื่อลูกค้าพิมพ์เบอร์ 10 หลัก
-                            </div>
-                        </div>
-                    </label>
-
-                    <!-- 9. ลูกค้าสมัครสมาชิกเสร็จแล้ว (Event ลูกค้าสมัครสมาชิก) -->
-                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1.5px solid #bbf7d0; border-radius: 10px; background: #f0fdf4; cursor: pointer;">
-                        <input
-                            type="checkbox"
-                            bind:checked={settings.lineOa.notifyOnMemberRegistered}
-                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
-                        />
-                        <div>
-                            <strong style="font-size: 0.9rem; color: #166534;">🎉 ลูกค้าสมัครสมาชิกเสร็จแล้ว (Member Registered)</strong>
-                            <div style="font-size: 0.8rem; color: #15803d; margin-top: 0.2rem;">
-                                แจ้งเตือนลูกค้าทาง LINE ทันทีเมื่อสมัครสมาชิกสำเร็จ (ถ้าผูกเบอร์กับ LINE ไว้ก่อนแล้ว) พร้อมแจ้งรหัส PIN
-                            </div>
-                        </div>
-                    </label>
-                </div>
-            </div>
-
-            <!-- กล่องที่ 3: แจ้งเตือนแอดมิน & ทดสอบส่งข้อความ -->
+                    <!-- กล่องที่ 3: แจ้งเตือนแอดมิน & ทดสอบส่งข้อความ -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
                 <!-- แจ้งเตือนแอดมิน -->
                 <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 1px solid #cbd5e1;">
@@ -6101,8 +6002,165 @@
                     </div>
                 </div>
             </div>
+                </div>
+            {/if}
 
-            <!-- กล่องที่ 4: การจัดการข้อความอัตโนมัติ (Auto-Replies & Keywords) -->
+            <!-- 2. หมวด: แจ้งเตือนสถานะลูกค้า -->
+            {#if lineOaSubTab === 'notifications'}
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <!-- กล่องที่ 2: ตั้งค่าการแจ้งเตือนสถานะคำสั่งซื้อให้ลูกค้า -->
+            <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 1px solid #cbd5e1;">
+                <h3 style="margin: 0 0 0.25rem 0; font-size: 1.15rem; color: #14532d; font-weight: 800;">
+                    🔔 2. ตั้งค่าการแจ้งเตือนสถานะคำสั่งซื้อให้ลูกค้า
+                </h3>
+                <p style="margin: 0 0 1.25rem 0; font-size: 0.85rem; color: #64748b;">
+                    เลือกว่าต้องการให้ระบบส่งแจ้งเตือน Flex Message ทาง LINE ไปยังลูกค้าในขั้นตอนใดบ้าง
+                </p>
+
+                <div class="line-notify-grid" style="display: grid; gap: 0.85rem;">
+                    <!-- 1. ได้รับคำสั่งซื้อใหม่ -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnOrderCreated}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #1e293b;">🍵 ได้รับคำสั่งซื้อใหม่ (Order Created)</strong>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
+                                ส่งสรุปรายการเครื่องดื่มและยอดรวมเมื่อลูกค้ากดยืนยันสั่งซื้อ
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- 2. อนุมัติสลิป / รับยอด -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnSlipApproved}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #1e293b;">💳 ตรวจสอบสลิป &amp; ยืนยันรับยอดแล้ว</strong>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
+                                แจ้งเตือนเมื่อแอดมินกดตรวจสลิปผ่าน หรือระบบตรวจสอบสลิปสำเร็จ
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- 3. กำลังชง -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnBrewing}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #1e293b;">🍃 บาริสต้าเริ่มชงเครื่องดื่ม</strong>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
+                                แจ้งเตือนเมื่อบาริสต้าเปลี่ยนสถานะเป็น "กำลังชง"
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- 4. ชงเสร็จแล้ว รอจัดส่ง -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnReadyToShip}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #1e293b;">📦 ชงเสร็จแล้ว แพ็กพร้อมส่ง</strong>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
+                                แจ้งเตือนเมื่อเครื่องดื่มพร้อมจัดส่งตามรอบเวลา
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- 5. กำลังนำส่ง -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnDelivering}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #1e293b;">🛵 ไรเดอร์กำลังนำส่งถึงที่</strong>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
+                                แจ้งเตือนให้ลูกค้าเตรียมตัวรับเครื่องดื่ม
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- 6. จัดส่งสำเร็จ -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnCompleted}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #1e293b;">🎉 จัดส่งสำเร็จ &amp; บันทึกแต้มสะสม</strong>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
+                                แจ้งเตือนส่งมอบสำเร็จ พร้อมแสดงแต้มสะสมที่ได้รับ
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- 7. ยกเลิกออเดอร์ -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #fee2e2; border-radius: 10px; background: #fff5f5; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnCancelled}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #dc2626;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #991b1b;">❌ ออเดอร์ถูกยกเลิก (Order Cancelled)</strong>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
+                                แจ้งเตือนลูกค้าเมื่อออเดอร์ถูกยกเลิก
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- 8. ได้รับเบอร์โทรศัพท์จากลูกค้า (Event ได้เบอร์) -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1.5px solid #fbcfe8; border-radius: 10px; background: #fdf2f8; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnPhoneLinked}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #be185d;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #831843;">📱 ได้รับเบอร์โทรศัพท์ (Event ได้เบอร์)</strong>
+                            <div style="font-size: 0.8rem; color: #9d174d; margin-top: 0.2rem;">
+                                ส่งการ์ดตอบกลับทันที (แจ้งผลเชื่อมต่อบัญชี / การ์ดชวนสมัครสมาชิก) เมื่อลูกค้าพิมพ์เบอร์ 10 หลัก
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- 9. ลูกค้าสมัครสมาชิกเสร็จแล้ว (Event ลูกค้าสมัครสมาชิก) -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1.5px solid #bbf7d0; border-radius: 10px; background: #f0fdf4; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnMemberRegistered}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #166534;">🎉 ลูกค้าสมัครสมาชิกเสร็จแล้ว (Member Registered)</strong>
+                            <div style="font-size: 0.8rem; color: #15803d; margin-top: 0.2rem;">
+                                แจ้งเตือนลูกค้าทาง LINE ทันทีเมื่อสมัครสมาชิกสำเร็จ (ถ้าผูกเบอร์กับ LINE ไว้ก่อนแล้ว) พร้อมแจ้งรหัส PIN
+                            </div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+                </div>
+            {/if}
+
+            <!-- 3. หมวด: บอท & คีย์เวิร์ด -->
+            {#if lineOaSubTab === 'bot'}
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <!-- กล่องที่ 4: การจัดการข้อความอัตโนมัติ (Auto-Replies & Keywords) -->
             <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 1px solid #cbd5e1;">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
                     <div>
@@ -6483,8 +6541,13 @@
                     </div>
                 </div>
             </div>
+                </div>
+            {/if}
 
-            <!-- กล่องที่ 6: 🎨 ระบบออกแบบ Card Layout ส่งหาลูกค้าแบบ Drag & Drop & ปุ่มลิงก์ -->
+            <!-- 4. หมวด: ออกแบบการ์ด Flex -->
+            {#if lineOaSubTab === 'designer'}
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <!-- กล่องที่ 6: 🎨 ระบบออกแบบ Card Layout ส่งหาลูกค้าแบบ Drag & Drop & ปุ่มลิงก์ -->
             <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 2px solid #86efac; border-radius: 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem;">
                     <div>
@@ -6601,7 +6664,25 @@
                 </div>
 
                 <!-- พื้นที่ทำงาน 2 ฝั่ง: ฝั่งซ้ายตัวแก้ไขบล็อก, ฝั่งขวาพรีวิวเสมือนจริง -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; align-items: start;">
+                <!-- Mobile Switch ระหว่างแก้ไขบล็อก กับ ดูพรีวิว -->
+                <div class="designer-mobile-switch">
+                    <button
+                        type="button"
+                        class="designer-switch-btn {designerMobileTab === 'blocks' ? 'active' : ''}"
+                        onclick={() => (designerMobileTab = 'blocks')}
+                    >
+                        🧱 แก้ไขบล็อก ({designerCardBlocks.length})
+                    </button>
+                    <button
+                        type="button"
+                        class="designer-switch-btn {designerMobileTab === 'preview' ? 'active' : ''}"
+                        onclick={() => (designerMobileTab = 'preview')}
+                    >
+                        📱 ดูพรีวิวการ์ดจริง
+                    </button>
+                </div>
+
+                <div class="designer-workspace-grid" style="display: grid; gap: 1.5rem; align-items: start;">
                     
                     <!-- ฝั่งซ้าย: บล็อกส่วนประกอบ และการแก้ไข -->
                     <div style="display: flex; flex-direction: column; gap: 0.75rem;">
@@ -7478,8 +7559,13 @@
                     </div>
                 </div>
             </div>
+                </div>
+            {/if}
 
-            <!-- กล่องที่ 7: 📱 คำแนะนำและวิธีทำ "เมนูรูปภาพด้านล่าง (LINE Rich Menu)" -->
+            <!-- 5. หมวด: สมาชิก LINE & ริชเมนู -->
+            {#if lineOaSubTab === 'users'}
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <!-- กล่องที่ 7: 📱 คำแนะนำและวิธีทำ "เมนูรูปภาพด้านล่าง (LINE Rich Menu)" -->
             <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
                     <div>
@@ -7601,8 +7687,7 @@
                     </div>
                 </div>
             </div>
-
-            <!-- กล่องที่ 8: บัญชี LINE ที่เชื่อมต่อแล้ว (Connected LINE Users) -->
+                    <!-- กล่องที่ 8: บัญชี LINE ที่เชื่อมต่อแล้ว (Connected LINE Users) -->
             <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 1px solid #cbd5e1;">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
                     <div>
@@ -7701,6 +7786,8 @@
                     </div>
                 {/if}
             </div>
+                </div>
+            {/if}
 
             <!-- ปุ่มบันทึกการตั้งค่า LINE OA ทั้งหมด (Sticky Bottom) -->
             <div style="position: sticky; bottom: 1.5rem; z-index: 1000; width: 100%; display: flex; justify-content: flex-end;">
@@ -8997,7 +9084,7 @@
 
     .admin-calendar-week-headers {
         display: grid;
-        grid-template-columns: repeat(7, 1fr);
+        grid-template-columns: repeat(7, minmax(0, 1fr));
         gap: 0.35rem;
         text-align: center;
         font-weight: 800;
@@ -9007,7 +9094,7 @@
 
     .admin-calendar-grid {
         display: grid;
-        grid-template-columns: repeat(7, 1fr);
+        grid-template-columns: repeat(7, minmax(0, 1fr));
         gap: 0.35rem;
         width: 100%;
         box-sizing: border-box;
@@ -9015,6 +9102,8 @@
 
     .admin-calendar-cell {
         min-height: 74px;
+        min-width: 0;
+        overflow: hidden;
         border-radius: 12px;
         padding: 0.35rem 0.25rem;
         display: flex;
@@ -9231,36 +9320,47 @@
         }
 
         .admin-calendar-week-headers {
-            gap: 0.15rem !important;
-            font-size: 0.78rem !important;
+            grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+            gap: 0.12rem !important;
+            font-size: 0.75rem !important;
             margin-bottom: 0.25rem !important;
         }
 
         .admin-calendar-grid {
-            gap: 0.2rem !important;
+            grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+            gap: 0.15rem !important;
         }
 
         .admin-calendar-cell {
-            min-height: 58px !important;
-            padding: 0.25rem 0.12rem !important;
+            min-height: 56px !important;
+            min-width: 0 !important;
+            width: 100% !important;
+            overflow: hidden !important;
+            padding: 0.2rem 0.1rem !important;
             border-radius: 8px !important;
             border-width: 1.5px !important;
         }
 
         .admin-cal-day-num {
-            font-size: 0.78rem !important;
+            font-size: 0.74rem !important;
         }
 
         .admin-cal-gear-btn {
-            width: 16px !important;
-            height: 16px !important;
-            font-size: 0.58rem !important;
+            width: 15px !important;
+            height: 15px !important;
+            font-size: 0.52rem !important;
             border-radius: 4px !important;
+            padding: 0 !important;
         }
 
         .cal-badge {
-            font-size: 0.55rem !important;
+            font-size: 0.52rem !important;
             padding: 0.5px 1px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            max-width: 100% !important;
+            display: block !important;
         }
 
         .admin-stats-grid {
@@ -9285,9 +9385,198 @@
             display: none;
         }
 
-        .admin-members-mobile-list {
+                .admin-members-mobile-list {
             display: flex;
         }
+
+        /* LINE OA SubTabs & Mobile Adjustments */
+        .line-subtabs-bar {
+            padding-left: 0.1rem;
+            padding-right: 0.1rem;
+        }
+
+        .line-subtab-btn {
+            font-size: 0.8rem;
+            padding: 0.45rem 0.8rem;
+        }
+
+        .line-notify-grid {
+            grid-template-columns: 1fr !important;
+            gap: 0.6rem !important;
+        }
+
+        .designer-mobile-switch {
+            display: flex;
+        }
+
+        .designer-workspace-grid {
+            grid-template-columns: 1fr !important;
+        }
+
+        .designer-col-blocks {
+            display: none !important;
+        }
+
+        .designer-col-blocks.mobile-active {
+            display: flex !important;
+        }
+
+        .designer-col-preview {
+            display: none !important;
+            position: static !important;
+        }
+
+        .designer-col-preview.mobile-active {
+            display: flex !important;
+        }
+
+        .line-keywords-desktop-table {
+            display: none !important;
+        }
+
+        .line-keywords-mobile-list {
+            display: flex !important;
+        }
+
+        .line-users-desktop-table {
+            display: none !important;
+        }
+
+        .line-users-mobile-list {
+            display: flex !important;
+        }
+    }
+
+    /* ========================================================
+       💬 LINE OA SUBTABS & MOBILE RESPONSIVENESS
+       ======================================================== */
+    .line-subtabs-bar {
+        display: flex;
+        gap: 0.5rem;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding: 0.25rem 0.15rem 0.5rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .line-subtabs-bar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .line-subtab-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.55rem 0.95rem;
+        border-radius: 999px;
+        border: 1.5px solid #cbd5e1;
+        background: #ffffff;
+        color: #475569;
+        font-size: 0.88rem;
+        font-weight: 700;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.18s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        flex-shrink: 0;
+    }
+
+    .line-subtab-btn:hover {
+        border-color: #06c755;
+        color: #166534;
+        background: #f0fdf4;
+    }
+
+    .line-subtab-btn.active {
+        background: #06c755;
+        color: #ffffff;
+        border-color: #06c755;
+        box-shadow: 0 4px 12px rgba(6, 199, 85, 0.25);
+    }
+
+    .line-notify-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 0.85rem;
+    }
+
+    .designer-mobile-switch {
+        display: none;
+        gap: 0.4rem;
+        background: #f1f5f9;
+        padding: 0.3rem;
+        border-radius: 12px;
+        margin-bottom: 1rem;
+    }
+
+    .designer-switch-btn {
+        flex: 1;
+        padding: 0.6rem 0.5rem;
+        border-radius: 9px;
+        border: none;
+        background: transparent;
+        color: #64748b;
+        font-weight: 700;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .designer-switch-btn.active {
+        background: #ffffff;
+        color: #166534;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+
+    .designer-workspace-grid {
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    }
+
+    .designer-col-blocks,
+    .designer-col-preview {
+        display: flex;
+    }
+
+    .line-keywords-desktop-table {
+        display: block;
+    }
+
+    .line-keywords-mobile-list {
+        display: none;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .line-keyword-card {
+        border: 1.5px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 0.85rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    .line-users-desktop-table {
+        display: block;
+    }
+
+    .line-users-mobile-list {
+        display: none;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .line-user-card {
+        background: #ffffff;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 0.85rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.03);
     }
 </style>
 

@@ -534,9 +534,11 @@
             if (shouldLock) {
                 document.body.style.overflow = 'hidden';
                 document.documentElement.style.overflow = 'hidden';
+                document.body.style.touchAction = 'none';
             } else {
                 document.body.style.overflow = '';
                 document.documentElement.style.overflow = '';
+                document.body.style.touchAction = '';
             }
         }
     });
@@ -1011,14 +1013,14 @@
                             <div class="profile-header-info">
                                 <div class="profile-header-name">
                                     <span class="profile-name-text">คุณ {currentMember.fullName}</span>
+                                </div>
+                                <div class="profile-header-sub">
                                     {#if isCurrentMemberAdmin}
                                         <span class="profile-badge-pill admin-badge">👑 แอดมิน</span>
                                     {:else}
                                         <span class="profile-badge-pill">สมาชิก</span>
                                     {/if}
-                                </div>
-                                <div class="profile-header-phone">
-                                    📱 {currentMember.phone}
+                                    <span class="profile-header-phone">📱 {currentMember.phone}</span>
                                 </div>
                             </div>
                         </div>
@@ -1132,14 +1134,14 @@
                             <div class="profile-header-info">
                                 <div class="profile-header-name">
                                     <span class="profile-name-text">คุณ {currentMember.fullName}</span>
+                                </div>
+                                <div class="profile-header-sub">
                                     {#if isCurrentMemberAdmin}
                                         <span class="profile-badge-pill admin-badge">👑 แอดมิน</span>
                                     {:else}
                                         <span class="profile-badge-pill">สมาชิก</span>
                                     {/if}
-                                </div>
-                                <div class="profile-header-phone">
-                                    📱 {currentMember.phone}
+                                    <span class="profile-header-phone">📱 {currentMember.phone}</span>
                                     <span class="locked-hint-tag">🔒 บัญชีสมาชิก</span>
                                 </div>
                             </div>
@@ -1836,21 +1838,28 @@
     }
 
     .profile-header-name {
-        font-size: 0.95rem;
+        font-size: 0.98rem;
         font-weight: 800;
         color: var(--matcha-deep);
-        display: flex;
-        align-items: center;
-        gap: 0.35rem;
-        flex-wrap: wrap;
-        line-height: 1.3;
-    }
-
-    .profile-name-text {
-        max-width: 175px;
+        line-height: 1.25;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    .profile-name-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: block;
+    }
+
+    .profile-header-sub {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+        margin-top: 0.1rem;
     }
 
     .profile-badge-pill {
@@ -1858,12 +1867,13 @@
         align-items: center;
         background: #166534;
         color: #ffffff;
-        font-size: 0.65rem;
+        font-size: 0.68rem;
         font-weight: 700;
-        padding: 0.12rem 0.45rem;
+        padding: 0.15rem 0.5rem;
         border-radius: 999px;
         white-space: nowrap;
         flex-shrink: 0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
 
     .profile-badge-pill.admin-badge {
@@ -1876,9 +1886,10 @@
     .profile-header-phone {
         font-size: 0.78rem;
         color: #4b6342;
-        display: flex;
+        display: inline-flex;
         align-items: center;
-        gap: 0.35rem;
+        gap: 0.25rem;
+        white-space: nowrap;
     }
 
     .locked-hint-tag {
