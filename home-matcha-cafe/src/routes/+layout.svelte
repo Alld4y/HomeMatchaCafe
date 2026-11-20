@@ -768,7 +768,8 @@
 
 <svelte:window onclick={closeModal} />
 
-<!-- แถบนำทางด้านบนแบบ Floating Frosted Glass -->
+<!-- แถบนำทางด้านบนแบบ Floating Frosted Glass (แสดงเฉพาะหน้าร้าน ไม่แสดงในหน้า Admin เพื่อไม่ให้ทับซ้อนเครื่องมือจัดการ) -->
+{#if !page.url.pathname.startsWith('/admin')}
 <div class="nav-bar-wrapper">
     <nav class="nav-bar">
         <div class="nav-left">
@@ -898,6 +899,7 @@
         </div>
     </nav>
 </div>
+{/if}
 
 <!-- ส่วนเนื้อหาของหน้าเว็บ -->
 {@render children()}

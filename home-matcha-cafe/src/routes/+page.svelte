@@ -46,6 +46,11 @@
     let todayInfo = $derived(scheduleDays[0] || null);
     let todayRounds = $derived(todayInfo?.availableRounds || []);
 
+    let scrollY = $state(0);
+    let cupScrollProgress = $derived(
+        typeof window !== 'undefined' ? Number(Math.min(1, Math.max(0, scrollY / 300)).toFixed(3)) : 0
+    );
+
     const highlights = [
         {
             icon: '🍵',
@@ -149,6 +154,8 @@
     });
 </script>
 
+<svelte:window bind:scrollY={scrollY} />
+
 <svelte:head>
     <title>Home Matcha Cafe | มัทฉะแท้ระดับพรีเมียม @ รพ.ทองผาภูมิ</title>
 </svelte:head>
@@ -222,8 +229,8 @@
             พร้อมจัดส่งภายในโรงพยาบาลทองผาภูมิ บ้านพัก และแฟลต
         </p>
 
-                <!-- ภาพโชว์แก้วมัทฉะคู่ -->
-        <div class="hero-cups-showcase">
+                <!-- ภาพโชว์แก้วมัทฉะคู่ (ขยับไหลตามจังหวะ Scroll ของผู้ใช้) -->
+        <div class="hero-cups-showcase" style="--cup-p: {cupScrollProgress};">
             <img 
                 oncontextmenu={(e) => e.preventDefault()} 
                 class="protect-img hero-cup-img hero-cup-left" 

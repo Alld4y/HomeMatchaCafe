@@ -3630,14 +3630,17 @@
         </div>
 
         <div class="admin-header-actions">
-            <button onclick={openCreateOrderModal} class="btn-matcha-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 800; background: #15803d; border-color: #15803d; display: inline-flex; align-items: center; gap: 0.35rem;">
-                ➕ เพิ่มออเดอร์เข้าคิว
+            <a href="/" class="btn-matcha-outline admin-btn-to-shop" style="padding: 0.5rem 0.85rem; font-size: 0.82rem; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; font-weight: 700;">
+                🏠 ดูหน้าร้านค้า
+            </a>
+            <button onclick={openCreateOrderModal} class="btn-matcha-primary" style="padding: 0.5rem 0.95rem; font-size: 0.85rem; font-weight: 800; background: #15803d; border-color: #15803d; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;">
+                ➕ เพิ่มออเดอร์
             </button>
-            <button onclick={() => { loadOrders(); loadMembers(); loadMenus(); }} class="btn-matcha-outline" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
-                🔄 รีเฟรชข้อมูล
+            <button onclick={() => { loadOrders(); loadMembers(); loadMenus(); }} class="btn-matcha-outline" style="padding: 0.5rem 0.85rem; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;">
+                🔄 รีเฟรช
             </button>
-            <button onclick={handleLockAdmin} class="btn-danger" style="padding: 0.5rem 0.9rem; font-size: 0.82rem;">
-                🔒 ล็อกหน้าแอดมิน
+            <button onclick={handleLockAdmin} class="btn-danger" style="padding: 0.5rem 0.85rem; font-size: 0.82rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;">
+                🔒 ล็อก
             </button>
         </div>
     </div>
@@ -5046,30 +5049,28 @@
             </div>
 
             <!-- 2. ปฏิทินรายเดือน (เลือกวันเปิดขาย และปรับแต่งรายวัน) -->
-            <div class="form-card" style="padding: 1.5rem; text-align: left;">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem;">
+            <div class="form-card admin-calendar-card">
+                <div class="admin-calendar-header-box">
                     <div>
-                        <h3 style="margin: 0; font-size: 1.25rem; color: var(--matcha-deep);">
+                        <h3 class="admin-calendar-title">
                             📅 ปฏิทินเปิดร้านรายเดือน ({thaiMonthNames[currentCalMonth]} {currentCalYear + 543})
                         </h3>
-                        <p style="margin: 0.2rem 0 0 0; font-size: 0.825rem; color: var(--text-muted);">
-                            คลิกที่วันเพื่อเปลี่ยนโหมด (ปิด ➔ เช้า+บ่าย ➔ แค่เช้า ➔ แค่บ่าย ➔ ปิด) หรือกด ⚙️ เพื่อเลือกโหมดทันที
+                        <p class="admin-calendar-desc">
+                            คลิกที่วันเพื่อเปลี่ยนโหมด หรือกด ⚙️ เพื่อเลือกโหมดทันที
                         </p>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div class="admin-calendar-month-btns">
                         <button 
                             type="button" 
                             onclick={() => (calendarDate = new Date(currentCalYear, currentCalMonth - 1, 1))}
-                            class="btn-matcha-outline"
-                            style="padding: 0.4rem 0.85rem; font-size: 0.85rem;"
+                            class="btn-matcha-outline cal-nav-btn"
                         >
                             ◀ เดือนก่อนหน้า
                         </button>
                         <button 
                             type="button" 
                             onclick={() => (calendarDate = new Date(currentCalYear, currentCalMonth + 1, 1))}
-                            class="btn-matcha-outline"
-                            style="padding: 0.4rem 0.85rem; font-size: 0.85rem;"
+                            class="btn-matcha-outline cal-nav-btn"
                         >
                             เดือนถัดไป ▶
                         </button>
@@ -5077,37 +5078,37 @@
                 </div>
 
                 <!-- แถบอธิบายสีสถานะ (Legend) -->
-                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem 0.85rem; margin-bottom: 0.85rem; font-size: 0.78rem; font-weight: 600; padding: 0.55rem 0.75rem; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0; align-items: center;">
-                    <span style="color: #475569; font-weight: 700;">🎨 โหมดรอบส่ง:</span>
-                    <span style="display: inline-flex; align-items: center; gap: 0.3rem; color: #166534;">
-                        <span style="width: 10px; height: 10px; border-radius: 3px; background: #22c55e;"></span>
-                        เช้า + บ่าย
+                <div class="admin-calendar-legend">
+                    <span style="color: #475569; font-weight: 700;">🎨 โหมด:</span>
+                    <span class="legend-chip both">
+                        <span class="legend-dot" style="background: #22c55e;"></span>
+                        เช้า+บ่าย
                     </span>
-                    <span style="display: inline-flex; align-items: center; gap: 0.3rem; color: #1d4ed8;">
-                        <span style="width: 10px; height: 10px; border-radius: 3px; background: #3b82f6;"></span>
-                        🌅 แค่รอบเช้า
+                    <span class="legend-chip morning">
+                        <span class="legend-dot" style="background: #3b82f6;"></span>
+                        🌅 แค่เช้า
                     </span>
-                    <span style="display: inline-flex; align-items: center; gap: 0.3rem; color: #b45309;">
-                        <span style="width: 10px; height: 10px; border-radius: 3px; background: #f59e0b;"></span>
-                        ☀️ แค่รอบบ่าย
+                    <span class="legend-chip noon">
+                        <span class="legend-dot" style="background: #f59e0b;"></span>
+                        ☀️ แค่บ่าย
                     </span>
                     {#if settings.deliveryRounds.some(r => r.id === 'allday' || r.isAllDayOpen)}
-                        <span style="display: inline-flex; align-items: center; gap: 0.3rem; color: #6d28d9;">
-                            <span style="width: 10px; height: 10px; border-radius: 3px; background: #8b5cf6;"></span>
+                        <span class="legend-chip allday">
+                            <span class="legend-dot" style="background: #8b5cf6;"></span>
                             🌿 รวบสาย-บ่าย
                         </span>
                     {/if}
-                    <span style="display: inline-flex; align-items: center; gap: 0.3rem; color: #64748b;">
-                        <span style="width: 10px; height: 10px; border-radius: 3px; background: #cbd5e1;"></span>
+                    <span class="legend-chip closed">
+                        <span class="legend-dot" style="background: #cbd5e1;"></span>
                         ⚪ ปิด
                     </span>
-                    <span style="margin-left: auto; color: #94a3b8; font-size: 0.73rem;">
+                    <span class="legend-tip">
                         💡 คลิกที่ช่องเพื่อสลับโหมด หรือกด ⚙️ เพื่อเลือก
                     </span>
                 </div>
 
                 <!-- หัววันในสัปดาห์ (อาทิตย์ - เสาร์) -->
-                <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.4rem; text-align: center; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.4rem;">
+                <div class="admin-calendar-week-headers">
                     <div style="color: #ef4444;">อา.</div>
                     <div style="color: #eab308;">จ.</div>
                     <div style="color: #ec4899;">อ.</div>
@@ -5118,7 +5119,7 @@
                 </div>
 
                 <!-- Grid ช่องวันในเดือน -->
-                <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.4rem;">
+                <div class="admin-calendar-grid">
                     {#each getCalendarMonthGrid(currentCalYear, currentCalMonth) as day}
                         {@const dayConfig = settings.calendar[day.dateStr] || { isOpen: false }}
                         {@const isOpen = Boolean(dayConfig.isOpen)}
@@ -5130,59 +5131,37 @@
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div 
-                            style="
-                                min-height: 76px;
-                                border-radius: 12px;
-                                padding: 0.4rem 0.3rem;
-                                display: flex;
-                                flex-direction: column;
-                                justify-content: space-between;
-                                cursor: pointer;
-                                border: 2px solid {isBothRounds ? '#22c55e' : isMorningOnly ? '#3b82f6' : isNoonOnly ? '#f59e0b' : isAllDay ? '#8b5cf6' : '#e2e8f0'};
-                                background: {isBothRounds ? '#f0fdf4' : isMorningOnly ? '#eff6ff' : isNoonOnly ? '#fffbeb' : isAllDay ? '#f5f3ff' : day.isCurrentMonth ? '#ffffff' : '#f8fafc'};
-                                opacity: {day.isCurrentMonth ? '1' : '0.45'};
-                                transition: all 0.15s;
-                            "
+                            class="admin-calendar-cell {isBothRounds ? 'is-both' : isMorningOnly ? 'is-morning' : isNoonOnly ? 'is-noon' : isAllDay ? 'is-allday' : 'is-closed'} {!day.isCurrentMonth ? 'not-current-month' : ''}"
                             onclick={() => cycleDayRounds(day.dateStr)}
                             title="คลิกเพื่อสลับโหมดรอบส่ง (ปิด ➔ เช้า+บ่าย ➔ แค่เช้า ➔ แค่บ่าย ➔ ปิด)"
                         >
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                                <span style="font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 0.95rem; color: {isBothRounds ? '#166534' : isMorningOnly ? '#1d4ed8' : isNoonOnly ? '#b45309' : isAllDay ? '#5b21b6' : '#64748b'};">
+                            <div class="admin-cal-cell-head">
+                                <span class="admin-cal-day-num">
                                     {day.dayNum}
                                 </span>
                                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                                 <button 
                                     type="button" 
+                                    class="admin-cal-gear-btn"
                                     onclick={(e) => { e.stopPropagation(); openEditDayModal(day.dateStr); }}
-                                    style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.72rem; cursor: pointer; padding: 1px 4px; line-height: 1.2;"
                                     title="ตั้งค่ารอบส่งเฉพาะวัน"
                                 >
                                     ⚙️
                                 </button>
                             </div>
 
-                            <div style="text-align: center; margin-top: 0.15rem; display: flex; flex-direction: column; gap: 2px;">
+                            <div class="admin-cal-cell-badge">
                                 {#if isBothRounds}
-                                    <span style="display: block; font-size: 0.62rem; font-weight: 800; color: #166534; background: #dcfce7; border-radius: 4px; padding: 1px 2px;">
-                                        เช้า + บ่าย
-                                    </span>
+                                    <span class="cal-badge both">เช้า+บ่าย</span>
                                 {:else if isMorningOnly}
-                                    <span style="display: block; font-size: 0.62rem; font-weight: 800; color: #1d4ed8; background: #dbeafe; border-radius: 4px; padding: 1px 2px;">
-                                        🌅 แค่เช้า
-                                    </span>
+                                    <span class="cal-badge morning">🌅 เช้า</span>
                                 {:else if isNoonOnly}
-                                    <span style="display: block; font-size: 0.62rem; font-weight: 800; color: #b45309; background: #fef3c7; border-radius: 4px; padding: 1px 2px;">
-                                        ☀️ แค่บ่าย
-                                    </span>
+                                    <span class="cal-badge noon">☀️ บ่าย</span>
                                 {:else if isAllDay}
-                                    <span style="display: block; font-size: 0.62rem; font-weight: 800; color: #5b21b6; background: #ede9fe; border-radius: 4px; padding: 1px 2px;">
-                                        9:00-13:00
-                                    </span>
+                                    <span class="cal-badge allday">9-13น.</span>
                                 {:else}
-                                    <span style="display: block; font-size: 0.65rem; color: #94a3b8;">
-                                        ปิด
-                                    </span>
+                                    <span class="cal-badge closed">ปิด</span>
                                 {/if}
                             </div>
                         </div>
@@ -8931,13 +8910,210 @@
         border-top: 1px dashed #e2e8f0;
     }
 
+    /* 📅 Admin Calendar Component Styles */
+    .admin-calendar-card {
+        padding: 1.5rem;
+        background: #ffffff;
+        border-radius: 18px;
+        border: 1.5px solid var(--border-matcha);
+        text-align: left;
+    }
+
+    .admin-calendar-header-box {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 1.15rem;
+    }
+
+    .admin-calendar-title {
+        margin: 0;
+        font-size: 1.25rem;
+        color: var(--matcha-deep);
+    }
+
+    .admin-calendar-desc {
+        margin: 0.2rem 0 0 0;
+        font-size: 0.825rem;
+        color: var(--text-muted);
+    }
+
+    .admin-calendar-month-btns {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .cal-nav-btn {
+        padding: 0.45rem 0.85rem;
+        font-size: 0.85rem;
+        border-radius: 10px;
+    }
+
+    .admin-calendar-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem 0.65rem;
+        margin-bottom: 0.85rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 0.55rem 0.75rem;
+        background: #f8fafc;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        align-items: center;
+    }
+
+    .legend-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.12rem 0.45rem;
+        border-radius: 6px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+    }
+
+    .legend-chip.both { color: #166534; border-color: #bbf7d0; background: #f0fdf4; }
+    .legend-chip.morning { color: #1d4ed8; border-color: #bfdbfe; background: #eff6ff; }
+    .legend-chip.noon { color: #b45309; border-color: #fde68a; background: #fffbeb; }
+    .legend-chip.allday { color: #5b21b6; border-color: #ddd6fe; background: #f5f3ff; }
+    .legend-chip.closed { color: #64748b; }
+
+    .legend-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+        display: inline-block;
+    }
+
+    .legend-tip {
+        margin-left: auto;
+        color: #94a3b8;
+        font-size: 0.72rem;
+    }
+
+    .admin-calendar-week-headers {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0.35rem;
+        text-align: center;
+        font-weight: 800;
+        font-size: 0.85rem;
+        margin-bottom: 0.35rem;
+    }
+
+    .admin-calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0.35rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .admin-calendar-cell {
+        min-height: 74px;
+        border-radius: 12px;
+        padding: 0.35rem 0.25rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        cursor: pointer;
+        border: 2px solid #e2e8f0;
+        background: #ffffff;
+        transition: all 0.15s ease;
+        box-sizing: border-box;
+    }
+
+    .admin-calendar-cell.is-both {
+        border-color: #22c55e;
+        background: #f0fdf4;
+    }
+    .admin-calendar-cell.is-morning {
+        border-color: #3b82f6;
+        background: #eff6ff;
+    }
+    .admin-calendar-cell.is-noon {
+        border-color: #f59e0b;
+        background: #fffbeb;
+    }
+    .admin-calendar-cell.is-allday {
+        border-color: #8b5cf6;
+        background: #f5f3ff;
+    }
+    .admin-calendar-cell.not-current-month {
+        opacity: 0.4;
+    }
+
+    .admin-cal-cell-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        line-height: 1;
+    }
+
+    .admin-cal-day-num {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 0.95rem;
+        color: #475569;
+    }
+
+    .admin-calendar-cell.is-both .admin-cal-day-num { color: #166534; }
+    .admin-calendar-cell.is-morning .admin-cal-day-num { color: #1d4ed8; }
+    .admin-calendar-cell.is-noon .admin-cal-day-num { color: #b45309; }
+    .admin-calendar-cell.is-allday .admin-cal-day-num { color: #5b21b6; }
+
+    .admin-cal-gear-btn {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.65rem;
+        cursor: pointer;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        line-height: 1;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+
+    .admin-cal-cell-badge {
+        text-align: center;
+        margin-top: 0.15rem;
+    }
+
+    .cal-badge {
+        display: block;
+        font-size: 0.62rem;
+        font-weight: 800;
+        border-radius: 4px;
+        padding: 1px 2px;
+        line-height: 1.25;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .cal-badge.both { background: #dcfce7; color: #166534; }
+    .cal-badge.morning { background: #dbeafe; color: #1d4ed8; }
+    .cal-badge.noon { background: #fef3c7; color: #b45309; }
+    .cal-badge.allday { background: #ede9fe; color: #5b21b6; }
+    .cal-badge.closed { background: transparent; color: #94a3b8; font-weight: 500; font-size: 0.62rem; }
+
     @media (max-width: 768px) {
         .admin-page-shell {
-            padding-top: 5.5rem !important;
-            padding-left: 0.75rem !important;
-            padding-right: 0.75rem !important;
+            padding-top: 0.85rem !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
             width: 100% !important;
             max-width: 100% !important;
+            box-sizing: border-box !important;
             overflow-x: hidden !important;
         }
 
@@ -8948,29 +9124,143 @@
         .admin-header-bar {
             flex-direction: column;
             align-items: stretch;
-            gap: 0.75rem;
+            gap: 0.65rem;
+            background: #ffffff;
+            border: 1.5px solid #d8e8d2;
+            border-radius: 16px;
+            padding: 0.85rem 0.75rem !important;
+            margin-bottom: 0.75rem !important;
+        }
+
+        .admin-page-title {
+            font-size: 1.15rem !important;
+            line-height: 1.3 !important;
         }
 
         .admin-header-actions {
             width: 100%;
             display: grid;
             grid-template-columns: 1fr 1fr;
+            gap: 0.4rem;
         }
 
-        .admin-header-actions button {
+        .admin-header-actions button,
+        .admin-header-actions a {
             width: 100%;
             justify-content: center;
         }
 
+        /* 📱 Main Tabs: Horizontal Scrollable Pill Bar */
         .admin-main-tabs {
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.35rem;
-            padding: 0.35rem;
+            display: flex !important;
+            grid-template-columns: none !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            scrollbar-width: none !important;
+            padding: 0.35rem 0.45rem !important;
+            gap: 0.4rem !important;
+            border-radius: 999px !important;
+            margin-bottom: 1rem !important;
+            background: #eef6ec !important;
+            border: 1px solid #d1e5cb !important;
+        }
+
+        .admin-main-tabs::-webkit-scrollbar {
+            display: none !important;
         }
 
         .admin-main-tab-btn {
-            font-size: 0.8rem;
-            padding: 0.6rem 0.35rem;
+            flex-shrink: 0 !important;
+            font-size: 0.82rem !important;
+            padding: 0.5rem 0.85rem !important;
+            white-space: nowrap !important;
+            border-radius: 999px !important;
+        }
+
+        /* 📅 Calendar Mobile Responsiveness: 7 วันพอดีจอ ไม่ล้น ไม่โดนตัด */
+        .admin-calendar-card {
+            padding: 0.75rem 0.4rem !important;
+            border-radius: 14px !important;
+        }
+
+        .admin-calendar-header-box {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 0.6rem !important;
+            margin-bottom: 0.75rem !important;
+        }
+
+        .admin-calendar-title {
+            font-size: 1.05rem !important;
+        }
+
+        .admin-calendar-desc {
+            font-size: 0.75rem !important;
+        }
+
+        .admin-calendar-month-btns {
+            width: 100% !important;
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 0.4rem !important;
+        }
+
+        .cal-nav-btn {
+            width: 100% !important;
+            text-align: center !important;
+            padding: 0.45rem 0.5rem !important;
+            font-size: 0.82rem !important;
+        }
+
+        .admin-calendar-legend {
+            font-size: 0.7rem !important;
+            padding: 0.45rem 0.5rem !important;
+            gap: 0.25rem 0.35rem !important;
+            margin-bottom: 0.65rem !important;
+        }
+
+        .legend-chip {
+            padding: 0.1rem 0.35rem !important;
+            font-size: 0.68rem !important;
+        }
+
+        .legend-tip {
+            width: 100% !important;
+            margin-top: 0.2rem !important;
+            font-size: 0.68rem !important;
+        }
+
+        .admin-calendar-week-headers {
+            gap: 0.15rem !important;
+            font-size: 0.78rem !important;
+            margin-bottom: 0.25rem !important;
+        }
+
+        .admin-calendar-grid {
+            gap: 0.2rem !important;
+        }
+
+        .admin-calendar-cell {
+            min-height: 58px !important;
+            padding: 0.25rem 0.12rem !important;
+            border-radius: 8px !important;
+            border-width: 1.5px !important;
+        }
+
+        .admin-cal-day-num {
+            font-size: 0.78rem !important;
+        }
+
+        .admin-cal-gear-btn {
+            width: 16px !important;
+            height: 16px !important;
+            font-size: 0.58rem !important;
+            border-radius: 4px !important;
+        }
+
+        .cal-badge {
+            font-size: 0.55rem !important;
+            padding: 0.5px 1px !important;
         }
 
         .admin-stats-grid {
