@@ -187,7 +187,7 @@ export const POST: RequestHandler = async ({ request }) => {
             deliveryRoundId: deliveryRoundId || undefined,
             redeemedFreeCups,
             discountAmount,
-            status: customStatus || (requiresManualReview ? 'pending' : (slipImageUrl || redeemedFreeCups > 0 ? 'paid' : 'pending'))
+            status: customStatus || (totalPrice === 0 && redeemedFreeCups > 0 ? 'paid' : 'pending')
         });
 
         return json({

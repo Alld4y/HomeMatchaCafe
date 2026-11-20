@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { pool, ensurePgSchema } from './pgPool';
 import { awardStampsForCompletedOrder } from './members';
-import { sendCustomerNotification, notifyAdminLine } from './notifications';
+import { sendCustomerNotification } from './notifications';
 
 export interface OrderItem {
     id: string;
@@ -248,7 +248,7 @@ export async function createOrder(data: {
     await ensurePgSchema();
     const orderCode = generateOrderId();
     const status: Order['status'] =
-        data.status || (data.needsManualReview ? 'pending' : (data.slipImage || (data.redeemedFreeCups && data.totalPrice === 0) ? 'paid' : 'pending'));
+        data.status || (data.totalPrice === 0 && data.redeemedFreeCups ? 'paid' : 'pending');
 
     const res = await pool.query(
         `
@@ -312,35 +312,8 @@ export async function createOrder(data: {
     const mapped = mapPgRowToOrder(res.rows[0]);
     const finalOrder = await processCompletedOrderLoyalty(mapped, false);
 
-    // แจ้งเตือนลูกค้าและแอดมินเมื่อมีออเดอร์ใหม่
-    const itemsSummary = Array.isArray(finalOrder.basket)
-        ? finalOrder.basket.map(i => `${i.thaiName || i.name || 'เครื่องดื่ม'} x${i.quantity}`).join(', ')
-        : undefined;
-
-    sendCustomerNotification({
-        phone: finalOrder.phone,
-        customerName: finalOrder.name,
-        orderId: finalOrder.id,
-        orderCode: finalOrder.order_id,
-        title: '🍵 ได้รับคำสั่งซื้อของคุณแล้ว',
-        body: `ทางร้านได้รับออเดอร์ ${finalOrder.order_id} เรียบร้อยแล้วค่ะ กำลังเตรียมการสำหรับรอบจัดส่ง ${finalOrder.deliveryRound || ''}`,
-        url: `/success?orderCode=${encodeURIComponent(finalOrder.order_id)}&phone=${encodeURIComponent(finalOrder.phone)}`,
-        eventType: 'order_created',
-        itemsSummary,
-        totalPrice: finalOrder.totalPrice
-    }).catch(e => console.warn('Customer order_created notif error:', e));
-
-    notifyAdminLine({
-        eventType: 'new_order',
-        orderCode: finalOrder.order_id,
-        customerName: finalOrder.name,
-        phone: finalOrder.phone,
-        totalPrice: finalOrder.totalPrice,
-        itemsSummary,
-        deliveryDate: finalOrder.deliveryDate,
-        deliveryRound: finalOrder.deliveryRound
-    }).catch(e => console.warn('Admin new_order notif error:', e));
-
+    // หมายเหตุ: ตามข้อกำหนด ไม่ส่งแจ้งเตือน order_created หาลูกค้า และไม่ส่ง new_order หาแอดมินตอนสร้างออเดอร์
+    // ให้รอแอดมินตรวจสอบสลิปและกดยืนยันในระบบก่อน จากนั้นระบบจะส่งเฉพาะการแจ้งเตือนตรวจสอบสลิปแล้ว (slip_approved)
     return finalOrder;
 }
 
