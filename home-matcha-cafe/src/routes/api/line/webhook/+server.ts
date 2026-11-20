@@ -283,153 +283,234 @@ export const POST: RequestHandler = async ({ request }) => {
                         : '';
                     const memberStamps = isMember ? Number(memberUpdate.rows[0].points || 0) : 0;
 
-                    // ตรวจสอบว่าเปิดส่งการ์ดหลังจากได้รับเบอร์โทรศัพท์ (Event ได้เบอร์) หรือไม่
+                    // ตรวจสอบว่าเปิดส่งข้อความ/การ์ดหลังจากได้รับเบอร์โทรศัพท์ (Event ได้เบอร์) หรือไม่
                     if (lineOa.notifyOnPhoneLinked !== false) {
-                        if (isMember) {
-                            const linkedBubble = {
-                                type: 'bubble',
-                                header: {
-                                    type: 'box',
-                                    layout: 'vertical',
-                                    backgroundColor: '#166534',
-                                    paddingAll: '16px',
-                                    contents: [
-                                        { type: 'text', text: 'HOME MATCHA CAFE', weight: 'bold', size: 'xs', color: '#bbf7d0' },
-                                        { type: 'text', text: '✅ เชื่อมต่อบัญชีสำเร็จ!', weight: 'bold', size: 'md', color: '#ffffff', margin: 'xs' }
-                                    ]
-                                },
-                                body: {
-                                    type: 'box',
-                                    layout: 'vertical',
-                                    paddingAll: '16px',
-                                    contents: [
-                                        {
-                                            type: 'text',
-                                            text: `เบอร์โทรศัพท์: ${cleanDigits}`,
-                                            weight: 'bold',
-                                            size: 'sm',
-                                            color: '#1e293b'
-                                        },
-                                        {
-                                            type: 'text',
-                                            text: `ยินดีต้อนรับคุณ ${memberName} ✨\nขณะนี้คุณมีคะแนนสะสม ${memberStamps} ดวง\nระบบจะแจ้งเตือนสถานะออเดอร์ของคุณผ่านช่องทางนี้โดยอัตโนมัติค่ะ 🍵`,
-                                            size: 'xs',
-                                            color: '#475569',
-                                            wrap: true,
-                                            margin: 'sm'
-                                        }
-                                    ]
-                                },
-                                footer: {
-                                    type: 'box',
-                                    layout: 'vertical',
-                                    paddingAll: '14px',
-                                    contents: [
-                                        {
-                                            type: 'button',
-                                            style: 'primary',
-                                            color: '#166534',
-                                            action: {
-                                                type: 'uri',
-                                                label: 'เข้าสู่ระบบ / บัตรสะสมแต้ม',
-                                                uri: `https://homematchacafe.store/loyalty?phone=${cleanDigits}`
-                                            }
-                                        }
-                                    ]
-                                }
-                            };
+                        const messagesToSend: any[] = [];
 
-                            await replyLineMessage(token, replyToken, [
-                                {
-                                    type: 'flex',
-                                    altText: 'เชื่อมต่อบัญชีสำเร็จ!',
-                                    contents: linkedBubble
-                                }
-                            ]);
-                        } else {
-                            // ยังไม่ได้เป็นสมาชิก: ตรวจสอบว่าแอดมินตั้งค่าการ์ดชวนสมัครสมาชิกไว้หรือไม่
-                            let registerBubble: any = null;
-                            if (lineOa.useCustomRegisterCard && lineOa.registerCardBubble) {
-                                try {
-                                    const rawJson = JSON.stringify(lineOa.registerCardBubble);
-                                    const replacedJson = rawJson.replace(/\{phone\}/g, cleanDigits);
-                                    registerBubble = JSON.parse(replacedJson);
-                                } catch (parseErr) {
-                                    console.error('Error replacing {phone} in registerCardBubble:', parseErr);
-                                    registerBubble = lineOa.registerCardBubble;
-                                }
-                            } else {
-                                registerBubble = {
-                                    type: 'bubble',
-                                    header: {
-                                        type: 'box',
-                                        layout: 'vertical',
-                                        backgroundColor: '#166534',
-                                        paddingAll: '16px',
-                                        contents: [
-                                            { type: 'text', text: 'HOME MATCHA CAFE', weight: 'bold', size: 'xs', color: '#bbf7d0' },
-                                            { type: 'text', text: '✨ สมาชิกสะสมแต้ม 10 แก้วฟรี 🍵', weight: 'bold', size: 'md', color: '#ffffff', margin: 'xs' }
-                                        ]
-                                    },
-                                    body: {
-                                        type: 'box',
-                                        layout: 'vertical',
-                                        paddingAll: '16px',
-                                        contents: [
-                                            {
-                                                type: 'text',
-                                                text: `เบอร์โทรศัพท์: ${cleanDigits}`,
-                                                weight: 'bold',
-                                                size: 'sm',
-                                                color: '#1e293b'
-                                            },
-                                            {
-                                                type: 'text',
-                                                text: 'ระบบบันทึกเบอร์โทรของคุณเรียบร้อยแล้วค่ะ! คุณยังไม่ได้เป็นสมาชิกสะสมแต้มของร้าน กดปุ่มด้านล่างเพื่อรับสิทธิ์สะสมแต้ม 10 แก้วฟรี 1 แก้วได้เลยนะคะ (ระบบจะกรอกเบอร์โทรให้อัตโนมัติค่ะ) 🍵',
-                                                size: 'xs',
-                                                color: '#475569',
-                                                wrap: true,
-                                                margin: 'sm'
-                                            }
-                                        ]
-                                    },
-                                    footer: {
-                                        type: 'box',
-                                        layout: 'vertical',
-                                        spacing: 'sm',
-                                        paddingAll: '14px',
-                                        contents: [
-                                            {
-                                                type: 'button',
-                                                style: 'primary',
-                                                color: '#166534',
-                                                action: {
-                                                    type: 'uri',
-                                                    label: '✨ สมัครสมาชิกสะสมแต้ม',
-                                                    uri: `https://homematchacafe.store/loyalty?action=register&phone=${cleanDigits}`
-                                                }
-                                            },
-                                            {
-                                                type: 'button',
-                                                style: 'secondary',
-                                                action: {
-                                                    type: 'uri',
-                                                    label: '🍵 ดูเมนูสั่งเครื่องดื่ม',
-                                                    uri: 'https://homematchacafe.store/menu'
-                                                }
-                                            }
-                                        ]
-                                    }
-                                };
+                        if (isMember) {
+                            // 🟢 เหตุการณ์ที่ 1: ตรวจพบเบอร์ในระบบ (ลูกค้าเป็นสมาชิกอยู่แล้ว)
+                            const replyType = lineOa.phoneLinkedExistingReplyType || 'card';
+
+                            // 1. เตรียมข้อความตัวอักษร
+                            const defaultExistingMsg = 'ยินดีต้อนรับคุณ {name} ✨ คุณมีคะแนนสะสม {points} ดวง ระบบเชื่อมต่อ LINE กับบัญชีสมาชิกเรียบร้อยแล้วค่ะ! 🍵';
+                            const rawMsg = (lineOa.phoneLinkedExistingMessage && lineOa.phoneLinkedExistingMessage.trim())
+                                ? lineOa.phoneLinkedExistingMessage
+                                : defaultExistingMsg;
+                            const formattedMsg = rawMsg
+                                .replace(/\{name\}/g, memberName || 'ลูกค้าคนพิเศษ')
+                                .replace(/\{points\}/g, String(memberStamps))
+                                .replace(/\{phone\}/g, cleanDigits)
+                                .replace(/\{loyaltyUrl\}/g, `https://homematchacafe.store/loyalty?phone=${cleanDigits}`)
+                                .replace(/\{menuUrl\}/g, 'https://homematchacafe.store/menu');
+
+                            if (replyType === 'text' || replyType === 'both') {
+                                messagesToSend.push({
+                                    type: 'text',
+                                    text: formattedMsg
+                                });
                             }
 
-                            await replyLineMessage(token, replyToken, [
-                                {
+                            if (replyType === 'card' || replyType === 'both') {
+                                let memberBubble: any = null;
+                                if (lineOa.useCustomMemberCard && lineOa.memberCardBubble) {
+                                    try {
+                                        const rawJson = JSON.stringify(lineOa.memberCardBubble);
+                                        const replacedJson = rawJson
+                                            .replace(/\{name\}/g, memberName || 'ลูกค้าคนพิเศษ')
+                                            .replace(/\{points\}/g, String(memberStamps))
+                                            .replace(/\{phone\}/g, cleanDigits)
+                                            .replace(/\{loyaltyUrl\}/g, `https://homematchacafe.store/loyalty?phone=${cleanDigits}`)
+                                            .replace(/\{menuUrl\}/g, 'https://homematchacafe.store/menu');
+                                        memberBubble = JSON.parse(replacedJson);
+                                    } catch (err) {
+                                        console.error('Error replacing placeholders in memberCardBubble:', err);
+                                        memberBubble = lineOa.memberCardBubble;
+                                    }
+                                } else {
+                                    memberBubble = {
+                                        type: 'bubble',
+                                        hero: {
+                                            type: 'image',
+                                            url: 'https://homematchacafe.store/image/mascot/cat-completed.jpg',
+                                            size: 'full',
+                                            aspectRatio: '1:1',
+                                            aspectMode: 'cover'
+                                        },
+                                        header: {
+                                            type: 'box',
+                                            layout: 'vertical',
+                                            backgroundColor: '#166534',
+                                            paddingAll: '16px',
+                                            contents: [
+                                                { type: 'text', text: 'HOME MATCHA CAFE', weight: 'bold', size: 'xs', color: '#bbf7d0' },
+                                                { type: 'text', text: '✅ เชื่อมต่อบัญชีสมาชิกสำเร็จ!', weight: 'bold', size: 'md', color: '#ffffff', margin: 'xs' }
+                                            ]
+                                        },
+                                        body: {
+                                            type: 'box',
+                                            layout: 'vertical',
+                                            paddingAll: '16px',
+                                            contents: [
+                                                {
+                                                    type: 'text',
+                                                    text: `เบอร์โทรศัพท์: ${cleanDigits}`,
+                                                    weight: 'bold',
+                                                    size: 'sm',
+                                                    color: '#1e293b'
+                                                },
+                                                {
+                                                    type: 'text',
+                                                    text: `ยินดีต้อนรับคุณ ${memberName} ✨\nขณะนี้คุณมีคะแนนสะสม ${memberStamps} ดวง\nระบบจะแจ้งเตือนสถานะออเดอร์สดให้คุณทราบทางนี้ทันทีค่ะ 🍵`,
+                                                    size: 'xs',
+                                                    color: '#475569',
+                                                    wrap: true,
+                                                    margin: 'sm'
+                                                }
+                                            ]
+                                        },
+                                        footer: {
+                                            type: 'box',
+                                            layout: 'vertical',
+                                            paddingAll: '14px',
+                                            contents: [
+                                                {
+                                                    type: 'button',
+                                                    style: 'primary',
+                                                    color: '#166534',
+                                                    action: {
+                                                        type: 'uri',
+                                                        label: `⭐ บัตรสะสมแต้ม (${memberStamps} ดวง)`,
+                                                        uri: `https://homematchacafe.store/loyalty?phone=${cleanDigits}`
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    };
+                                }
+
+                                messagesToSend.push({
+                                    type: 'flex',
+                                    altText: `ยินดีต้อนรับคุณ ${memberName || 'สมาชิก'} สู่ Home Matcha Cafe ✨`,
+                                    contents: memberBubble
+                                });
+                            }
+                        } else {
+                            // 🟡 เหตุการณ์ที่ 2: ยังไม่พบเบอร์ในระบบ (ยังไม่เคยเป็นสมาชิก / สมาชิกใหม่)
+                            const replyType = lineOa.phoneLinkedNewReplyType || 'card';
+
+                            // 1. เตรียมข้อความตัวอักษร
+                            const defaultNewMsg = 'บันทึกเบอร์โทรศัพท์ {phone} เรียบร้อยแล้วค่ะ! คุณยังไม่ได้เป็นสมาชิกสะสมแต้ม กดสมัครสมาชิกสะสมแต้มเพื่อรับสิทธิ์ 10 แก้วฟรี 1 แก้วได้เลยนะคะ 🍵\n👉 สมัครได้ที่: {registerUrl}';
+                            const rawMsg = (lineOa.phoneLinkedNewMessage && lineOa.phoneLinkedNewMessage.trim())
+                                ? lineOa.phoneLinkedNewMessage
+                                : defaultNewMsg;
+                            const formattedMsg = rawMsg
+                                .replace(/\{phone\}/g, cleanDigits)
+                                .replace(/\{registerUrl\}/g, `https://homematchacafe.store/loyalty?action=register&phone=${cleanDigits}`)
+                                .replace(/\{menuUrl\}/g, 'https://homematchacafe.store/menu');
+
+                            if (replyType === 'text' || replyType === 'both') {
+                                messagesToSend.push({
+                                    type: 'text',
+                                    text: formattedMsg
+                                });
+                            }
+
+                            if (replyType === 'card' || replyType === 'both') {
+                                let registerBubble: any = null;
+                                if (lineOa.useCustomRegisterCard && lineOa.registerCardBubble) {
+                                    try {
+                                        const rawJson = JSON.stringify(lineOa.registerCardBubble);
+                                        const replacedJson = rawJson
+                                            .replace(/\{phone\}/g, cleanDigits)
+                                            .replace(/\{registerUrl\}/g, `https://homematchacafe.store/loyalty?action=register&phone=${cleanDigits}`)
+                                            .replace(/\{menuUrl\}/g, 'https://homematchacafe.store/menu');
+                                        registerBubble = JSON.parse(replacedJson);
+                                    } catch (parseErr) {
+                                        console.error('Error replacing {phone} in registerCardBubble:', parseErr);
+                                        registerBubble = lineOa.registerCardBubble;
+                                    }
+                                } else {
+                                    registerBubble = {
+                                        type: 'bubble',
+                                        hero: {
+                                            type: 'image',
+                                            url: 'https://homematchacafe.store/image/mascot/cat-loyalty.jpg',
+                                            size: 'full',
+                                            aspectRatio: '1:1',
+                                            aspectMode: 'cover'
+                                        },
+                                        header: {
+                                            type: 'box',
+                                            layout: 'vertical',
+                                            backgroundColor: '#166534',
+                                            paddingAll: '16px',
+                                            contents: [
+                                                { type: 'text', text: 'HOME MATCHA CAFE', weight: 'bold', size: 'xs', color: '#bbf7d0' },
+                                                { type: 'text', text: '✨ สมาชิกสะสมแต้ม 10 แก้วฟรี 🍵', weight: 'bold', size: 'md', color: '#ffffff', margin: 'xs' }
+                                            ]
+                                        },
+                                        body: {
+                                            type: 'box',
+                                            layout: 'vertical',
+                                            paddingAll: '16px',
+                                            contents: [
+                                                {
+                                                    type: 'text',
+                                                    text: `เบอร์โทรศัพท์: ${cleanDigits}`,
+                                                    weight: 'bold',
+                                                    size: 'sm',
+                                                    color: '#1e293b'
+                                                },
+                                                {
+                                                    type: 'text',
+                                                    text: 'ระบบบันทึกเบอร์โทรของคุณเรียบร้อยแล้วค่ะ! คุณยังไม่ได้เป็นสมาชิกสะสมแต้มของร้าน กดปุ่มด้านล่างเพื่อรับสิทธิ์สะสมแต้ม 10 แก้วฟรี 1 แก้วได้เลยนะคะ (ระบบจะกรอกเบอร์โทรให้อัตโนมัติค่ะ) 🍵',
+                                                    size: 'xs',
+                                                    color: '#475569',
+                                                    wrap: true,
+                                                    margin: 'sm'
+                                                }
+                                            ]
+                                        },
+                                        footer: {
+                                            type: 'box',
+                                            layout: 'vertical',
+                                            spacing: 'sm',
+                                            paddingAll: '14px',
+                                            contents: [
+                                                {
+                                                    type: 'button',
+                                                    style: 'primary',
+                                                    color: '#166534',
+                                                    action: {
+                                                        type: 'uri',
+                                                        label: '✨ สมัครสมาชิกสะสมแต้ม',
+                                                        uri: `https://homematchacafe.store/loyalty?action=register&phone=${cleanDigits}`
+                                                    }
+                                                },
+                                                {
+                                                    type: 'button',
+                                                    style: 'secondary',
+                                                    action: {
+                                                        type: 'uri',
+                                                        label: '🍵 ดูเมนูสั่งเครื่องดื่ม',
+                                                        uri: 'https://homematchacafe.store/menu'
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    };
+                                }
+
+                                messagesToSend.push({
                                     type: 'flex',
                                     altText: '✨ สมัครสมาชิกสะสมแต้ม Home Matcha Cafe',
                                     contents: registerBubble
-                                }
-                            ]);
+                                });
+                            }
+                        }
+
+                        if (messagesToSend.length > 0) {
+                            await replyLineMessage(token, replyToken, messagesToSend);
                         }
                     }
                     continue;

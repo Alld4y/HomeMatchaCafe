@@ -51,9 +51,21 @@ export interface LineOaSettings {
     useCustomWelcomeCard?: boolean;
     welcomeCardBubble?: any;
     welcomeCardBlocks?: any[] | null;
+
+    // Event ได้เบอร์: กรณีมีข้อมูลสมาชิกในระบบแล้ว (เป็นสมาชิกอยู่แล้ว)
+    phoneLinkedExistingReplyType?: 'card' | 'text' | 'both';
+    phoneLinkedExistingMessage?: string;
+    useCustomMemberCard?: boolean;
+    memberCardBubble?: any;
+    memberCardBlocks?: any[] | null;
+
+    // Event ได้เบอร์: กรณียังไม่มีข้อมูลสมาชิกในระบบ (ยังไม่เป็นสมาชิก)
+    phoneLinkedNewReplyType?: 'card' | 'text' | 'both';
+    phoneLinkedNewMessage?: string;
     useCustomRegisterCard?: boolean;
     registerCardBubble?: any;
     registerCardBlocks?: any[] | null;
+
     defaultReplyMessage: string;
     keywordReplies: LineOaKeywordReply[];
 
@@ -144,9 +156,21 @@ const DEFAULT_SETTINGS: StoreSettings = {
         useCustomWelcomeCard: false,
         welcomeCardBubble: null,
         welcomeCardBlocks: null,
+
+        // Event ได้เบอร์: กรณีมีสมาชิกอยู่แล้ว
+        phoneLinkedExistingReplyType: 'card',
+        phoneLinkedExistingMessage: 'ยินดีต้อนรับคุณ {name} ✨ คุณมีคะแนนสะสม {points} ดวง ระบบเชื่อมต่อ LINE กับบัญชีสมาชิกเรียบร้อยแล้วค่ะ! 🍵',
+        useCustomMemberCard: false,
+        memberCardBubble: null,
+        memberCardBlocks: null,
+
+        // Event ได้เบอร์: กรณียังไม่เป็นสมาชิก
+        phoneLinkedNewReplyType: 'card',
+        phoneLinkedNewMessage: 'บันทึกเบอร์โทรศัพท์ {phone} เรียบร้อยแล้วค่ะ! คุณยังไม่ได้เป็นสมาชิกสะสมแต้ม กดสมัครสมาชิกสะสมแต้มเพื่อรับสิทธิ์ 10 แก้วฟรี 1 แก้วได้เลยนะคะ 🍵\n👉 สมัครได้ที่: {registerUrl}',
         useCustomRegisterCard: false,
         registerCardBubble: null,
         registerCardBlocks: null,
+
         defaultReplyMessage: 'ขออภัยค่ะ หากต้องการดูรายการเครื่องดื่ม พิมพ์ "เมนู" หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อระบบสมาชิกและรับแจ้งเตือนสถานะออเดอร์นะคะ 🍵',
         keywordReplies: [
             {
@@ -339,6 +363,25 @@ function normalizeSettings(parsed: any): StoreSettings {
             useCustomWelcomeCard: Boolean(parsedLineOa.useCustomWelcomeCard),
             welcomeCardBubble: parsedLineOa.welcomeCardBubble || null,
             welcomeCardBlocks: Array.isArray(parsedLineOa.welcomeCardBlocks) ? parsedLineOa.welcomeCardBlocks : null,
+
+            // Event ได้เบอร์: กรณีมีสมาชิกอยู่แล้ว
+            phoneLinkedExistingReplyType: ['card', 'text', 'both'].includes(parsedLineOa.phoneLinkedExistingReplyType)
+                ? parsedLineOa.phoneLinkedExistingReplyType
+                : 'card',
+            phoneLinkedExistingMessage: typeof parsedLineOa.phoneLinkedExistingMessage === 'string'
+                ? parsedLineOa.phoneLinkedExistingMessage
+                : defaultLineOa.phoneLinkedExistingMessage,
+            useCustomMemberCard: Boolean(parsedLineOa.useCustomMemberCard),
+            memberCardBubble: parsedLineOa.memberCardBubble || null,
+            memberCardBlocks: Array.isArray(parsedLineOa.memberCardBlocks) ? parsedLineOa.memberCardBlocks : null,
+
+            // Event ได้เบอร์: กรณียังไม่เป็นสมาชิก
+            phoneLinkedNewReplyType: ['card', 'text', 'both'].includes(parsedLineOa.phoneLinkedNewReplyType)
+                ? parsedLineOa.phoneLinkedNewReplyType
+                : 'card',
+            phoneLinkedNewMessage: typeof parsedLineOa.phoneLinkedNewMessage === 'string'
+                ? parsedLineOa.phoneLinkedNewMessage
+                : defaultLineOa.phoneLinkedNewMessage,
             useCustomRegisterCard: Boolean(parsedLineOa.useCustomRegisterCard),
             registerCardBubble: parsedLineOa.registerCardBubble || null,
             registerCardBlocks: Array.isArray(parsedLineOa.registerCardBlocks) ? parsedLineOa.registerCardBlocks : null,
