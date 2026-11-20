@@ -122,6 +122,7 @@
         notifyOnCompleted: boolean;
         notifyOnCancelled: boolean;
         notifyOnPhoneLinked: boolean;
+        notifyOnMemberRegistered: boolean;
         customStatusCards?: Record<string, { enabled: boolean; bubble: any; blocks?: any[] | null }>;
         notifyAdminOnNewOrder: boolean;
         notifyAdminOnSlipUploaded: boolean;
@@ -219,6 +220,7 @@
             notifyOnCompleted: true,
             notifyOnCancelled: true,
             notifyOnPhoneLinked: true,
+            notifyOnMemberRegistered: true,
             customStatusCards: {},
             notifyAdminOnNewOrder: true,
             notifyAdminOnSlipUploaded: true
@@ -1522,7 +1524,8 @@
         totalPrice: '฿165',
         customerName: 'คุณลูกค้า',
         phone: '0812345678',
-        points: '10'
+        points: '10',
+        pin: '1234'
     });
     let showTestVars = $state(false);
 
@@ -1572,6 +1575,7 @@
             .replace(/\{customerName\}/g, testVars.customerName || 'คุณลูกค้า')
             .replace(/\{name\}/g, testVars.customerName || 'คุณลูกค้า')
             .replace(/\{phone\}/g, testVars.phone || '0812345678')
+            .replace(/\{pin\}/g, testVars.pin || '1234')
             .replace(/\{points\}/g, testVars.points || '10')
             .replace(/\{itemsSummary\}/g, testVars.itemsSummary || 'Cold-Fermented Oat Milk Matcha Latte x1')
             .replace(/\{url\}/g, 'https://homematchacafe.store/order')
@@ -1581,7 +1585,7 @@
             .replace(/\{menuUrl\}/g, 'https://homematchacafe.store/menu');
     }
 
-    function loadDesignerPreset(preset: 'promo' | 'loyalty' | 'delivery' | 'welcome' | 'register' | 'member' | 'status_slip_approved' | 'status_brewing' | 'status_ready' | 'status_delivering' | 'status_completed' | 'status_cancelled') {
+    function loadDesignerPreset(preset: 'promo' | 'loyalty' | 'delivery' | 'welcome' | 'register' | 'member' | 'status_slip_approved' | 'status_member_registered' | 'status_brewing' | 'status_ready' | 'status_delivering' | 'status_completed' | 'status_cancelled') {
         const now = Date.now();
         if (preset === 'welcome') {
             designerCardBlocks = [
@@ -1603,6 +1607,16 @@
                 { id: `b-${now}-5`, type: 'highlight', highlightText: '🧾 ยอดชำระสำเร็จ: {totalPrice} บ. เข้าสู่คิวชงเรียบร้อย' },
                 { id: `b-${now}-6`, type: 'button', buttonLabel: '🧾 ดูใบเสร็จ & สถานะออเดอร์', buttonUrl: 'https://homematchacafe.store/success?orderCode={orderCode}&phone={phone}', buttonStyle: 'primary' },
                 { id: `b-${now}-7`, type: 'button', buttonLabel: '⭐ บัตรสะสมแต้มของฉัน', buttonUrl: 'https://homematchacafe.store/loyalty', buttonStyle: 'gold' }
+            ];
+        } else if (preset === 'status_member_registered') {
+            designerCardBlocks = [
+                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://homematchacafe.store/image/mascot/cat-loyalty.jpg', aspectRatio: '1:1' },
+                { id: `b-${now}-2`, type: 'tag', tagText: '🎉 สมัครสมาชิกสำเร็จเรียบร้อย', tagBg: '#dcfce7', tagColor: '#166534' },
+                { id: `b-${now}-3`, type: 'title', titleText: 'ยินดีต้อนรับสู่ระบบสมาชิกค่ะ ✨', titleSize: 'lg' },
+                { id: `b-${now}-4`, type: 'body', bodyText: 'คุณได้สมัครสมาชิกกับร้าน Home Matcha Cafe สำเร็จเรียบร้อยแล้วค่ะ!\nเบอร์โทรศัพท์: {phone}\nรหัส PIN สำหรับเข้าสู่ระบบ: {pin}' },
+                { id: `b-${now}-5`, type: 'highlight', highlightText: '🔐 จดจำรหัส PIN 4 หลักนี้ไว้เพื่อใช้เข้าสู่ระบบสะสมแต้มนะคะ' },
+                { id: `b-${now}-6`, type: 'button', buttonLabel: '⭐ เปิดบัตรสะสมแต้มของฉัน', buttonUrl: 'https://homematchacafe.store/loyalty?phone={phone}', buttonStyle: 'gold' },
+                { id: `b-${now}-7`, type: 'button', buttonLabel: '🍵 สั่งเครื่องดื่มออนไลน์', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary' }
             ];
         } else if (preset === 'member') {
             designerCardBlocks = [
@@ -2000,7 +2014,7 @@
         }
     }
 
-    async function setAsStatusCard(statusKey: 'slip_approved' | 'brewing' | 'ready_to_ship' | 'delivering' | 'completed' | 'cancelled') {
+    async function setAsStatusCard(statusKey: 'slip_approved' | 'brewing' | 'ready_to_ship' | 'delivering' | 'completed' | 'cancelled' | 'member_registered') {
         const bubble = buildDesignerFlexBubble();
         if (!settings.lineOa.customStatusCards) {
             settings.lineOa.customStatusCards = {};
@@ -2012,6 +2026,7 @@
         };
         await saveAllSettings();
         const statusNameMap: Record<string, string> = {
+            member_registered: '🎉 ลูกค้าสมัครสมาชิกเสร็จแล้ว',
             slip_approved: '💳 อนุมัติสลิป / รับยอด',
             brewing: '🍵 กำลังชง',
             ready_to_ship: '✨ ชงเสร็จพร้อมส่ง',
@@ -2047,6 +2062,7 @@
             swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `โหลดการ์ดสถานะที่บันทึกไว้แล้ว ✨`, showConfirmButton: false, timer: 1500 });
         } else {
             const presetMap: Record<string, any> = {
+                member_registered: 'status_member_registered',
                 slip_approved: 'status_slip_approved',
                 brewing: 'status_brewing',
                 ready_to_ship: 'status_ready',
@@ -5430,6 +5446,21 @@
                             </div>
                         </div>
                     </label>
+
+                    <!-- 9. ลูกค้าสมัครสมาชิกเสร็จแล้ว (Event ลูกค้าสมัครสมาชิก) -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1.5px solid #bbf7d0; border-radius: 10px; background: #f0fdf4; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnMemberRegistered}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #166534;">🎉 ลูกค้าสมัครสมาชิกเสร็จแล้ว (Member Registered)</strong>
+                            <div style="font-size: 0.8rem; color: #15803d; margin-top: 0.2rem;">
+                                แจ้งเตือนลูกค้าทาง LINE ทันทีเมื่อสมัครสมาชิกสำเร็จ (ถ้าผูกเบอร์กับ LINE ไว้ก่อนแล้ว) พร้อมแจ้งรหัส PIN
+                            </div>
+                        </div>
+                    </label>
                 </div>
             </div>
 
@@ -5549,6 +5580,15 @@
                                 title="ยิงการ์ดทดสอบสถานะ: ตรวจสอบสลิปผ่าน เข้า LINE แอดมิน"
                             >
                                 💳 อนุมัติสลิป
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isSendingLineTest}
+                                onclick={() => sendLineTestPushMessage('member_registered')}
+                                style="padding: 0.35rem 0.45rem; font-size: 0.74rem; font-weight: 700; background: #fdf2f8; border: 1px solid #f472b6; color: #9d174d; border-radius: 6px; cursor: pointer;"
+                                title="ยิงการ์ดทดสอบสถานะ: ลูกค้าสมัครสมาชิกสำเร็จ เข้า LINE แอดมิน"
+                            >
+                                ✨ สมัครสมาชิก
                             </button>
                         </div>
                     </div>
@@ -6008,6 +6048,9 @@
                             <button type="button" onclick={() => loadDesignerPreset('status_slip_approved')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #f0fdf4; border: 1.5px solid #86efac; color: #15803d; border-radius: 6px; cursor: pointer;" title="โหลดพรีเซ็ตการ์ดอนุมัติสลิป (ปุ่มลิงก์ไปหน้า /success)">
                                 💳 อนุมัติสลิป (/success)
                             </button>
+                            <button type="button" onclick={() => loadDesignerPreset('status_member_registered')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #fdf2f8; border: 1.5px solid #f472b6; color: #9d174d; border-radius: 6px; cursor: pointer;" title="โหลดพรีเซ็ตการ์ดแจ้งเตือนลูกค้าสมัครสมาชิกสำเร็จ">
+                                ✨ สมัครสมาชิกเสร็จ
+                            </button>
                             <button type="button" onclick={() => loadDesignerPreset('status_brewing')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #ccfbf1; border: 1.5px solid #14b8a6; color: #0f766e; border-radius: 6px; cursor: pointer;">
                                 🍵 กำลังชง
                             </button>
@@ -6044,6 +6087,7 @@
                                     </button>
                                 {/if}
                                 {#each [
+                                    { key: 'member_registered', label: '🎉 สมัครสมาชิก' },
                                     { key: 'slip_approved', label: '💳 อนุมัติสลิป' },
                                     { key: 'brewing', label: '🍵 กำลังชง' },
                                     { key: 'ready_to_ship', label: '✨ ชงเสร็จ' },
@@ -6314,6 +6358,7 @@
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'titleText', '{totalPrice}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fefce8; border: 1px solid #fde047; color: #854d0e; border-radius: 4px; cursor: pointer;">+{'{totalPrice}'}</button>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'titleText', '{name}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 4px; cursor: pointer;">+{'{name}'}</button>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'titleText', '{phone}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fdf2f8; border: 1px solid #fbcfe8; color: #9d174d; border-radius: 4px; cursor: pointer;">+{'{phone}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'titleText', '{pin}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #f0fdfa; border: 1px solid #5eead4; color: #0f766e; border-radius: 4px; cursor: pointer; font-weight: 700;">+{'{pin}'}</button>
                                             </div>
                                         </div>
                                     {:else if block.type === 'body'}
@@ -6332,6 +6377,7 @@
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'bodyText', '{totalPrice}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fefce8; border: 1px solid #fde047; color: #854d0e; border-radius: 4px; cursor: pointer;">+{'{totalPrice}'}</button>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'bodyText', '{name}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 4px; cursor: pointer;">+{'{name}'}</button>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'bodyText', '{phone}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fdf2f8; border: 1px solid #fbcfe8; color: #9d174d; border-radius: 4px; cursor: pointer;">+{'{phone}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'bodyText', '{pin}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #f0fdfa; border: 1px solid #5eead4; color: #0f766e; border-radius: 4px; cursor: pointer; font-weight: 700;">+{'{pin}'}</button>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'bodyText', '{points}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fff7ed; border: 1px solid #fed7aa; color: #c2410c; border-radius: 4px; cursor: pointer;">+{'{points}'}</button>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'bodyText', '{url}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #f5f3ff; border: 1px solid #ddd6fe; color: #6d28d9; border-radius: 4px; cursor: pointer;">+{'{url}'}</button>
                                             </div>
@@ -6350,6 +6396,7 @@
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'highlightText', '{orderCode}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 4px; cursor: pointer;">+{'{orderCode}'}</button>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'highlightText', '{itemsSummary}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #e0f2fe; border: 1px solid #bae6fd; color: #0369a1; border-radius: 4px; cursor: pointer;">+{'{itemsSummary}'}</button>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'highlightText', '{totalPrice}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fefce8; border: 1px solid #fde047; color: #854d0e; border-radius: 4px; cursor: pointer;">+{'{totalPrice}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'highlightText', '{pin}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #f0fdfa; border: 1px solid #5eead4; color: #0f766e; border-radius: 4px; cursor: pointer; font-weight: 700;">+{'{pin}'}</button>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'highlightText', '{points}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fff7ed; border: 1px solid #fed7aa; color: #c2410c; border-radius: 4px; cursor: pointer;">+{'{points}'}</button>
                                             </div>
                                         </div>
@@ -6736,6 +6783,7 @@
                             
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem; margin-bottom: 0.5rem;">
                                 {#each [
+                                    { key: 'member_registered', name: '🎉 สมัครสมาชิก', color: '#166534' },
                                     { key: 'slip_approved', name: '💳 อนุมัติสลิป', color: '#15803d' },
                                     { key: 'brewing', name: '🍵 กำลังชง', color: '#0d9488' },
                                     { key: 'ready_to_ship', name: '✨ ชงเสร็จ', color: '#059669' },
@@ -6769,14 +6817,14 @@
                             {#if Object.values(settings.lineOa.customStatusCards || {}).some(c => c?.enabled)}
                                 <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; border-top: 1px dashed #cbd5e1; padding-top: 0.5rem; font-size: 0.72rem; color: #475569;">
                                     <span>สลับกลับใช้การ์ดระบบ:</span>
-                                    {#each ['slip_approved', 'brewing', 'ready_to_ship', 'delivering', 'completed', 'cancelled'] as st}
+                                    {#each ['member_registered', 'slip_approved', 'brewing', 'ready_to_ship', 'delivering', 'completed', 'cancelled'] as st}
                                         {#if settings.lineOa.customStatusCards?.[st]?.enabled}
                                             <button
                                                 type="button"
                                                 onclick={() => unsetStatusCard(st)}
                                                 style="padding: 0.15rem 0.45rem; font-size: 0.7rem; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; border-radius: 4px; cursor: pointer;"
                                             >
-                                                รีเซ็ต {st === 'slip_approved' ? 'อนุมัติสลิป' : st === 'brewing' ? 'กำลังชง' : st === 'ready_to_ship' ? 'ชงเสร็จ' : st === 'delivering' ? 'กำลังส่ง' : st === 'completed' ? 'ส่งสำเร็จ' : 'ยกเลิก'}
+                                                รีเซ็ต {st === 'member_registered' ? 'สมัครสมาชิก' : st === 'slip_approved' ? 'อนุมัติสลิป' : st === 'brewing' ? 'กำลังชง' : st === 'ready_to_ship' ? 'ชงเสร็จ' : st === 'delivering' ? 'กำลังส่ง' : st === 'completed' ? 'ส่งสำเร็จ' : 'ยกเลิก'}
                                             </button>
                                         {/if}
                                     {/each}
@@ -6843,6 +6891,21 @@
                                         </div>
                                     </div>
 
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                        <div>
+                                            <label style="font-size: 0.72rem; font-weight: 700; color: #475569; display: block; margin-bottom: 0.15rem;">
+                                                {'{pin}'} รหัส PIN สมาชิก:
+                                            </label>
+                                            <input type="text" class="form-input" bind:value={testVars.pin} placeholder="เช่น 1234" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" />
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 0.72rem; font-weight: 700; color: #475569; display: block; margin-bottom: 0.15rem;">
+                                                {'{points}'} คะแนนสะสม:
+                                            </label>
+                                            <input type="text" class="form-input" bind:value={testVars.points} placeholder="เช่น 10" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" />
+                                        </div>
+                                    </div>
+
                                     <div style="text-align: right;">
                                         <button
                                             type="button"
@@ -6853,6 +6916,7 @@
                                                 testVars.customerName = 'คุณลูกค้า';
                                                 testVars.phone = '0812345678';
                                                 testVars.points = '10';
+                                                testVars.pin = '1234';
                                             }}
                                             style="background: none; border: none; font-size: 0.7rem; color: #64748b; cursor: pointer; text-decoration: underline;"
                                         >

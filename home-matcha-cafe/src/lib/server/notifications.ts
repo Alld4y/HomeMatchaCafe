@@ -118,9 +118,10 @@ export interface CustomerNotificationPayload {
     title: string;
     body: string;
     url?: string;
-    eventType: 'order_created' | 'slip_approved' | 'brewing' | 'ready_to_ship' | 'delivering' | 'completed' | 'cancelled' | 'custom';
+    eventType: 'order_created' | 'slip_approved' | 'brewing' | 'ready_to_ship' | 'delivering' | 'completed' | 'cancelled' | 'member_registered' | 'custom';
     itemsSummary?: string;
     totalPrice?: number;
+    pin?: string;
 }
 
 /**
@@ -160,7 +161,7 @@ export async function sendCustomerNotification(payload: CustomerNotificationPayl
     lineOaSent: boolean;
     reason?: string;
 }> {
-    const { phone, title, body, url = '/loyalty', eventType, orderCode, itemsSummary, totalPrice } = payload;
+    const { phone, title, body, url = '/loyalty', eventType, orderCode, itemsSummary, totalPrice, pin } = payload;
     if (!phone) {
         return { webPushSent: 0, lineOaSent: false, reason: 'ไม่มีเบอร์โทรลูกค้า' };
     }
@@ -180,7 +181,8 @@ export async function sendCustomerNotification(payload: CustomerNotificationPayl
         eventType === 'ready_to_ship' ? lineOaSettings.notifyOnReadyToShip !== false :
         eventType === 'delivering' ? lineOaSettings.notifyOnDelivering !== false :
         eventType === 'completed' ? lineOaSettings.notifyOnCompleted !== false :
-        eventType === 'cancelled' ? lineOaSettings.notifyOnCancelled !== false : true
+        eventType === 'cancelled' ? lineOaSettings.notifyOnCancelled !== false :
+        eventType === 'member_registered' ? lineOaSettings.notifyOnMemberRegistered !== false : true
     );
 
     const channelToken = lineOaSettings?.channelAccessToken || notifSettings?.lineOaChannelAccessToken;
@@ -200,7 +202,8 @@ export async function sendCustomerNotification(payload: CustomerNotificationPayl
                         itemsSummary,
                         totalPrice,
                         url,
-                        phone: cleanPhone
+                        phone: cleanPhone,
+                        pin
                     }
                 );
             }
@@ -227,11 +230,12 @@ export async function sendLineStatusFlexMessage(
         totalPrice?: number;
         url: string;
         phone?: string;
+        pin?: string;
     }
 ): Promise<boolean> {
     if (!channelAccessToken || !toUserId) return false;
 
-    const { title, body, eventType, orderCode, itemsSummary, totalPrice, url, phone } = params;
+    const { title, body, eventType, orderCode, itemsSummary, totalPrice, url, phone, pin } = params;
     let targetUrl = url;
     if (eventType === 'slip_approved' && (!targetUrl || !targetUrl.includes('/success'))) {
         targetUrl = `/success?orderCode=${encodeURIComponent(orderCode || '')}&phone=${encodeURIComponent(phone || '')}`;
@@ -254,15 +258,22 @@ export async function sendLineStatusFlexMessage(
                 .replace(/\{title\}/g, title)
                 .replace(/\{body\}/g, body)
                 .replace(/\{phone\}/g, phone || '')
+                .replace(/\{pin\}/g, pin || '')
                 .replace(/\{loyaltyUrl\}/g, phone ? `https://homematchacafe.store/loyalty?phone=${phone}` : 'https://homematchacafe.store/loyalty');
             const customBubble = JSON.parse(rawJson);
-            return sendLineRawFlexMessage(channelAccessToken, toUserId, `${title}: ${body}`, customBubble);
+            return sendLineRawFlexMessage(channelAccessToken, toUserId, `${title}: ${body}`, customBubble, { pin: pin || '' });
         }
     } catch (cfgErr) {
         console.warn('⚠️ Error checking custom status card:', cfgErr);
     }
 
     const themeMap: Record<string, { color: string; badge: string; icon: string; imageUrl: string }> = {
+        member_registered: {
+            color: '#166534',
+            badge: 'สมัครสมาชิกสำเร็จ',
+            icon: '🎉',
+            imageUrl: 'https://homematchacafe.store/image/mascot/cat-loyalty.jpg'
+        },
         order_created: {
             color: '#166534',
             badge: 'รับออเดอร์แล้ว',
@@ -379,8 +390,30 @@ export async function sendLineStatusFlexMessage(
         footer: {
             type: 'box',
             layout: 'vertical',
+            spacing: 'sm',
             paddingAll: '14px',
-            contents: [
+            contents: eventType === 'member_registered' ? [
+                {
+                    type: 'button',
+                    style: 'primary',
+                    color: '#166534',
+                    action: {
+                        type: 'uri',
+                        label: '⭐ เปิดบัตรสะสมแต้ม',
+                        uri: phone ? `https://homematchacafe.store/loyalty?phone=${phone}` : 'https://homematchacafe.store/loyalty'
+                    }
+                },
+                {
+                    type: 'button',
+                    style: 'secondary',
+                    color: '#0d9488',
+                    action: {
+                        type: 'uri',
+                        label: '🍵 สั่งเครื่องดื่มออนไลน์',
+                        uri: 'https://homematchacafe.store/menu'
+                    }
+                }
+            ] : [
                 {
                     type: 'button',
                     style: 'primary',
@@ -394,6 +427,58 @@ export async function sendLineStatusFlexMessage(
             ]
         }
     };
+
+    if (phone) {
+        contents.body.contents.push({
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'sm',
+            contents: [
+                {
+                    type: 'text',
+                    text: 'เบอร์โทรศัพท์:',
+                    size: 'sm',
+                    color: '#64748b',
+                    flex: 3
+                },
+                {
+                    type: 'text',
+                    text: phone,
+                    size: 'sm',
+                    weight: 'bold',
+                    color: '#1e293b',
+                    flex: 4,
+                    align: 'end'
+                }
+            ]
+        });
+    }
+
+    if (pin) {
+        contents.body.contents.push({
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'sm',
+            contents: [
+                {
+                    type: 'text',
+                    text: 'รหัส PIN (4 หลัก):',
+                    size: 'sm',
+                    color: '#64748b',
+                    flex: 3
+                },
+                {
+                    type: 'text',
+                    text: pin,
+                    size: 'sm',
+                    weight: 'bold',
+                    color: '#166534',
+                    flex: 4,
+                    align: 'end'
+                }
+            ]
+        });
+    }
 
     if (orderCode) {
         contents.body.contents.push({
@@ -496,10 +581,12 @@ export function sanitizeFlexBubble(bubble: any, fallbackPhone?: string, testVars
         const totalPrice = testVars?.totalPrice || '165';
         const name = testVars?.customerName || testVars?.name || 'ลูกค้า';
         const points = testVars?.points || '10';
+        const pin = testVars?.pin || '1234';
 
         const successUrl = `https://homematchacafe.store/success?orderCode=${encodeURIComponent(orderCode)}&phone=${encodeURIComponent(phone)}`;
 
         str = str.replace(/\{phone\}/g, phone);
+        str = str.replace(/\{pin\}/g, pin);
         str = str.replace(/\{orderCode\}/g, orderCode);
         str = str.replace(/\{itemsSummary\}/g, itemsSummary);
         str = str.replace(/\{totalPrice\}/g, totalPrice);
@@ -861,6 +948,11 @@ export async function sendLineTestMessage(
     // กรณีทดสอบการ์ดแจ้งเตือนสถานะออเดอร์ (Status Card Test)
     if (statusType) {
         const statusMetaMap: Record<string, { title: string; body: string; name: string }> = {
+            member_registered: {
+                name: 'ลูกค้าสมัครสมาชิกเสร็จแล้ว',
+                title: '🎉 สมัครสมาชิกสำเร็จเรียบร้อยค่ะ',
+                body: 'ยินดีต้อนรับสู่ครอบครัว Home Matcha Cafe ค่ะ 🍵 รหัส PIN สำหรับเข้าสู่ระบบของคุณคือ {pin}'
+            },
             order_created: {
                 name: 'รับออเดอร์ใหม่',
                 title: '📝 ได้รับคำสั่งซื้อเรียบร้อยแล้ว',
@@ -908,6 +1000,7 @@ export async function sendLineTestMessage(
         const testCode = testVars?.orderCode || 'HM-TEST88';
         const testPrice = testVars?.totalPrice ? Number(testVars.totalPrice.replace(/[^0-9.]/g, '')) || 165 : 165;
         const testPhone = targetPhone || lineOa.adminPhone || '0987654321';
+        const testPin = testVars?.pin || '8899';
         const testUrl = statusType === 'slip_approved'
             ? `/success?orderCode=${encodeURIComponent(testCode)}&phone=${encodeURIComponent(testPhone)}`
             : '/order/test';
@@ -922,7 +1015,8 @@ export async function sendLineTestMessage(
                 itemsSummary: testItems,
                 totalPrice: testPrice,
                 url: testUrl,
-                phone: testPhone
+                phone: testPhone,
+                pin: testPin
             });
             if (ok) successCount++;
         }

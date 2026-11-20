@@ -503,7 +503,7 @@
     function dismissInstallPrompt() {
         showInstallBanner = false;
         try {
-            localStorage.setItem(PWA_PROMPT_KEY, 'true');
+            sessionStorage.setItem('hmc_pwa_dismissed', 'true');
         } catch {}
     }
 
@@ -517,17 +517,24 @@
     }
 
     async function handleInstallPwa() {
-        try {
-            localStorage.setItem(PWA_PROMPT_KEY, 'true');
-        } catch {}
-        showInstallBanner = false;
-
         if (deferredInstallPrompt) {
-            deferredInstallPrompt.prompt();
-            const { outcome } = await deferredInstallPrompt.userChoice;
-            if (outcome === 'accepted') {
-                console.log('User accepted PWA installation');
-                showInstallModal = false;
+            try {
+                deferredInstallPrompt.prompt();
+                const { outcome } = await deferredInstallPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    console.log('User accepted PWA installation');
+                    showInstallBanner = false;
+                    showInstallModal = false;
+                    try {
+                        localStorage.setItem(PWA_PROMPT_KEY, 'true');
+                    } catch {}
+                } else {
+                    // หากผู้ใช้กดยกเลิกในหน้าต่างของเบราว์เซอร์ ให้เปิด Modal แนะนำขั้นตอนแบบละเอียดให้อัตโนมัติ
+                    openInstallModal();
+                }
+            } catch (err) {
+                console.warn('Error invoking deferredInstallPrompt:', err);
+                openInstallModal();
             }
             deferredInstallPrompt = null;
         } else {
@@ -622,29 +629,23 @@
             } catch {}
         }
 
-        // ตรวจสอบว่าเคยแสดงป๊อปอัปติดตั้งแอปแล้วหรือยัง (ขึ้นแค่ครั้งเดียวเท่านั้น ถ้าเคยขึ้นแล้วไม่ต้องขึ้นอีก)
-        let hasShownPrompt = false;
+        // ตรวจสอบว่าเคยปฏิเสธหรือติดตั้งแอปแล้วหรือยัง
+        let hasDismissedPrompt = false;
         try {
-            hasShownPrompt = localStorage.getItem(PWA_PROMPT_KEY) === 'true';
+            hasDismissedPrompt = sessionStorage.getItem('hmc_pwa_dismissed') === 'true' || localStorage.getItem(PWA_PROMPT_KEY) === 'true';
         } catch {}
 
-        // หากเป็น iOS และยังไม่เคยแสดงมาก่อน และไม่อยู่ในหน้า Admin
-        if (isIosDevice && !isStandalone && !isLine && !isOtherInApp && !hasShownPrompt && !window.location.pathname.startsWith('/admin')) {
+        // หากเป็น iOS และยังไม่เคยปิดแบนเนอร์ และไม่ได้เปิดแบบ Standalone และไม่อยู่ในหน้า Admin
+        if (isIosDevice && !isStandalone && !isLine && !isOtherInApp && !hasDismissedPrompt && !window.location.pathname.startsWith('/admin')) {
             showInstallBanner = true;
-            try {
-                localStorage.setItem(PWA_PROMPT_KEY, 'true');
-            } catch {}
         }
 
-        // ดักจับ Event สำหรับปุ่มติดตั้งแอปบน Chrome/Android (ขึ้นแค่ครั้งเดียวเท่านั้น)
+        // ดักจับ Event สำหรับปุ่มติดตั้งแอปบน Chrome/Android
         const handleBeforeInstall = (e: Event) => {
             e.preventDefault();
             deferredInstallPrompt = e;
-            if (!hasShownPrompt && !isStandalone && !isLine && !isOtherInApp && !window.location.pathname.startsWith('/admin')) {
+            if (!hasDismissedPrompt && !isStandalone && !isLine && !isOtherInApp && !window.location.pathname.startsWith('/admin')) {
                 showInstallBanner = true;
-                try {
-                    localStorage.setItem(PWA_PROMPT_KEY, 'true');
-                } catch {}
             }
         };
         window.addEventListener('beforeinstallprompt', handleBeforeInstall);
@@ -1162,17 +1163,16 @@
                             type="button"
                             class="install-direct-action-btn"
                             onclick={() => {
-                                showInstallModal = false;
                                 handleInstallPwa();
                             }}
                         >
                             📲 กดเพื่อติดตั้งลงหน้าจอโฮมทันที
                         </button>
-                        <!-- <div class="install-divider">
-                            <span>หรือติดตั้งผ่านเมนูของ Chrome</span>
-                        </div> -->
+                        <div class="install-divider">
+                            <span>หรือติดตั้งผ่านเมนูของ Chrome ด้านล่าง</span>
+                        </div>
                     {/if}
-                    <!-- <div class="install-step-list">
+                    <div class="install-step-list">
                         <div class="install-step-item">
                             <span class="install-step-num">1</span>
                             <div class="install-step-content">
@@ -1184,8 +1184,8 @@
                         <div class="install-step-item">
                             <span class="install-step-num">2</span>
                             <div class="install-step-content">
-                                <strong>เลือก "ติดตั้งแอปพลิเคชัน" (Install app)</strong>
-                                <p>แตะเมนู <strong style="display: inline;">"ติดตั้งแอปพลิเคชัน"</strong></p>
+                                <strong>เลือก "ติดตั้งแอป" หรือ "เพิ่มลงในหน้าจอหลัก"</strong>
+                                <p>แตะเมนู <strong style="display: inline;">"ติดตั้งแอปพลิเคชัน" (Install app)</strong> หรือ <strong style="display: inline;">"เพิ่มลงในหน้าจอหลัก" (Add to Home screen)</strong></p>
                             </div>
                         </div>
 
@@ -1193,10 +1193,10 @@
                             <span class="install-step-num">3</span>
                             <div class="install-step-content">
                                 <strong>กดยืนยันการติดตั้ง</strong>
-                                <p>แตะ <strong style="display: inline;">"ติดตั้ง"</strong> <br>ในหน้าต่างยืนยัน รอ 5-10 วินาที ไอคอนแอปจะไปอยู่ที่หน้าจอโฮมทันที</p>
+                                <p>แตะ <strong style="display: inline;">"ติดตั้ง"</strong> ในหน้าต่างยืนยัน ไอคอนแอปจะไปอยู่ที่หน้าจอโฮมทันที</p>
                             </div>
                         </div>
-                    </div> -->
+                    </div>
                 </div>
             {:else}
                 <!-- เนื้อหาแท็บ iOS (Safari) -->

@@ -11,6 +11,8 @@ import {
     updateMemberProfile
 } from '$lib/server/members';
 import { getStoreSettings } from '$lib/server/settings';
+import { getLineUserIdByPhone, sendCustomerNotification } from '$lib/server/notifications';
+import { pool } from '$lib/server/pgPool';
 
 export const GET: RequestHandler = async ({ url }) => {
     try {
@@ -59,12 +61,43 @@ export const POST: RequestHandler = async ({ request }) => {
         const action = body.action || 'login';
 
         if (action === 'register') {
+            const rawPin = String(body.pin || '').trim();
             const result = await registerMember({
                 firstName: body.firstName || '',
                 lastName: body.lastName || '',
                 phone: body.phone || '',
-                pin: body.pin || ''
+                pin: rawPin
             });
+
+            if (result.success && result.member) {
+                try {
+                    const cleanPhone = result.member.phone;
+                    const lineUserId = await getLineUserIdByPhone(cleanPhone);
+                    if (lineUserId) {
+                        try {
+                            await pool.query(
+                                `UPDATE public.members SET line_user_id = $1 WHERE id = $2 AND (line_user_id IS NULL OR line_user_id = '')`,
+                                [lineUserId, result.member.id]
+                            );
+                        } catch (linkErr) {
+                            console.warn('⚠️ Error linking line_user_id to member:', linkErr);
+                        }
+
+                        // ส่งการ์ดแจ้งเตือนลูกค้าใน LINE OA อัตโนมัติ (Event: ลูกค้าสมัครสมาชิกเสร็จแล้ว)
+                        await sendCustomerNotification({
+                            phone: cleanPhone,
+                            title: '🎉 สมัครสมาชิกสำเร็จเรียบร้อยค่ะ',
+                            body: `ยินดีต้อนรับคุณ ${result.member.firstName} เข้าสู่ระบบสมาชิก Home Matcha Cafe รหัส PIN ของคุณคือ ${rawPin}`,
+                            eventType: 'member_registered',
+                            pin: rawPin,
+                            url: `/loyalty?phone=${cleanPhone}`
+                        });
+                    }
+                } catch (notifErr) {
+                    console.warn('⚠️ Error sending member_registered notification:', notifErr);
+                }
+            }
+
             return json(result, { status: result.success ? 200 : 400 });
         }
 
