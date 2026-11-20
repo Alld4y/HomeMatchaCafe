@@ -93,6 +93,9 @@
         adminLineUserId: string;
         autoReplyEnabled: boolean;
         welcomeMessage: string;
+        useCustomWelcomeCard?: boolean;
+        welcomeCardBubble?: any;
+        welcomeCardBlocks?: any[] | null;
         defaultReplyMessage: string;
         keywordReplies: LineOaKeywordReply[];
         notifyOnOrderCreated: boolean;
@@ -163,6 +166,9 @@
             adminLineUserId: 'Uc04ed4f079c031e33621c131cec0ca27',
             autoReplyEnabled: true,
             welcomeMessage: 'ยินดีต้อนรับสู่ Home Matcha Cafe 🍵✨\nคุณสามารถพิมพ์ "เมนู" เพื่อดูรายการเครื่องดื่ม, "สถานะ" เพื่อติดตามออเดอร์, "แต้ม" เพื่อเช็คคะแนนสะสม หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อรับแจ้งเตือนได้เลยค่ะ',
+            useCustomWelcomeCard: false,
+            welcomeCardBubble: null,
+            welcomeCardBlocks: null,
             defaultReplyMessage: 'ขออภัยค่ะ หากต้องการดูรายการเครื่องดื่ม พิมพ์ "เมนู" หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อระบบสมาชิกและรับแจ้งเตือนสถานะออเดอร์นะคะ 🍵',
             keywordReplies: [
                 { id: 'kw-1', keyword: 'เมนู', matchType: 'exact', replyType: 'flex_menu', replyText: 'รายการเครื่องดื่ม Home Matcha Cafe', enabled: true },
@@ -889,6 +895,9 @@
                             ...(data.settings.lineOa || {})
                         }
                     };
+                    if (Array.isArray(data.settings?.lineOa?.welcomeCardBlocks) && data.settings.lineOa.welcomeCardBlocks.length > 0) {
+                        designerCardBlocks = data.settings.lineOa.welcomeCardBlocks;
+                    }
                 }
             }
         } catch (e) {
@@ -1439,9 +1448,20 @@
         designerCardBlocks = copy;
     }
 
-    function loadDesignerPreset(preset: 'promo' | 'loyalty' | 'delivery') {
+    function loadDesignerPreset(preset: 'promo' | 'loyalty' | 'delivery' | 'welcome') {
         const now = Date.now();
-        if (preset === 'promo') {
+        if (preset === 'welcome') {
+            designerCardBlocks = [
+                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80', aspectRatio: '20:13' },
+                { id: `b-${now}-2`, type: 'tag', tagText: '🍵 ยินดีต้อนรับสู่ Home Matcha Cafe', tagBg: '#dcfce7', tagColor: '#166534' },
+                { id: `b-${now}-3`, type: 'title', titleText: 'ยินดีต้อนรับเพื่อนใหม่นะคะ ✨', titleSize: 'lg' },
+                { id: `b-${now}-4`, type: 'body', bodyText: 'ขอบคุณที่แอดไลน์ร้าน Home Matcha Cafe ค่ะ คุณสามารถกดสั่งซื้อเครื่องดื่มออนไลน์ สะสมแต้ม หรือเช็คสถานะออเดอร์ได้ทันทีจากปุ่มด้านล่างเลยนะคะ' },
+                { id: `b-${now}-5`, type: 'highlight', highlightText: '💡 พิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อผูกบัญชีรับแจ้งเตือนสถานะออเดอร์นะคะ 🍵' },
+                { id: `b-${now}-6`, type: 'button', buttonLabel: '🍵 สั่งเครื่องดื่มออนไลน์', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary' },
+                { id: `b-${now}-7`, type: 'button', buttonLabel: '⭐ เปิดบัตรสะสมแต้ม 10 แก้วฟรี', buttonUrl: 'https://homematchacafe.store/loyalty', buttonStyle: 'gold' },
+                { id: `b-${now}-8`, type: 'button', buttonLabel: '📍 เช็ครอบจัดส่งวันนี้', buttonUrl: 'https://homematchacafe.store/order', buttonStyle: 'outline' }
+            ];
+        } else if (preset === 'promo') {
             designerCardBlocks = [
                 { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80', aspectRatio: '20:13' },
                 { id: `b-${now}-2`, type: 'tag', tagText: '🍵 เมนูใหม่ประจำสัปดาห์', tagBg: '#dcfce7', tagColor: '#166534' },
@@ -1658,6 +1678,32 @@
             title: 'คัดลอก LINE Flex JSON เรียบร้อย! 📋',
             showConfirmButton: false,
             timer: 2000
+        });
+    }
+
+    async function setAsWelcomeCard() {
+        const bubble = buildDesignerFlexBubble();
+        settings.lineOa.useCustomWelcomeCard = true;
+        settings.lineOa.welcomeCardBubble = bubble;
+        settings.lineOa.welcomeCardBlocks = JSON.parse(JSON.stringify(designerCardBlocks));
+
+        await saveAllSettings();
+        swal.fire({
+            icon: 'success',
+            title: 'ตั้งเป็นการ์ดต้อนรับสำเร็จ! 🎉',
+            text: 'เมื่อมีลูกค้ากดเพิ่มเพื่อน (Follow) LINE OA ครั้งแรก ระบบจะส่งการ์ดนี้ให้ลูกค้าทันทีค่ะ 🍵',
+            confirmButtonColor: '#166534'
+        });
+    }
+
+    async function unsetWelcomeCard() {
+        settings.lineOa.useCustomWelcomeCard = false;
+        await saveAllSettings();
+        swal.fire({
+            icon: 'info',
+            title: 'เปลี่ยนกลับเป็นข้อความต้อนรับปกติแล้วค่ะ',
+            text: 'ระบบจะส่งข้อความตัวหนังสือแบบเดิมเมื่อมีลูกค้าเพิ่มเพื่อน',
+            confirmButtonColor: '#166534'
         });
     }
 
@@ -5053,13 +5099,30 @@
                 <!-- ข้อความต้อนรับ & Fallback -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
                     <div>
-                        <label for="lineWelcomeMsg" style="display: block; font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-bottom: 0.35rem;">
-                            ข้อความต้อนรับเมื่อแอดเพื่อนใหม่ (Welcome Message):
-                        </label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                            <label for="lineWelcomeMsg" style="font-size: 0.85rem; font-weight: 700; color: #1e293b;">
+                                ข้อความต้อนรับเมื่อแอดเพื่อนใหม่ (Welcome Message):
+                            </label>
+                            {#if settings.lineOa.useCustomWelcomeCard}
+                                <span style="font-size: 0.72rem; background: #dcfce7; color: #166534; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 6px; border: 1px solid #86efac;">
+                                    🎨 ใช้การ์ด Flex Card
+                                </span>
+                            {/if}
+                        </div>
+                        {#if settings.lineOa.useCustomWelcomeCard}
+                            <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 8px; padding: 0.65rem 0.75rem; font-size: 0.82rem; color: #166534; margin-bottom: 0.5rem; line-height: 1.45;">
+                                <strong>✓ กำลังใช้งานการ์ดต้อนรับแบบ Flex Card</strong> (ระบบจะส่งการ์ดที่ออกแบบไว้ในข้อ 6 ให้ลูกค้าทันทีเมื่อกดเพิ่มเพื่อน)
+                                <div style="margin-top: 0.35rem;">
+                                    <button type="button" onclick={unsetWelcomeCard} style="font-size: 0.75rem; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; border-radius: 4px; padding: 0.2rem 0.5rem; cursor: pointer; font-weight: 700;">
+                                        กลับไปใช้ข้อความตัวอักษรปกติ
+                                    </button>
+                                </div>
+                            </div>
+                        {/if}
                         <textarea
                             id="lineWelcomeMsg"
                             bind:value={settings.lineOa.welcomeMessage}
-                            rows={4}
+                            rows={settings.lineOa.useCustomWelcomeCard ? 2 : 4}
                             placeholder="ข้อความทักทายเมื่อลูกค้าเพิ่ม LINE OA เป็นเพื่อนครั้งแรก..."
                             style="width: 100%; padding: 0.6rem 0.75rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; line-height: 1.5;"
                         ></textarea>
@@ -5199,6 +5262,9 @@
                     <!-- แถบเลือกเทมเพลตด่วน -->
                     <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;">
                         <span style="font-size: 0.78rem; color: #475569; font-weight: 700;">เทมเพลตด่วน:</span>
+                        <button type="button" onclick={() => loadDesignerPreset('welcome')} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 800; background: #ecfdf5; border: 1.5px solid #10b981; color: #065f46; border-radius: 8px; cursor: pointer;">
+                            👋 บัตรต้อนรับเพิ่มเพื่อน
+                        </button>
                         <button type="button" onclick={() => loadDesignerPreset('promo')} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #f0fdf4; border: 1.5px solid #86efac; color: #166534; border-radius: 8px; cursor: pointer;">
                             🍵 เมนูแนะนำ
                         </button>
@@ -5545,6 +5611,48 @@
                             <!-- เวลาจำลองใต้บอลลูน -->
                             <div style="text-align: right; margin-top: 0.35rem; padding-right: 0.25rem;">
                                 <span style="font-size: 0.68rem; color: #ffffff; opacity: 0.85;">12:00</span>
+                            </div>
+                        </div>
+
+                        <!-- กล่องตั้งเป็นการ์ดต้อนรับเมื่อเพิ่มเพื่อนใหม่ -->
+                        <div style="background: {settings.lineOa.useCustomWelcomeCard ? '#f0fdf4' : '#ffffff'}; border: 1.5px solid {settings.lineOa.useCustomWelcomeCard ? '#86efac' : '#cbd5e1'}; border-radius: 12px; padding: 1rem; margin-bottom: 0.85rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                    <span style="font-size: 1.05rem;">👋</span>
+                                    <strong style="font-size: 0.88rem; color: #1e293b;">การ์ดต้อนรับเมื่อเพิ่มเพื่อนใหม่</strong>
+                                </div>
+                                {#if settings.lineOa.useCustomWelcomeCard}
+                                    <span style="font-size: 0.72rem; background: #22c55e; color: #ffffff; font-weight: 800; padding: 0.15rem 0.55rem; border-radius: 9999px;">
+                                        ● กำลังใช้งานอยู่
+                                    </span>
+                                {:else}
+                                    <span style="font-size: 0.72rem; background: #f1f5f9; color: #64748b; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 9999px; border: 1px solid #e2e8f0;">
+                                        ○ ไม่ได้เปิดใช้
+                                    </span>
+                                {/if}
+                            </div>
+                            <p style="margin: 0 0 0.65rem 0; font-size: 0.78rem; color: #64748b; line-height: 1.45;">
+                                ตั้งให้ระบบส่งการ์ดที่กำลังออกแบบอยู่นี้อัตโนมัติทันที เมื่อมีลูกค้ากดเพิ่มเพื่อนหรือสแกน QR Code เข้ามา
+                            </p>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button
+                                    type="button"
+                                    onclick={setAsWelcomeCard}
+                                    class="btn-matcha-primary"
+                                    style="flex: 1; padding: 0.5rem 0.75rem; font-size: 0.82rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; background: #166534;"
+                                >
+                                    {settings.lineOa.useCustomWelcomeCard ? '💾 อัปเดตการ์ดต้อนรับเพิ่มเพื่อน' : '⭐ ตั้งเป็นการ์ดต้อนรับเพิ่มเพื่อน'}
+                                </button>
+                                {#if settings.lineOa.useCustomWelcomeCard}
+                                    <button
+                                        type="button"
+                                        onclick={unsetWelcomeCard}
+                                        style="padding: 0.5rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; border-radius: 8px; cursor: pointer; white-space: nowrap;"
+                                        title="ยกเลิกการใช้การ์ดและกลับไปใช้ข้อความตัวอักษรธรรมดา"
+                                    >
+                                        ปิดใช้การ์ด
+                                    </button>
+                                {/if}
                             </div>
                         </div>
 

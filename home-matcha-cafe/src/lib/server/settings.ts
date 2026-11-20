@@ -48,6 +48,9 @@ export interface LineOaSettings {
     // Auto replies
     autoReplyEnabled: boolean;
     welcomeMessage: string;
+    useCustomWelcomeCard?: boolean;
+    welcomeCardBubble?: any;
+    welcomeCardBlocks?: any[] | null;
     defaultReplyMessage: string;
     keywordReplies: LineOaKeywordReply[];
 
@@ -134,6 +137,9 @@ const DEFAULT_SETTINGS: StoreSettings = {
         adminLineUserId: 'Uc04ed4f079c031e33621c131cec0ca27',
         autoReplyEnabled: true,
         welcomeMessage: 'ยินดีต้อนรับสู่ Home Matcha Cafe 🍵✨\nคุณสามารถพิมพ์ "เมนู" เพื่อดูรายการเครื่องดื่ม, "สถานะ" เพื่อติดตามออเดอร์, "แต้ม" เพื่อเช็คคะแนนสะสม หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อรับแจ้งเตือนได้เลยค่ะ',
+        useCustomWelcomeCard: false,
+        welcomeCardBubble: null,
+        welcomeCardBlocks: null,
         defaultReplyMessage: 'ขออภัยค่ะ หากต้องการดูรายการเครื่องดื่ม พิมพ์ "เมนู" หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อระบบสมาชิกและรับแจ้งเตือนสถานะออเดอร์นะคะ 🍵',
         keywordReplies: [
             {
@@ -322,6 +328,9 @@ function normalizeSettings(parsed: any): StoreSettings {
             adminLineUserId: String(parsedLineOa.adminLineUserId || defaultLineOa.adminLineUserId).trim(),
             autoReplyEnabled: parsedLineOa.autoReplyEnabled !== false,
             welcomeMessage: welcomeMsg,
+            useCustomWelcomeCard: Boolean(parsedLineOa.useCustomWelcomeCard),
+            welcomeCardBubble: parsedLineOa.welcomeCardBubble || null,
+            welcomeCardBlocks: Array.isArray(parsedLineOa.welcomeCardBlocks) ? parsedLineOa.welcomeCardBlocks : null,
             defaultReplyMessage: defaultReplyMsg,
             keywordReplies,
             notifyOnOrderCreated: parsedLineOa.notifyOnOrderCreated !== false,

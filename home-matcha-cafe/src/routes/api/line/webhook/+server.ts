@@ -138,77 +138,79 @@ export const POST: RequestHandler = async ({ request }) => {
 
             // ตอบกลับข้อความต้อนรับ
             if (token && replyToken && lineOa.autoReplyEnabled) {
-                const welcomeBubble = {
-                    type: 'bubble',
-                    header: {
-                        type: 'box',
-                        layout: 'vertical',
-                        backgroundColor: '#166534',
-                        paddingAll: '16px',
-                        contents: [
-                            { type: 'text', text: 'HOME MATCHA CAFE', weight: 'bold', size: 'xs', color: '#bbf7d0' },
-                            { type: 'text', text: 'ยินดีต้อนรับสู่ร้านมัทฉะ 🍵', weight: 'bold', size: 'lg', color: '#ffffff', margin: 'xs' }
-                        ]
-                    },
-                    body: {
-                        type: 'box',
-                        layout: 'vertical',
-                        paddingAll: '16px',
-                        contents: [
-                            {
-                                type: 'text',
-                                text: lineOa.welcomeMessage || 'ยินดีต้อนรับสู่ Home Matcha Cafe ค่ะ!',
-                                size: 'sm',
-                                color: '#334155',
-                                wrap: true
-                            },
-                            {
-                                type: 'box',
-                                layout: 'vertical',
-                                margin: 'md',
-                                paddingAll: '10px',
-                                backgroundColor: '#f0fdf4',
-                                cornerRadius: '8px',
-                                contents: [
-                                    {
-                                        type: 'text',
-                                        text: '💡 พิมพ์ "เมนู" เพื่อดูรายการเครื่องดื่ม หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อผูกบัญชีรับแจ้งเตือนสถานะออเดอร์นะคะ 🍵',
-                                        size: 'xs',
-                                        color: '#166534',
-                                        wrap: true
+                const welcomeBubble = (lineOa.useCustomWelcomeCard && lineOa.welcomeCardBubble)
+                    ? lineOa.welcomeCardBubble
+                    : {
+                        type: 'bubble',
+                        header: {
+                            type: 'box',
+                            layout: 'vertical',
+                            backgroundColor: '#166534',
+                            paddingAll: '16px',
+                            contents: [
+                                { type: 'text', text: 'HOME MATCHA CAFE', weight: 'bold', size: 'xs', color: '#bbf7d0' },
+                                { type: 'text', text: 'ยินดีต้อนรับสู่ร้านมัทฉะ 🍵', weight: 'bold', size: 'lg', color: '#ffffff', margin: 'xs' }
+                            ]
+                        },
+                        body: {
+                            type: 'box',
+                            layout: 'vertical',
+                            paddingAll: '16px',
+                            contents: [
+                                {
+                                    type: 'text',
+                                    text: lineOa.welcomeMessage || 'ยินดีต้อนรับสู่ Home Matcha Cafe ค่ะ!',
+                                    size: 'sm',
+                                    color: '#334155',
+                                    wrap: true
+                                },
+                                {
+                                    type: 'box',
+                                    layout: 'vertical',
+                                    margin: 'md',
+                                    paddingAll: '10px',
+                                    backgroundColor: '#f0fdf4',
+                                    cornerRadius: '8px',
+                                    contents: [
+                                        {
+                                            type: 'text',
+                                            text: '💡 พิมพ์ "เมนู" เพื่อดูรายการเครื่องดื่ม หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อผูกบัญชีรับแจ้งเตือนสถานะออเดอร์นะคะ 🍵',
+                                            size: 'xs',
+                                            color: '#166534',
+                                            wrap: true
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        footer: {
+                            type: 'box',
+                            layout: 'vertical',
+                            spacing: 'sm',
+                            paddingAll: '14px',
+                            contents: [
+                                {
+                                    type: 'button',
+                                    style: 'primary',
+                                    color: '#166534',
+                                    action: {
+                                        type: 'uri',
+                                        label: '🍵 สั่งซื้อเครื่องดื่ม',
+                                        uri: 'https://homematchacafe.store'
                                     }
-                                ]
-                            }
-                        ]
-                    },
-                    footer: {
-                        type: 'box',
-                        layout: 'vertical',
-                        spacing: 'sm',
-                        paddingAll: '14px',
-                        contents: [
-                            {
-                                type: 'button',
-                                style: 'primary',
-                                color: '#166534',
-                                action: {
-                                    type: 'uri',
-                                    label: '🍵 สั่งซื้อเครื่องดื่ม',
-                                    uri: 'https://homematchacafe.store'
+                                },
+                                {
+                                    type: 'button',
+                                    style: 'secondary',
+                                    action: {
+                                        type: 'uri',
+                                        label: '⭐ เช็คคะแนนสะสม',
+                                        uri: 'https://homematchacafe.store/loyalty'
+                                    }
                                 }
-                            },
-                            {
-                                type: 'button',
-                                style: 'secondary',
-                                action: {
-                                    type: 'uri',
-                                    label: '⭐ เช็คคะแนนสะสม',
-                                    uri: 'https://homematchacafe.store/loyalty'
-                                }
-                            }
-                        ]
-                    }
-                };
+                            ]
+                        }
+                    };
 
                 await replyLineMessage(token, replyToken, [
                     {
