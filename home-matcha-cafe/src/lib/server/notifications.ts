@@ -277,7 +277,11 @@ export async function sendLineStatusFlexMessage(
     if (!channelAccessToken || !toUserId) return false;
 
     const { title, body, eventType, orderCode, itemsSummary, totalPrice, url, phone } = params;
-    const trackingUrl = url.startsWith('http') ? url : `https://homematchacafe.store${url}`;
+    let targetUrl = url;
+    if (eventType === 'slip_approved' && (!targetUrl || !targetUrl.includes('/success'))) {
+        targetUrl = `/success?orderCode=${encodeURIComponent(orderCode || '')}&phone=${encodeURIComponent(phone || '')}`;
+    }
+    const trackingUrl = targetUrl.startsWith('http') ? targetUrl : `https://homematchacafe.store${targetUrl}`;
 
     // ตรวจสอบว่าแอดมินตั้งค่าการ์ดแจ้งเตือนสถานะออกแบบเอง (Custom Status Card) สำหรับสถานะนี้หรือไม่
     try {
@@ -291,6 +295,7 @@ export async function sendLineStatusFlexMessage(
                 .replace(/\{totalPrice\}/g, totalPrice !== undefined ? `฿${totalPrice.toLocaleString()}` : '')
                 .replace(/\{url\}/g, trackingUrl)
                 .replace(/\{trackingUrl\}/g, trackingUrl)
+                .replace(/\{successUrl\}/g, trackingUrl)
                 .replace(/\{title\}/g, title)
                 .replace(/\{body\}/g, body)
                 .replace(/\{phone\}/g, phone || '')
@@ -427,7 +432,7 @@ export async function sendLineStatusFlexMessage(
                     color: theme.color,
                     action: {
                         type: 'uri',
-                        label: 'ดูสถานะ / ใบเสร็จ',
+                        label: eventType === 'slip_approved' ? '🧾 ดูใบเสร็จ & ออเดอร์' : 'ดูสถานะ / ใบเสร็จ',
                         uri: trackingUrl
                     }
                 }
@@ -537,6 +542,8 @@ export function sanitizeFlexBubble(bubble: any, fallbackPhone?: string, testVars
         const name = testVars?.customerName || testVars?.name || 'ลูกค้า';
         const points = testVars?.points || '10';
 
+        const successUrl = `https://homematchacafe.store/success?orderCode=${encodeURIComponent(orderCode)}&phone=${encodeURIComponent(phone)}`;
+
         str = str.replace(/\{phone\}/g, phone);
         str = str.replace(/\{orderCode\}/g, orderCode);
         str = str.replace(/\{itemsSummary\}/g, itemsSummary);
@@ -546,8 +553,9 @@ export function sanitizeFlexBubble(bubble: any, fallbackPhone?: string, testVars
         str = str.replace(/\{name\}/g, name);
         str = str.replace(/\{customerName\}/g, name);
         str = str.replace(/\{points\}/g, points);
-        str = str.replace(/\{url\}/g, 'https://homematchacafe.store/order');
-        str = str.replace(/\{trackingUrl\}/g, 'https://homematchacafe.store/order');
+        str = str.replace(/\{successUrl\}/g, successUrl);
+        str = str.replace(/\{url\}/g, successUrl);
+        str = str.replace(/\{trackingUrl\}/g, successUrl);
         str = str.replace(/\{loyaltyUrl\}/g, 'https://homematchacafe.store/loyalty');
         str = str.replace(/\{registerUrl\}/g, `https://homematchacafe.store/loyalty?action=register&phone=${phone}`);
         str = str.replace(/\{menuUrl\}/g, 'https://homematchacafe.store/menu');
@@ -944,6 +952,10 @@ export async function sendLineTestMessage(
         const testItems = testVars?.itemsSummary || 'Cold-Fermented Oat Milk Matcha Latte x1, Clear Matcha Cold Whisk x1';
         const testCode = testVars?.orderCode || 'HM-TEST88';
         const testPrice = testVars?.totalPrice ? Number(testVars.totalPrice.replace(/[^0-9.]/g, '')) || 165 : 165;
+        const testPhone = targetPhone || lineOa.adminPhone || '0987654321';
+        const testUrl = statusType === 'slip_approved'
+            ? `/success?orderCode=${encodeURIComponent(testCode)}&phone=${encodeURIComponent(testPhone)}`
+            : '/order/test';
 
         let successCount = 0;
         for (const to of recipients) {
@@ -954,8 +966,8 @@ export async function sendLineTestMessage(
                 orderCode: testCode,
                 itemsSummary: testItems,
                 totalPrice: testPrice,
-                url: '/order/test',
-                phone: targetPhone || lineOa.adminPhone || '0987654321'
+                url: testUrl,
+                phone: testPhone
             });
             if (ok) successCount++;
         }

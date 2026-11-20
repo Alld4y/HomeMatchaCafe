@@ -323,7 +323,7 @@ export async function createOrder(data: {
         orderCode: finalOrder.order_id,
         title: '🍵 ได้รับคำสั่งซื้อของคุณแล้ว',
         body: `ทางร้านได้รับออเดอร์ ${finalOrder.order_id} เรียบร้อยแล้วค่ะ กำลังเตรียมการสำหรับรอบจัดส่ง ${finalOrder.deliveryRound || ''}`,
-        url: `/success?phone=${encodeURIComponent(finalOrder.phone)}`,
+        url: `/success?orderCode=${encodeURIComponent(finalOrder.order_id)}&phone=${encodeURIComponent(finalOrder.phone)}`,
         eventType: 'order_created',
         itemsSummary,
         totalPrice: finalOrder.totalPrice
@@ -383,7 +383,7 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
             orderCode: order.order_id,
             title: '🍵 ยืนยันรับยอดออเดอร์แล้ว',
             body: `แอดมินตรวจสอบสลิปและรับยอดออเดอร์ ${order.order_id} เรียบร้อยแล้วค่ะ กำลังเตรียมคิวชงให้นะคะ`,
-            url: `/success?phone=${encodeURIComponent(order.phone)}`,
+            url: `/success?orderCode=${encodeURIComponent(order.order_id)}&phone=${encodeURIComponent(order.phone)}`,
             eventType: 'slip_approved',
             itemsSummary,
             totalPrice: order.totalPrice
@@ -398,7 +398,7 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
             orderCode: order.order_id,
             title: '🍵 กำลังชงเครื่องดื่มของคุณ',
             body: `บาริสต้ากำลังพิถีพิถันชงเครื่องดื่มสำหรับออเดอร์ ${order.order_id} ให้อย่างตั้งใจค่ะ`,
-            url: `/success?phone=${encodeURIComponent(order.phone)}`,
+            url: `/success?orderCode=${encodeURIComponent(order.order_id)}&phone=${encodeURIComponent(order.phone)}`,
             eventType: 'brewing',
             itemsSummary,
             totalPrice: order.totalPrice
@@ -413,7 +413,7 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
             orderCode: order.order_id,
             title: '📦 เครื่องดื่มชงเสร็จแล้ว',
             body: `ออเดอร์ ${order.order_id} ชงเสร็จเรียบร้อยและแพ็กพร้อมส่งตามรอบเวลา ${order.deliveryRound || ''} ค่ะ`,
-            url: `/success?phone=${encodeURIComponent(order.phone)}`,
+            url: `/success?orderCode=${encodeURIComponent(order.order_id)}&phone=${encodeURIComponent(order.phone)}`,
             eventType: 'ready_to_ship',
             itemsSummary,
             totalPrice: order.totalPrice
@@ -428,7 +428,7 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
             orderCode: order.order_id,
             title: '🛵 เครื่องดื่มของคุณกำลังนำส่ง',
             body: `ออเดอร์ ${order.order_id} กำลังนำส่งไปที่ ${order.address} แล้วค่ะ เตรียมรับความสดชื่นได้เลย!`,
-            url: `/success?phone=${encodeURIComponent(order.phone)}`,
+            url: `/success?orderCode=${encodeURIComponent(order.order_id)}&phone=${encodeURIComponent(order.phone)}`,
             eventType: 'delivering',
             itemsSummary,
             totalPrice: order.totalPrice
@@ -443,7 +443,7 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
             orderCode: order.order_id,
             title: '✅ จัดส่งสำเร็จเรียบร้อยแล้ว',
             body: `ออเดอร์ ${order.order_id} จัดส่งถึง ${order.address} เรียบร้อยแล้วค่ะ ขอบคุณที่อุดหนุน Home Matcha Cafe นะคะ 🍵`,
-            url: `/success?phone=${encodeURIComponent(order.phone)}`,
+            url: `/success?orderCode=${encodeURIComponent(order.order_id)}&phone=${encodeURIComponent(order.phone)}`,
             eventType: 'completed',
             itemsSummary,
             totalPrice: order.totalPrice
@@ -458,7 +458,7 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
             orderCode: order.order_id,
             title: '❌ ออเดอร์ถูกยกเลิก',
             body: `ออเดอร์ ${order.order_id} ถูกยกเลิก หากมีข้อสงสัยหรือต้องการความช่วยเหลือ สามารถสอบถามทางร้านได้เลยนะคะ`,
-            url: `/success?phone=${encodeURIComponent(order.phone)}`,
+            url: `/success?orderCode=${encodeURIComponent(order.order_id)}&phone=${encodeURIComponent(order.phone)}`,
             eventType: 'cancelled',
             itemsSummary,
             totalPrice: order.totalPrice

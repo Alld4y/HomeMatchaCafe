@@ -1,5 +1,6 @@
 <script lang="ts">
     import { goto } from '$app/navigation';
+    import { page } from '$app/state';
     import { onMount, getContext } from 'svelte';
     import swal from 'sweetalert2';
     import {
@@ -12,27 +13,31 @@
     const memberCtx = getContext<any>('memberData');
     let member = $derived(memberCtx?.member || null);
 
+    const queryPhone = $derived((page.url.searchParams.get('phone') || '').trim().replace(/[^0-9]/g, ''));
+    const queryOrderCode = $derived((page.url.searchParams.get('orderCode') || page.url.searchParams.get('orderId') || '').trim());
+    const activePhone = $derived(member?.phone || queryPhone);
+
     let isSubscribedToPush = $state(false);
     let isPushLoading = $state(false);
 
     async function checkPushStatus() {
         if (typeof window === 'undefined') return;
-        const phone = member?.phone;
+        const phone = activePhone;
         if (phone && isPushNotificationSupported()) {
             isSubscribedToPush = await checkServerSubscription(phone);
         }
     }
 
     $effect(() => {
-        const phone = member?.phone;
+        const phone = activePhone;
         if (phone) {
             checkPushStatus();
         }
     });
 
     async function handleTogglePush() {
-        const activePhone = member?.phone;
-        if (!activePhone || !member) {
+        const phoneToUse = activePhone;
+        if (!phoneToUse) {
             const res = await swal.fire({
                 icon: 'info',
                 title: 'เข้าสู่ระบบสมาชิกเพื่อเปิดแจ้งเตือน',
@@ -51,13 +56,13 @@
         isPushLoading = true;
         try {
             if (isSubscribedToPush) {
-                const res = await unsubscribeFromPush(activePhone);
+                const res = await unsubscribeFromPush(phoneToUse);
                 if (res.success) {
                     isSubscribedToPush = false;
                     swal.fire({ icon: 'success', title: 'ปิดแจ้งเตือนแล้ว', confirmButtonColor: '#15803d' });
                 }
             } else {
-                const res = await subscribeToPush(activePhone);
+                const res = await subscribeToPush(phoneToUse);
                 if (res.success) {
                     isSubscribedToPush = true;
                     swal.fire({
@@ -158,7 +163,7 @@
     }
 
     async function fetchHistory(phoneToFetch?: string) {
-        const targetPhone = phoneToFetch || member?.phone;
+        const targetPhone = phoneToFetch || activePhone;
         if (!targetPhone) {
             ordersList = [];
             loading = false;
@@ -176,6 +181,13 @@
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data)) {
+                    if (queryOrderCode) {
+                        data.sort((a, b) => {
+                            const aMatch = (a.order_id === queryOrderCode || a.id === queryOrderCode) ? 1 : 0;
+                            const bMatch = (b.order_id === queryOrderCode || b.id === queryOrderCode) ? 1 : 0;
+                            return bMatch - aMatch;
+                        });
+                    }
                     ordersList = data;
                 } else {
                     ordersList = [];
@@ -189,16 +201,17 @@
     }
 
     onMount(() => {
-        if (member?.phone) {
-            fetchHistory(member.phone);
+        if (activePhone) {
+            fetchHistory(activePhone);
         } else {
             loading = false;
         }
     });
 
     $effect(() => {
-        if (member?.phone) {
-            fetchHistory(member.phone);
+        const ph = activePhone;
+        if (ph) {
+            fetchHistory(ph);
         } else {
             ordersList = [];
             loading = false;
@@ -262,8 +275,8 @@
         </button>
     </div>
 
-    <!-- สภาพที่ 1: หากยังไม่ได้เข้าสู่ระบบสมาชิก -->
-    {#if !member}
+    <!-- สภาพที่ 1: หากยังไม่ได้เข้าสู่ระบบสมาชิก และไม่ได้ระบุเบอร์โทรผ่านลิงก์ -->
+    {#if !member && !queryPhone}
         <div class="form-card" style="width: 100%; max-width: 680px; text-align: center; padding: 3.5rem 1.5rem; background: #ffffff; border: 1.5px dashed #86efac; border-radius: 18px; margin-bottom: 2rem;">
             <div style="font-size: 3.2rem; margin-bottom: 0.6rem;">🔒</div>
             <h2 style="margin: 0 0 0.5rem 0; color: #14532d; font-size: 1.35rem; font-weight: 800;">
@@ -292,29 +305,44 @@
             </div>
         </div>
     {:else}
-        <!-- สภาพที่ 2: ล็อกอินแล้ว แสดงข้อมูลสมาชิกเจ้าของประวัติ -->
+        <!-- สภาพที่ 2: ล็อกอินแล้ว หรือเปิดจากลิงก์แจ้งเตือน (มี queryPhone) -->
         <div style="width: 100%; max-width: 720px; margin-bottom: 1.25rem; background: #ffffff; border: 1.5px solid #dcfce7; border-radius: 14px; padding: 0.85rem 1.15rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
             <div style="display: flex; align-items: center; gap: 0.65rem;">
                 <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #15803d, #22c55e); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.1rem; box-shadow: 0 3px 8px rgba(21, 128, 61, 0.25);">
-                    {member.firstName ? member.firstName.charAt(0) : '🍵'}
+                    {member ? (member.firstName ? member.firstName.charAt(0) : '🍵') : '🧾'}
                 </div>
                 <div>
                     <div style="font-size: 0.95rem; font-weight: 800; color: #14532d;">
-                        คำสั่งซื้อของคุณ {member.fullName}
+                        {member ? `คำสั่งซื้อของคุณ ${member.fullName}` : `ใบเสร็จและสถานะคำสั่งซื้อ`}
                     </div>
                     <div style="font-size: 0.78rem; color: #64748b;">
-                        📱 {member.phone} · บัญชีสมาชิกของคุณ (แสดงเฉพาะของตนเอง)
+                        📱 {activePhone} {member ? '· บัญชีสมาชิกของคุณ (แสดงเฉพาะของตนเอง)' : '· ติดตามสถานะคำสั่งซื้อ'}
                     </div>
                 </div>
             </div>
             <button
                 type="button"
-                onclick={() => fetchHistory(member.phone)}
+                onclick={() => fetchHistory(activePhone)}
                 style="background: #f0fdf4; border: 1.5px solid #86efac; color: #15803d; padding: 0.4rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.35rem;"
             >
                 🔄 รีเฟรชสถานะ
             </button>
         </div>
+
+        {#if !member && queryPhone}
+            <div style="width: 100%; max-width: 720px; margin-bottom: 1.25rem; background: #fdf2f8; border: 1.5px dashed #f472b6; border-radius: 12px; padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                <div style="font-size: 0.85rem; color: #9d174d;">
+                    💡 <strong>สมัครสมาชิกสะสมแต้ม:</strong> เบอร์ {queryPhone} สามารถสะสมแต้ม 10 แก้วฟรีได้ทันทีค่ะ
+                </div>
+                <button
+                    type="button"
+                    onclick={() => memberCtx?.openAuthModal('register')}
+                    style="background: #db2777; color: #ffffff; border: none; padding: 0.4rem 0.9rem; border-radius: 999px; font-size: 0.8rem; font-weight: 800; cursor: pointer;"
+                >
+                    ✨ สมัครสมาชิกเลย
+                </button>
+            </div>
+        {/if}
 
         <!-- Orders List Section -->
         <div style="width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 1.5rem;">
@@ -328,7 +356,7 @@
                     <p style="font-size: 3rem; margin: 0 0 1rem 0;">🍵</p>
                     <h3 style="margin: 0 0 0.5rem 0; color: var(--matcha-deep);">ยังไม่พบประวัติคำสั่งซื้อของคุณ</h3>
                     <p style="margin: 0 0 1.5rem 0; color: var(--text-muted); font-size: 0.9rem;">
-                        ยังไม่มีรายการสั่งซื้อที่เชื่อมโยงกับเบอร์ {member.phone} ค่ะ<br/>เริ่มสั่งเครื่องดื่มมัทฉะแก้วโปรดของคุณได้เลยนะคะ
+                        ยังไม่มีรายการสั่งซื้อที่เชื่อมโยงกับเบอร์ {activePhone} ค่ะ<br/>เริ่มสั่งเครื่องดื่มมัทฉะแก้วโปรดของคุณได้เลยนะคะ
                     </p>
                     <button onclick={() => goto('/menu')} class="btn-matcha-primary">
                         🍵 สั่งเครื่องดื่มตอนนี้
@@ -338,8 +366,9 @@
                 {#each ordersList as order}
                 {@const badge = getStatusBadge(order.status)}
                 {@const currentStepIdx = getStepIndex(order.status)}
+                {@const isMatchedOrder = queryOrderCode && (order.order_id === queryOrderCode || order.id === queryOrderCode)}
 
-                <div class="form-card" style="text-align: left;">
+                <div class="form-card" style="text-align: left; {isMatchedOrder ? 'border: 2px solid #16a34a; box-shadow: 0 4px 16px rgba(22, 163, 74, 0.18);' : ''}">
                     <!-- Order Header -->
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-light);">
                         <div>
@@ -347,6 +376,11 @@
                                 <h3 style="margin: 0; font-size: 1.15rem; color: var(--matcha-deep);">
                                     {order.order_id || order.id}
                                 </h3>
+                                {#if isMatchedOrder}
+                                    <span style="font-size: 0.72rem; font-weight: 800; background: #dcfce7; color: #15803d; border: 1px solid #86efac; padding: 0.12rem 0.5rem; border-radius: 999px;">
+                                        ✓ ออเดอร์ของคุณ
+                                    </span>
+                                {/if}
                                 <button 
                                     onclick={() => copyOrderId(order.order_id || order.id)} 
                                     title="คัดลอกรหัสออเดอร์" 
