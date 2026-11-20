@@ -1585,7 +1585,7 @@
             .replace(/\{menuUrl\}/g, 'https://homematchacafe.store/menu');
     }
 
-    function loadDesignerPreset(preset: 'promo' | 'loyalty' | 'delivery' | 'welcome' | 'register' | 'member' | 'status_slip_approved' | 'status_member_registered' | 'status_brewing' | 'status_ready' | 'status_delivering' | 'status_completed' | 'status_cancelled') {
+    function loadDesignerPreset(preset: 'promo' | 'loyalty' | 'delivery' | 'welcome' | 'register' | 'member' | 'status_order_created' | 'status_slip_approved' | 'status_member_registered' | 'status_brewing' | 'status_ready' | 'status_delivering' | 'status_completed' | 'status_cancelled') {
         const now = Date.now();
         if (preset === 'welcome') {
             designerCardBlocks = [
@@ -1597,6 +1597,16 @@
                 { id: `b-${now}-6`, type: 'button', buttonLabel: '🍵 สั่งเครื่องดื่มออนไลน์', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary' },
                 { id: `b-${now}-7`, type: 'button', buttonLabel: '⭐ เปิดบัตรสะสมแต้ม 10 แก้วฟรี', buttonUrl: 'https://homematchacafe.store/loyalty', buttonStyle: 'gold' },
                 { id: `b-${now}-8`, type: 'button', buttonLabel: '📍 เช็ครอบจัดส่งวันนี้', buttonUrl: 'https://homematchacafe.store/order', buttonStyle: 'outline' }
+            ];
+        } else if (preset === 'status_order_created') {
+            designerCardBlocks = [
+                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://homematchacafe.store/image/mascot/cat-welcome.jpg', aspectRatio: '1:1' },
+                { id: `b-${now}-2`, type: 'tag', tagText: '📝 ได้รับคำสั่งซื้อแล้ว', tagBg: '#f0fdf4', tagColor: '#166534' },
+                { id: `b-${now}-3`, type: 'title', titleText: 'ได้รับออเดอร์ #{orderCode} แล้วค่ะ ✨', titleSize: 'lg' },
+                { id: `b-${now}-4`, type: 'body', bodyText: 'ทางร้านได้รับคำสั่งซื้อของคุณเรียบร้อยแล้วค่ะ กรุณาตรวจสอบยอดชำระและแนบสลิปโอนเงิน เพื่อให้บาริสต้าเริ่มคิวชงนะคะ 🍵\n{itemsSummary}' },
+                { id: `b-${now}-5`, type: 'highlight', highlightText: '🧾 ยอดชำระ: {totalPrice} บ. (กรุณาแนบสลิป)' },
+                { id: `b-${now}-6`, type: 'button', buttonLabel: '🧾 แนบสลิป / ดูออเดอร์', buttonUrl: 'https://homematchacafe.store/success?orderCode={orderCode}&phone={phone}', buttonStyle: 'primary' },
+                { id: `b-${now}-7`, type: 'button', buttonLabel: '⭐ บัตรสะสมแต้มของฉัน', buttonUrl: 'https://homematchacafe.store/loyalty?phone={phone}', buttonStyle: 'gold' }
             ];
         } else if (preset === 'status_slip_approved') {
             designerCardBlocks = [
@@ -2014,7 +2024,7 @@
         }
     }
 
-    async function setAsStatusCard(statusKey: 'slip_approved' | 'brewing' | 'ready_to_ship' | 'delivering' | 'completed' | 'cancelled' | 'member_registered') {
+    async function setAsStatusCard(statusKey: 'order_created' | 'slip_approved' | 'brewing' | 'ready_to_ship' | 'delivering' | 'completed' | 'cancelled' | 'member_registered') {
         const bubble = buildDesignerFlexBubble();
         if (!settings.lineOa.customStatusCards) {
             settings.lineOa.customStatusCards = {};
@@ -2026,6 +2036,7 @@
         };
         await saveAllSettings();
         const statusNameMap: Record<string, string> = {
+            order_created: '📝 รับออเดอร์ใหม่ (Order Created)',
             member_registered: '🎉 ลูกค้าสมัครสมาชิกเสร็จแล้ว',
             slip_approved: '💳 อนุมัติสลิป / รับยอด',
             brewing: '🍵 กำลังชง',
@@ -2062,6 +2073,7 @@
             swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `โหลดการ์ดสถานะที่บันทึกไว้แล้ว ✨`, showConfirmButton: false, timer: 1500 });
         } else {
             const presetMap: Record<string, any> = {
+                order_created: 'status_order_created',
                 member_registered: 'status_member_registered',
                 slip_approved: 'status_slip_approved',
                 brewing: 'status_brewing',
@@ -6045,6 +6057,9 @@
 
                         <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; border-top: 1px dashed #e2e8f0; padding-top: 0.4rem;">
                             <span style="font-size: 0.74rem; color: #0f766e; font-weight: 800;">📢 แจ้งเตือนสถานะออเดอร์:</span>
+                            <button type="button" onclick={() => loadDesignerPreset('status_order_created')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #f8fafc; border: 1.5px solid #94a3b8; color: #334155; border-radius: 6px; cursor: pointer;" title="โหลดพรีเซ็ตการ์ดรับออเดอร์ใหม่ (ปุ่มลิงก์ไปหน้า /success ให้แนบสลิป)">
+                                📝 รับออเดอร์ (Order Created)
+                            </button>
                             <button type="button" onclick={() => loadDesignerPreset('status_slip_approved')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #f0fdf4; border: 1.5px solid #86efac; color: #15803d; border-radius: 6px; cursor: pointer;" title="โหลดพรีเซ็ตการ์ดอนุมัติสลิป (ปุ่มลิงก์ไปหน้า /success)">
                                 💳 อนุมัติสลิป (/success)
                             </button>
@@ -6087,6 +6102,7 @@
                                     </button>
                                 {/if}
                                 {#each [
+                                    { key: 'order_created', label: '📝 รับออเดอร์' },
                                     { key: 'member_registered', label: '🎉 สมัครสมาชิก' },
                                     { key: 'slip_approved', label: '💳 อนุมัติสลิป' },
                                     { key: 'brewing', label: '🍵 กำลังชง' },
@@ -6783,7 +6799,8 @@
                             
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem; margin-bottom: 0.5rem;">
                                 {#each [
-                                    { key: 'member_registered', name: '🎉 สมัครสมาชิก', color: '#166534' },
+                                    { key: 'order_created', name: '📝 รับออเดอร์', color: '#166534' },
+                                    { key: 'member_registered', name: '🎉 สมัครสมาชิก', color: '#831843' },
                                     { key: 'slip_approved', name: '💳 อนุมัติสลิป', color: '#15803d' },
                                     { key: 'brewing', name: '🍵 กำลังชง', color: '#0d9488' },
                                     { key: 'ready_to_ship', name: '✨ ชงเสร็จ', color: '#059669' },
@@ -6817,14 +6834,14 @@
                             {#if Object.values(settings.lineOa.customStatusCards || {}).some(c => c?.enabled)}
                                 <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; border-top: 1px dashed #cbd5e1; padding-top: 0.5rem; font-size: 0.72rem; color: #475569;">
                                     <span>สลับกลับใช้การ์ดระบบ:</span>
-                                    {#each ['member_registered', 'slip_approved', 'brewing', 'ready_to_ship', 'delivering', 'completed', 'cancelled'] as st}
+                                    {#each ['order_created', 'member_registered', 'slip_approved', 'brewing', 'ready_to_ship', 'delivering', 'completed', 'cancelled'] as st}
                                         {#if settings.lineOa.customStatusCards?.[st]?.enabled}
                                             <button
                                                 type="button"
                                                 onclick={() => unsetStatusCard(st)}
                                                 style="padding: 0.15rem 0.45rem; font-size: 0.7rem; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; border-radius: 4px; cursor: pointer;"
                                             >
-                                                รีเซ็ต {st === 'member_registered' ? 'สมัครสมาชิก' : st === 'slip_approved' ? 'อนุมัติสลิป' : st === 'brewing' ? 'กำลังชง' : st === 'ready_to_ship' ? 'ชงเสร็จ' : st === 'delivering' ? 'กำลังส่ง' : st === 'completed' ? 'ส่งสำเร็จ' : 'ยกเลิก'}
+                                                รีเซ็ต {st === 'order_created' ? 'รับออเดอร์' : st === 'member_registered' ? 'สมัครสมาชิก' : st === 'slip_approved' ? 'อนุมัติสลิป' : st === 'brewing' ? 'กำลังชง' : st === 'ready_to_ship' ? 'ชงเสร็จ' : st === 'delivering' ? 'กำลังส่ง' : st === 'completed' ? 'ส่งสำเร็จ' : 'ยกเลิก'}
                                             </button>
                                         {/if}
                                     {/each}
