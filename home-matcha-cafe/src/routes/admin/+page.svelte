@@ -2355,23 +2355,87 @@
         return grid;
     }
 
-    function toggleDayOpen(dateStr: string) {
+    async function cycleDayRounds(dateStr: string) {
         const current = settings.calendar[dateStr] || { isOpen: false };
         const dParts = dateStr.split('-').map(Number);
         const dayOfWeek = new Date(dParts[0], dParts[1] - 1, dParts[2]).getDay();
-        const defaultRounds = (dayOfWeek === 0 || dayOfWeek === 6) ? ['allday'] : ['morning', 'noon'];
+        const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+        const hasAllDayConfig = settings.deliveryRounds.some(r => r.id === 'allday' || r.isAllDayOpen);
+
+        let nextIsOpen = true;
+        let nextCustomRounds: string[] = [];
+
+        if (!current.isOpen) {
+            // ปิดอยู่ -> เปิดทั้ง 2 รอบ (หรือ allday ในวันหยุด)
+            nextIsOpen = true;
+            nextCustomRounds = (isWeekend && hasAllDayConfig) ? ['allday'] : ['morning', 'noon'];
+        } else {
+            const rounds = current.customRounds && current.customRounds.length > 0 ? current.customRounds : ['morning', 'noon'];
+            if (rounds.includes('allday')) {
+                // รวบสาย-บ่าย -> ปิด
+                nextIsOpen = false;
+                nextCustomRounds = [];
+            } else if (rounds.includes('morning') && rounds.includes('noon')) {
+                // เปิดทั้งเช้า+บ่าย -> แค่รอบเช้า
+                nextIsOpen = true;
+                nextCustomRounds = ['morning'];
+            } else if (rounds.length === 1 && rounds.includes('morning')) {
+                // แค่รอบเช้า -> แค่รอบบ่าย
+                nextIsOpen = true;
+                nextCustomRounds = ['noon'];
+            } else {
+                // แค่รอบบ่าย หรือโหมดอื่นๆ -> ปิด
+                nextIsOpen = false;
+                nextCustomRounds = [];
+            }
+        }
+
         settings.calendar[dateStr] = {
-            ...current,
-            isOpen: !current.isOpen,
-            customRounds: current.customRounds && current.customRounds.length > 0 ? current.customRounds : defaultRounds
+            isOpen: nextIsOpen,
+            customRounds: nextCustomRounds
         };
+
+        // บันทึกลงระบบทันที
+        try {
+            await fetch('/api/settings', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            });
+        } catch (e) {
+            console.error('Auto-save day cycle failed:', e);
+        }
+    }
+
+    function toggleDayOpen(dateStr: string) {
+        cycleDayRounds(dateStr);
+    }
+
+    function setDayModalPreset(preset: 'both' | 'morning' | 'noon' | 'allday' | 'closed') {
+        if (!editingDayModal) return;
+        if (preset === 'closed') {
+            editingDayModal.isOpen = false;
+            editingDayModal.customRounds = [];
+        } else if (preset === 'both') {
+            editingDayModal.isOpen = true;
+            editingDayModal.customRounds = ['morning', 'noon'];
+        } else if (preset === 'morning') {
+            editingDayModal.isOpen = true;
+            editingDayModal.customRounds = ['morning'];
+        } else if (preset === 'noon') {
+            editingDayModal.isOpen = true;
+            editingDayModal.customRounds = ['noon'];
+        } else if (preset === 'allday') {
+            editingDayModal.isOpen = true;
+            editingDayModal.customRounds = ['allday'];
+        }
     }
 
     function openEditDayModal(dateStr: string) {
         const dParts = dateStr.split('-').map(Number);
         const dayOfWeek = new Date(dParts[0], dParts[1] - 1, dParts[2]).getDay();
         const defaultRounds = (dayOfWeek === 0 || dayOfWeek === 6) ? ['allday'] : ['morning', 'noon'];
-        const current = settings.calendar[dateStr] || { isOpen: true, customRounds: defaultRounds };
+        const current = settings.calendar[dateStr] || { isOpen: false, customRounds: defaultRounds };
         editingDayModal = {
             dateStr,
             isOpen: Boolean(current.isOpen),
@@ -2951,6 +3015,57 @@
             <h3 style="margin: 0 0 0.5rem 0; font-size: 1.2rem; color: var(--matcha-deep);">
                 🗓️ กำหนดรอบส่งวันที่ {editingDayModal.dateStr}
             </h3>
+
+            <!-- ⚡ ปุ่มลัดเลือกโหมดรอบส่งแบบ 1-Click -->
+            <div style="margin: 0.85rem 0 0.75rem 0;">
+                <span style="font-size: 0.82rem; font-weight: 700; color: #475569; display: block; margin-bottom: 0.4rem;">
+                    ⚡ เลือกโหมดรอบส่งด่วน:
+                </span>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <button
+                        type="button"
+                        onclick={() => setDayModalPreset('both')}
+                        style="padding: 0.6rem 0.5rem; font-size: 0.85rem; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s; border: 2px solid {editingDayModal.isOpen && editingDayModal.customRounds.includes('morning') && editingDayModal.customRounds.includes('noon') ? '#22c55e' : '#e2e8f0'}; background: {editingDayModal.isOpen && editingDayModal.customRounds.includes('morning') && editingDayModal.customRounds.includes('noon') ? '#f0fdf4' : '#ffffff'}; color: #166534; display: flex; flex-direction: column; align-items: center; gap: 2px;"
+                    >
+                        <span>🌅☀️ เช้า + บ่าย</span>
+                        <span style="font-size: 0.72rem; font-weight: 500; color: #166534;">(เปิดทั้ง 2 รอบ)</span>
+                    </button>
+                    <button
+                        type="button"
+                        onclick={() => setDayModalPreset('morning')}
+                        style="padding: 0.6rem 0.5rem; font-size: 0.85rem; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s; border: 2px solid {editingDayModal.isOpen && editingDayModal.customRounds.length === 1 && editingDayModal.customRounds.includes('morning') ? '#3b82f6' : '#e2e8f0'}; background: {editingDayModal.isOpen && editingDayModal.customRounds.length === 1 && editingDayModal.customRounds.includes('morning') ? '#eff6ff' : '#ffffff'}; color: #1d4ed8; display: flex; flex-direction: column; align-items: center; gap: 2px;"
+                    >
+                        <span>🌅 แค่รอบเช้า</span>
+                        <span style="font-size: 0.72rem; font-weight: 500; color: #1d4ed8;">(7:00 - 8:30 น.)</span>
+                    </button>
+                    <button
+                        type="button"
+                        onclick={() => setDayModalPreset('noon')}
+                        style="padding: 0.6rem 0.5rem; font-size: 0.85rem; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s; border: 2px solid {editingDayModal.isOpen && editingDayModal.customRounds.length === 1 && editingDayModal.customRounds.includes('noon') ? '#f59e0b' : '#e2e8f0'}; background: {editingDayModal.isOpen && editingDayModal.customRounds.length === 1 && editingDayModal.customRounds.includes('noon') ? '#fffbeb' : '#ffffff'}; color: #b45309; display: flex; flex-direction: column; align-items: center; gap: 2px;"
+                    >
+                        <span>☀️ แค่รอบบ่าย</span>
+                        <span style="font-size: 0.72rem; font-weight: 500; color: #b45309;">(12:30 น.)</span>
+                    </button>
+                    <button
+                        type="button"
+                        onclick={() => setDayModalPreset('closed')}
+                        style="padding: 0.6rem 0.5rem; font-size: 0.85rem; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s; border: 2px solid {!editingDayModal.isOpen ? '#ef4444' : '#e2e8f0'}; background: {!editingDayModal.isOpen ? '#fef2f2' : '#ffffff'}; color: #991b1b; display: flex; flex-direction: column; align-items: center; gap: 2px;"
+                    >
+                        <span>⚪ ปิดร้านทั้งวัน</span>
+                        <span style="font-size: 0.72rem; font-weight: 500; color: #991b1b;">(ไม่รับออเดอร์)</span>
+                    </button>
+                    {#if settings.deliveryRounds.some(r => r.id === 'allday' || r.isAllDayOpen)}
+                        <button
+                            type="button"
+                            onclick={() => setDayModalPreset('allday')}
+                            style="grid-column: span 2; padding: 0.6rem 0.5rem; font-size: 0.85rem; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s; border: 2px solid {editingDayModal.isOpen && editingDayModal.customRounds.includes('allday') ? '#8b5cf6' : '#e2e8f0'}; background: {editingDayModal.isOpen && editingDayModal.customRounds.includes('allday') ? '#f5f3ff' : '#ffffff'}; color: #5b21b6; display: flex; flex-direction: column; align-items: center; gap: 2px;"
+                        >
+                            <span>🌿 รอบพิเศษ รวบสาย-บ่าย</span>
+                            <span style="font-size: 0.72rem; font-weight: 500; color: #5b21b6;">(9:00 - 13:00 น. สำหรับวันหยุด)</span>
+                        </button>
+                    {/if}
+                </div>
+            </div>
             
             <div style="margin: 0.85rem 0; padding: 0.75rem 1rem; border-radius: 12px; background: {editingDayModal.isOpen ? '#f0fdf4' : '#fef2f2'}; border: 1px solid {editingDayModal.isOpen ? '#bbf7d0' : '#fecdd3'}; display: flex; justify-content: space-between; align-items: center;">
                 <span style="font-weight: 700; color: {editingDayModal.isOpen ? '#166534' : '#991b1b'}; font-size: 0.95rem;">
@@ -4938,7 +5053,7 @@
                             📅 ปฏิทินเปิดร้านรายเดือน ({thaiMonthNames[currentCalMonth]} {currentCalYear + 543})
                         </h3>
                         <p style="margin: 0.2rem 0 0 0; font-size: 0.825rem; color: var(--text-muted);">
-                            คลิกที่วันเพื่อ <span style="color: #166534; font-weight: 700;">เปิด (สีเขียว)</span> หรือ <span style="color: #64748b; font-weight: 700;">ปิด (สีเทา)</span> และคลิกฟันเฟือง ⚙️ เพื่อกำหนดรอบส่งเฉพาะวัน
+                            คลิกที่วันเพื่อเปลี่ยนโหมด (ปิด ➔ เช้า+บ่าย ➔ แค่เช้า ➔ แค่บ่าย ➔ ปิด) หรือกด ⚙️ เพื่อเลือกโหมดทันที
                         </p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -4961,6 +5076,36 @@
                     </div>
                 </div>
 
+                <!-- แถบอธิบายสีสถานะ (Legend) -->
+                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem 0.85rem; margin-bottom: 0.85rem; font-size: 0.78rem; font-weight: 600; padding: 0.55rem 0.75rem; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0; align-items: center;">
+                    <span style="color: #475569; font-weight: 700;">🎨 โหมดรอบส่ง:</span>
+                    <span style="display: inline-flex; align-items: center; gap: 0.3rem; color: #166534;">
+                        <span style="width: 10px; height: 10px; border-radius: 3px; background: #22c55e;"></span>
+                        เช้า + บ่าย
+                    </span>
+                    <span style="display: inline-flex; align-items: center; gap: 0.3rem; color: #1d4ed8;">
+                        <span style="width: 10px; height: 10px; border-radius: 3px; background: #3b82f6;"></span>
+                        🌅 แค่รอบเช้า
+                    </span>
+                    <span style="display: inline-flex; align-items: center; gap: 0.3rem; color: #b45309;">
+                        <span style="width: 10px; height: 10px; border-radius: 3px; background: #f59e0b;"></span>
+                        ☀️ แค่รอบบ่าย
+                    </span>
+                    {#if settings.deliveryRounds.some(r => r.id === 'allday' || r.isAllDayOpen)}
+                        <span style="display: inline-flex; align-items: center; gap: 0.3rem; color: #6d28d9;">
+                            <span style="width: 10px; height: 10px; border-radius: 3px; background: #8b5cf6;"></span>
+                            🌿 รวบสาย-บ่าย
+                        </span>
+                    {/if}
+                    <span style="display: inline-flex; align-items: center; gap: 0.3rem; color: #64748b;">
+                        <span style="width: 10px; height: 10px; border-radius: 3px; background: #cbd5e1;"></span>
+                        ⚪ ปิด
+                    </span>
+                    <span style="margin-left: auto; color: #94a3b8; font-size: 0.73rem;">
+                        💡 คลิกที่ช่องเพื่อสลับโหมด หรือกด ⚙️ เพื่อเลือก
+                    </span>
+                </div>
+
                 <!-- หัววันในสัปดาห์ (อาทิตย์ - เสาร์) -->
                 <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.4rem; text-align: center; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.4rem;">
                     <div style="color: #ef4444;">อา.</div>
@@ -4977,7 +5122,11 @@
                     {#each getCalendarMonthGrid(currentCalYear, currentCalMonth) as day}
                         {@const dayConfig = settings.calendar[day.dateStr] || { isOpen: false }}
                         {@const isOpen = Boolean(dayConfig.isOpen)}
-                        {@const isAllDayMode = (dayConfig.customRounds || []).includes('allday')}
+                        {@const rounds = dayConfig.customRounds || []}
+                        {@const isAllDay = isOpen && rounds.includes('allday')}
+                        {@const isMorningOnly = isOpen && rounds.length === 1 && rounds.includes('morning')}
+                        {@const isNoonOnly = isOpen && rounds.length === 1 && rounds.includes('noon')}
+                        {@const isBothRounds = isOpen && !isAllDay && !isMorningOnly && !isNoonOnly}
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
                         <div 
@@ -4989,36 +5138,46 @@
                                 flex-direction: column;
                                 justify-content: space-between;
                                 cursor: pointer;
-                                border: 2px solid {isOpen ? (isAllDayMode ? '#8b5cf6' : '#22c55e') : '#e2e8f0'};
-                                background: {isOpen ? (isAllDayMode ? '#f5f3ff' : '#f0fdf4') : day.isCurrentMonth ? '#ffffff' : '#f8fafc'};
+                                border: 2px solid {isBothRounds ? '#22c55e' : isMorningOnly ? '#3b82f6' : isNoonOnly ? '#f59e0b' : isAllDay ? '#8b5cf6' : '#e2e8f0'};
+                                background: {isBothRounds ? '#f0fdf4' : isMorningOnly ? '#eff6ff' : isNoonOnly ? '#fffbeb' : isAllDay ? '#f5f3ff' : day.isCurrentMonth ? '#ffffff' : '#f8fafc'};
                                 opacity: {day.isCurrentMonth ? '1' : '0.45'};
                                 transition: all 0.15s;
                             "
-                            onclick={() => toggleDayOpen(day.dateStr)}
-                            title="คลิกเพื่อสลับ เปิด/ปิด ร้านในวันนี้"
+                            onclick={() => cycleDayRounds(day.dateStr)}
+                            title="คลิกเพื่อสลับโหมดรอบส่ง (ปิด ➔ เช้า+บ่าย ➔ แค่เช้า ➔ แค่บ่าย ➔ ปิด)"
                         >
                             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                                <span style="font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 0.95rem; color: {isOpen ? (isAllDayMode ? '#5b21b6' : '#166534') : '#64748b'};">
+                                <span style="font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 0.95rem; color: {isBothRounds ? '#166534' : isMorningOnly ? '#1d4ed8' : isNoonOnly ? '#b45309' : isAllDay ? '#5b21b6' : '#64748b'};">
                                     {day.dayNum}
                                 </span>
-                                {#if isOpen}
-                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                    <button 
-                                        type="button" 
-                                        onclick={(e) => { e.stopPropagation(); openEditDayModal(day.dateStr); }}
-                                        style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.72rem; cursor: pointer; padding: 1px 4px; line-height: 1.2;"
-                                        title="ตั้งค่ารอบส่งเฉพาะวัน"
-                                    >
-                                        ⚙️
-                                    </button>
-                                {/if}
+                                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                <button 
+                                    type="button" 
+                                    onclick={(e) => { e.stopPropagation(); openEditDayModal(day.dateStr); }}
+                                    style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.72rem; cursor: pointer; padding: 1px 4px; line-height: 1.2;"
+                                    title="ตั้งค่ารอบส่งเฉพาะวัน"
+                                >
+                                    ⚙️
+                                </button>
                             </div>
 
                             <div style="text-align: center; margin-top: 0.15rem; display: flex; flex-direction: column; gap: 2px;">
-                                {#if isOpen}
-                                    <span style="display: block; font-size: 0.62rem; font-weight: 800; color: {isAllDayMode ? '#5b21b6' : '#166534'}; background: {isAllDayMode ? '#ede9fe' : '#dcfce7'}; border-radius: 4px; padding: 1px 2px;">
-                                        {isAllDayMode ? '9:00-13:00' : 'เช้า/เที่ยง'}
+                                {#if isBothRounds}
+                                    <span style="display: block; font-size: 0.62rem; font-weight: 800; color: #166534; background: #dcfce7; border-radius: 4px; padding: 1px 2px;">
+                                        เช้า + บ่าย
+                                    </span>
+                                {:else if isMorningOnly}
+                                    <span style="display: block; font-size: 0.62rem; font-weight: 800; color: #1d4ed8; background: #dbeafe; border-radius: 4px; padding: 1px 2px;">
+                                        🌅 แค่เช้า
+                                    </span>
+                                {:else if isNoonOnly}
+                                    <span style="display: block; font-size: 0.62rem; font-weight: 800; color: #b45309; background: #fef3c7; border-radius: 4px; padding: 1px 2px;">
+                                        ☀️ แค่บ่าย
+                                    </span>
+                                {:else if isAllDay}
+                                    <span style="display: block; font-size: 0.62rem; font-weight: 800; color: #5b21b6; background: #ede9fe; border-radius: 4px; padding: 1px 2px;">
+                                        9:00-13:00
                                     </span>
                                 {:else}
                                     <span style="display: block; font-size: 0.65rem; color: #94a3b8;">

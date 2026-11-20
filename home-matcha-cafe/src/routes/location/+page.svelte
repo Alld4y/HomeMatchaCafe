@@ -499,8 +499,10 @@
                             {#each allDisplayDates as day}
                                 {@const isPastCutoffs = Boolean(day.isPastAllCutoffs)}
                                 {@const fermentedOk = isDateValidForFermented(day.dateStr)}
+                                {@const rounds = day.availableRounds || []}
+                                {@const roundBadge = rounds.length === 1 ? (rounds[0].id === 'morning' ? ' [🌅 เปิดเฉพาะรอบเช้า]' : rounds[0].id === 'noon' ? ' [☀️ เปิดเฉพาะรอบบ่าย]' : ` [🌿 ${rounds[0].name}]`) : ''}
                                 <option value={day.dateStr} disabled={isPastCutoffs}>
-                                    วัน{day.dayNameTh}ที่ {day.dayNum} {day.monthNameTh} ({day.dateStr}) - {isPastCutoffs ? '⛔ ปิดรับรอบวันนี้แล้ว (เลยเวลาตัดรอบ)' : hasFermentedItem ? (fermentedOk ? '✓ สั่งเมนูบ่มได้ (เลือกได้ทุกรอบ)' : '⚠️ เลยเวลาเมนูบ่ม (ได้เฉพาะเมนูไม่บ่ม)') : '✓ เปิดรับออเดอร์'}
+                                    วัน{day.dayNameTh}ที่ {day.dayNum} {day.monthNameTh} ({day.dateStr}){roundBadge} - {isPastCutoffs ? '⛔ ปิดรับรอบวันนี้แล้ว (เลยเวลาตัดรอบ)' : hasFermentedItem ? (fermentedOk ? '✓ สั่งเมนูบ่มได้ (เลือกได้ทุกรอบ)' : '⚠️ เลยเวลาเมนูบ่ม (ได้เฉพาะเมนูไม่บ่ม)') : '✓ เปิดรับออเดอร์'}
                                 </option>
                             {/each}
                         </select>

@@ -505,6 +505,20 @@
         }
     }
 
+    // ล็อกไม่ให้เลื่อนหน้าจอด้านหลังเมื่อมี Modal หรือ Profile เปิดอยู่
+    $effect(() => {
+        if (typeof document !== 'undefined') {
+            const shouldLock = showMemberQuickModal || showMemberAuthModal || isModalOpen || showInstallModal;
+            if (shouldLock) {
+                document.body.style.overflow = 'hidden';
+                document.documentElement.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = '';
+                document.documentElement.style.overflow = '';
+            }
+        }
+    });
+
     // 📲 PWA & In-App Browser Detection & Installation
     const PWA_PROMPT_KEY = 'hmc_pwa_prompt_shown_v1';
     let isLineBrowser = $state(false);
@@ -1607,6 +1621,8 @@
         justify-content: center;
         padding: 1rem;
         box-sizing: border-box;
+        overscroll-behavior: contain;
+        touch-action: none;
     }
 
     .member-modal-card {
@@ -1620,6 +1636,8 @@
         border: 1px solid #d7e8ce;
         box-sizing: border-box;
         overflow: hidden;
+        overscroll-behavior: contain;
+        touch-action: auto;
     }
 
     .member-modal-card.profile-modal-card {
