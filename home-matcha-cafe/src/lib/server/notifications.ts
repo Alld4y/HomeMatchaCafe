@@ -630,7 +630,41 @@ export async function sendLineBroadcastFlexMessage(
 }
 
 /**
- * แจ้งเตือนแอดมินทาง LINE เมื่อมีออเดอร์ใหม่ หรือมีการแนบสลิป
+ * ดึงรายการ LINE User ID ทั้งหมดของแอดมิน (รองรับหลายคน จากทั้งช่อง adminLineUserId และ adminPhone)
+ */
+export async function getAdminLineUserIds(): Promise<string[]> {
+    const settings = await getStoreSettings();
+    const lineOa = settings.lineOa;
+    const userIds = new Set<string>();
+
+    // 1. จาก adminLineUserId (รองรับหลายคน คั่นด้วยจุลภาค , หรือเว้นวรรค)
+    if (lineOa?.adminLineUserId) {
+        lineOa.adminLineUserId
+            .split(/[,;\s]+/)
+            .map(s => s.trim())
+            .filter(Boolean)
+            .forEach(id => {
+                if (id.startsWith('U')) userIds.add(id);
+            });
+    }
+
+    // 2. จาก adminPhone (รองรับหลายเบอร์ คั่นด้วยจุลภาค , หรือเว้นวรรค)
+    const phoneRaw = lineOa?.adminPhone || '';
+    const phones = phoneRaw
+        .split(/[,;\s\n]+/)
+        .map(p => p.replace(/[^0-9]/g, ''))
+        .filter(p => p.length >= 9);
+
+    for (const ph of phones) {
+        const uid = await getLineUserIdByPhone(ph);
+        if (uid) userIds.add(uid);
+    }
+
+    return Array.from(userIds);
+}
+
+/**
+ * แจ้งเตือนแอดมินทาง LINE เมื่อมีออเดอร์ใหม่ หรือมีการแนบสลิป (ส่งหาแอดมินทุกคน)
  */
 export async function notifyAdminLine(params: {
     eventType: 'new_order' | 'slip_uploaded';
@@ -645,7 +679,12 @@ export async function notifyAdminLine(params: {
     const settings = await getStoreSettings();
     const lineOa = settings.lineOa;
 
-    if (!lineOa?.enabled || !lineOa?.channelAccessToken || !lineOa?.adminLineUserId) {
+    if (!lineOa?.enabled || !lineOa?.channelAccessToken) {
+        return false;
+    }
+
+    const adminUserIds = await getAdminLineUserIds();
+    if (!adminUserIds.length) {
         return false;
     }
 
@@ -762,7 +801,10 @@ export async function notifyAdminLine(params: {
         });
     }
 
-    return sendLineRawFlexMessage(lineOa.channelAccessToken, lineOa.adminLineUserId, altText, bubble);
+    const results = await Promise.all(
+        adminUserIds.map(uid => sendLineRawFlexMessage(lineOa.channelAccessToken, uid, altText, bubble))
+    );
+    return results.some(r => r === true);
 }
 
 /**
@@ -800,15 +842,39 @@ export async function sendLineTestMessage(
         customMessage = legacyCustomMessage;
     }
 
-    let to = targetUserId || lineOa.adminLineUserId;
-    if (!to && targetPhone) {
-        to = (await getLineUserIdByPhone(targetPhone)) || '';
-    }
-    if (!to && lineOa.adminPhone) {
-        to = (await getLineUserIdByPhone(lineOa.adminPhone)) || '';
+    let recipients: string[] = [];
+
+    if (targetUserId) {
+        targetUserId
+            .split(/[,;\s]+/)
+            .map(s => s.trim())
+            .filter(Boolean)
+            .forEach(id => {
+                if (id.startsWith('U')) recipients.push(id);
+            });
     }
 
-    if (!to) {
+    if (targetPhone) {
+        const phones = targetPhone
+            .split(/[,;\s\n]+/)
+            .map(p => p.replace(/[^0-9]/g, ''))
+            .filter(p => p.length >= 9);
+
+        for (const ph of phones) {
+            const uid = await getLineUserIdByPhone(ph);
+            if (uid && !recipients.includes(uid)) {
+                recipients.push(uid);
+            }
+        }
+    }
+
+    if (!recipients.length) {
+        recipients = await getAdminLineUserIds();
+    }
+
+    recipients = Array.from(new Set(recipients));
+
+    if (!recipients.length) {
         return {
             success: false,
             message: 'ไม่พบ LINE User ID สำหรับรับข้อความทดสอบ (กรุณาระบุ Admin User ID หรือระบุเบอร์โทรแอดมินที่เคยพิมพ์ในแชท LINE OA ค่ะ)'
@@ -861,21 +927,25 @@ export async function sendLineTestMessage(
             body: 'นี่คือข้อความทดสอบการแจ้งเตือนสถานะคำสั่งซื้อทาง LINE OA'
         };
 
-        const ok = await sendLineStatusFlexMessage(token, to, {
-            title: meta.title,
-            body: meta.body,
-            eventType: statusType as any,
-            orderCode: 'HM-TEST88',
-            itemsSummary: 'Cold-Fermented Oat Milk Matcha Latte x1, Clear Matcha Cold Whisk x1',
-            totalPrice: 165,
-            url: '/order/test',
-            phone: targetPhone || lineOa.adminPhone || '0987654321'
-        });
+        let successCount = 0;
+        for (const to of recipients) {
+            const ok = await sendLineStatusFlexMessage(token, to, {
+                title: meta.title,
+                body: meta.body,
+                eventType: statusType as any,
+                orderCode: 'HM-TEST88',
+                itemsSummary: 'Cold-Fermented Oat Milk Matcha Latte x1, Clear Matcha Cold Whisk x1',
+                totalPrice: 165,
+                url: '/order/test',
+                phone: targetPhone || lineOa.adminPhone || '0987654321'
+            });
+            if (ok) successCount++;
+        }
 
-        if (ok) {
+        if (successCount > 0) {
             return {
                 success: true,
-                message: `ยิงการ์ดทดสอบสถานะ "${meta.name}" ไปยัง LINE แอดมินสำเร็จเรียบร้อยแล้วค่ะ! 🍵`
+                message: `ยิงการ์ดทดสอบสถานะ "${meta.name}" ไปยัง LINE แอดมินสำเร็จแล้ว (${successCount}/${recipients.length} ท่าน) 🍵`
             };
         } else {
             return {
@@ -921,9 +991,14 @@ export async function sendLineTestMessage(
         }
     };
 
-    const ok = await sendLineRawFlexMessage(token, to, 'ข้อความทดสอบระบบ LINE OA Home Matcha Cafe', testBubble);
-    if (ok) {
-        return { success: true, message: `ส่งข้อความทดสอบไปยัง LINE แอดมินสำเร็จแล้วค่ะ! (${to})` };
+    let successCount = 0;
+    for (const to of recipients) {
+        const ok = await sendLineRawFlexMessage(token, to, 'ข้อความทดสอบระบบ LINE OA Home Matcha Cafe', testBubble);
+        if (ok) successCount++;
+    }
+
+    if (successCount > 0) {
+        return { success: true, message: `ส่งข้อความทดสอบไปยัง LINE แอดมินสำเร็จแล้วค่ะ (${successCount}/${recipients.length} ท่าน)!` };
     } else {
         return { success: false, message: 'ส่งข้อความไม่สำเร็จ กรุณาตรวจสอบว่าแอดมินกดแอดเพื่อนกับบอท LINE OA หรือยังนะคะ' };
     }

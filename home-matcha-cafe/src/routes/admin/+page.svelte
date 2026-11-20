@@ -1509,6 +1509,10 @@
     let designerTarget = $state<'admin' | 'broadcast'>('admin');
     let draggedBlockIdx = $state<number | null>(null);
 
+    let designerHeroBlock = $derived(designerCardBlocks.find(b => b.type === 'banner' && b.imageUrl));
+    let designerBodyBlocks = $derived(designerCardBlocks.filter(b => b.type !== 'banner' && b.type !== 'button'));
+    let designerFooterBlocks = $derived(designerCardBlocks.filter(b => b.type === 'button' && b.buttonLabel));
+
     function addDesignerBlock(type: DesignerCardBlock['type']) {
         const id = `blk-${Date.now()}`;
         if (type === 'banner') {
@@ -1538,6 +1542,23 @@
         copy[idx] = copy[targetIdx];
         copy[targetIdx] = temp;
         designerCardBlocks = copy;
+    }
+
+    function replacePreviewVars(text?: string): string {
+        if (!text) return '';
+        return text
+            .replace(/\{orderCode\}/g, 'HM-8899')
+            .replace(/\{totalPrice\}/g, '฿165')
+            .replace(/\{customerName\}/g, 'คุณลูกค้า')
+            .replace(/\{name\}/g, 'คุณลูกค้า')
+            .replace(/\{phone\}/g, '081-234-5678')
+            .replace(/\{points\}/g, '10')
+            .replace(/\{itemsSummary\}/g, 'Cold-Fermented Oat Milk Matcha Latte x1')
+            .replace(/\{url\}/g, 'https://homematchacafe.store/order')
+            .replace(/\{trackingUrl\}/g, 'https://homematchacafe.store/order')
+            .replace(/\{loyaltyUrl\}/g, 'https://homematchacafe.store/loyalty')
+            .replace(/\{registerUrl\}/g, 'https://homematchacafe.store/loyalty?action=register')
+            .replace(/\{menuUrl\}/g, 'https://homematchacafe.store/menu');
     }
 
     function loadDesignerPreset(preset: 'promo' | 'loyalty' | 'delivery' | 'welcome' | 'register' | 'member' | 'status_brewing' | 'status_ready' | 'status_delivering' | 'status_completed' | 'status_cancelled') {
@@ -5175,7 +5196,7 @@
                     <div>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
                             <label for="lineAdminUserId" style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin: 0;">
-                                Admin User ID (สำหรับรับแจ้งเตือน):
+                                🆔 Admin User ID (รองรับหลายคน คั่นด้วยจุลภาค ,):
                             </label>
                             {#if settings.lineOa.adminLineUserId}
                                 <button
@@ -5191,17 +5212,17 @@
                             id="lineAdminUserId"
                             type="text"
                             bind:value={settings.lineOa.adminLineUserId}
-                            placeholder="เช่น Uc04ed4f079c031e33621c131cec0ca27"
+                            placeholder="เช่น U123..., U456... (คั่นด้วยจุลภาค , เมื่อมีแอดมินหลายคน)"
                             style="width: 100%; padding: 0.6rem 0.8rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.88rem; font-family: monospace;"
                         />
-                        <span style="font-size: 0.75rem; color: #64748b;">ดูได้จาก "Your user ID" ที่ด้านล่างของแท็บ Basic settings</span>
+                        <span style="font-size: 0.75rem; color: #64748b;">ดูได้จาก "Your user ID" ที่ด้านล่างของแท็บ Basic settings ใน LINE Developers Console</span>
                     </div>
 
                     <!-- เบอร์โทรศัพท์แอดมิน (Admin Phone Number) -->
                     <div>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
                             <label for="lineAdminPhone" style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin: 0;">
-                                📱 เบอร์โทรศัพท์แอดมิน:
+                                📱 เบอร์โทรศัพท์แอดมิน (รองรับหลายคน คั่นด้วยจุลภาค ,):
                             </label>
                             {#if settings.lineOa.adminPhone}
                                 <button
@@ -5215,12 +5236,32 @@
                         </div>
                         <input
                             id="lineAdminPhone"
-                            type="tel"
+                            type="text"
                             bind:value={settings.lineOa.adminPhone}
-                            placeholder="เช่น 0812345678"
+                            placeholder="เช่น 0812345678, 0898765432"
                             style="width: 100%; padding: 0.6rem 0.8rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.88rem; font-weight: 600;"
                         />
-                        <span style="font-size: 0.75rem; color: #64748b;">เบอร์แอดมินสำหรับผูกบัญชีรับแจ้งเตือน และยิงทดสอบสถานะ</span>
+                        <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">
+                            ใส่เบอร์โทรศัพท์แอดมินได้มากกว่า 1 คน โดยคั่นด้วยเครื่องหมายจุลภาค <code>,</code> ระบบจะค้นหาบัญชี LINE ที่ผูกกับแต่ละเบอร์ และส่งแจ้งเตือนออเดอร์ใหม่ / สลิปโอนเงิน / การทดสอบ ไปยังแอดมินทุกคนพร้อมกันทันทีค่ะ
+                        </div>
+
+                        {#if settings.lineOa.adminPhone}
+                            {@const parsedAdminPhones = settings.lineOa.adminPhone.split(/[,;\s\n]+/).map(p => p.trim()).filter(Boolean)}
+                            {#if parsedAdminPhones.length > 0}
+                                <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.45rem;">
+                                    {#each parsedAdminPhones as ph}
+                                        {@const cleanPh = ph.replace(/[^0-9]/g, '')}
+                                        {@const linked = lineUsersList.find(u => u.phone && u.phone.replace(/[^0-9]/g, '') === cleanPh)}
+                                        <span style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.55rem; background: {linked ? '#dcfce7' : '#fee2e2'}; border: 1px solid {linked ? '#86efac' : '#fca5a5'}; border-radius: 999px; font-size: 0.74rem; font-weight: 700; color: {linked ? '#166534' : '#991b1b'};">
+                                            {linked ? '🟢 ผูกแล้ว' : '⚪ ยังไม่ผูก'}: {ph}
+                                            {#if linked?.display_name}
+                                                <small style="opacity: 0.85;">({linked.display_name})</small>
+                                            {/if}
+                                        </span>
+                                    {/each}
+                                </div>
+                            {/if}
+                        {/if}
                     </div>
 
                     <!-- Channel Access Token (Long-lived) -->
@@ -6372,71 +6413,92 @@
                         <!-- กรอบจำลองหน้าจอ LINE Chat -->
                         <div style="background: #849ebf; border-radius: 24px; padding: 1.25rem 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.15); max-width: 360px; margin: 0 auto; width: 100%;">
                             
-                            <!-- ตัวการ์ด Flex Message สีขาว -->
-                            <div style="background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.12);">
+                            <!-- ตัวการ์ด Flex Message สีขาว (จำลอง Flex Bubble ขนาด Mega ตามสเปก LINE 1:1) -->
+                            <div style="background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.18);">
                                 
-                                {#each designerCardBlocks as b}
-                                    {#if b.type === 'banner' && b.imageUrl}
-                                        <div style="width: 100%; aspect-ratio: {b.aspectRatio === '1:1' ? '1/1' : b.aspectRatio === '16:9' ? '16/9' : '20/13'}; overflow: hidden; background: #e2e8f0;">
-                                            <img
-                                                src={b.imageUrl}
-                                                alt="Banner"
-                                                style="width: 100%; height: 100%; object-fit: cover; display: block;"
-                                                onerror={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80'; }}
-                                            />
+                                <!-- 1. HERO BANNER (ขอบชนขอบ ด้านบนสุดของการ์ด) -->
+                                {#if designerHeroBlock}
+                                    <div style="width: 100%; aspect-ratio: {designerHeroBlock.aspectRatio === '1:1' ? '1/1' : designerHeroBlock.aspectRatio === '16:9' ? '16/9' : '20/13'}; overflow: hidden; background: #e2e8f0; position: relative;">
+                                        <img
+                                            src={designerHeroBlock.imageUrl}
+                                            alt="Hero Mascot"
+                                            style="width: 100%; height: 100%; object-fit: cover; display: block;"
+                                            onerror={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80'; }}
+                                        />
+                                        <!-- จำลอง Badge วันนี้ ของแอป LINE บนหัวภาพ -->
+                                        <div style="position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: #96a978; color: #ffffff; font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.55rem; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">
+                                            วันนี้
                                         </div>
-                                    {:else if b.type === 'tag' && b.tagText}
-                                        <div style="padding: 0.5rem 1rem 0 1rem;">
-                                            <span style="display: inline-block; background: {b.tagBg || '#dcfce7'}; color: {b.tagColor || '#166534'}; font-size: 0.72rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 999px;">
-                                                {b.tagText}
-                                            </span>
-                                        </div>
-                                    {:else if b.type === 'title' && b.titleText}
-                                        <div style="padding: 0.4rem 1rem 0.2rem 1rem;">
-                                            <strong style="color: #14532d; font-size: {b.titleSize === 'xl' ? '1.25rem' : b.titleSize === 'md' ? '1rem' : '1.12rem'}; line-height: 1.35; display: block;">
-                                                {b.titleText}
-                                            </strong>
-                                        </div>
-                                    {:else if b.type === 'body' && b.bodyText}
-                                        <div style="padding: 0.2rem 1rem 0.4rem 1rem;">
-                                            <p style="margin: 0; color: #475569; font-size: 0.82rem; line-height: 1.5; white-space: pre-line;">
-                                                {b.bodyText}
-                                            </p>
-                                        </div>
-                                    {:else if b.type === 'highlight' && b.highlightText}
-                                        <div style="padding: 0.25rem 1rem 0.4rem 1rem;">
-                                            <div style="background: #fef3c7; border: 1.5px solid #fde047; border-radius: 8px; padding: 0.5rem 0.75rem; color: #92400e; font-size: 0.82rem; font-weight: 800; text-align: center;">
-                                                {b.highlightText}
-                                            </div>
-                                        </div>
-                                    {:else if b.type === 'button' && b.buttonLabel}
-                                        <div style="padding: 0.25rem 1rem 0.45rem 1rem;">
+                                    </div>
+                                {/if}
+
+                                <!-- 2. BODY CONTAINER (PaddingAll: 20px ตามมาตรฐาน Flex Message) -->
+                                {#if designerBodyBlocks.length > 0}
+                                    <div style="padding: 20px 20px 14px 20px; display: flex; flex-direction: column; gap: 8px;">
+                                        {#each designerBodyBlocks as b}
+                                            {#if b.type === 'tag' && b.tagText}
+                                                <div style="display: flex;">
+                                                    <span style="display: inline-block; background: {b.tagBg || '#e0f2fe'}; color: {b.tagColor || '#0369a1'}; font-size: 0.72rem; font-weight: 800; padding: 0.22rem 0.65rem; border-radius: 999px;">
+                                                        {b.tagText}
+                                                    </span>
+                                                </div>
+                                            {:else if b.type === 'title' && b.titleText}
+                                                <div>
+                                                    <strong style="color: #14532d; font-size: {b.titleSize === 'xl' ? '1.25rem' : b.titleSize === 'md' ? '1rem' : '1.12rem'}; line-height: 1.35; display: block; font-weight: 800;">
+                                                        {replacePreviewVars(b.titleText)}
+                                                    </strong>
+                                                </div>
+                                            {:else if b.type === 'body' && b.bodyText}
+                                                <div>
+                                                    <p style="margin: 0; color: #475569; font-size: 0.85rem; line-height: 1.5; white-space: pre-line;">
+                                                        {replacePreviewVars(b.bodyText)}
+                                                    </p>
+                                                </div>
+                                            {:else if b.type === 'highlight' && b.highlightText}
+                                                <div style="background: #fef3c7; border: 1.5px solid #fde047; border-radius: 8px; padding: 0.55rem 0.85rem; color: #92400e; font-size: 0.82rem; font-weight: 700; text-align: left; line-height: 1.45;">
+                                                    {replacePreviewVars(b.highlightText)}
+                                                </div>
+                                            {/if}
+                                        {/each}
+                                    </div>
+                                {/if}
+
+                                <!-- 3. FOOTER CONTAINER (LINE Flex Buttons: ความสูง sm 38px, รัศมี 4px ตาม LINE Native Style) -->
+                                {#if designerFooterBlocks.length > 0}
+                                    <div style="padding: 6px 20px 18px 20px; display: flex; flex-direction: column; gap: 8px;">
+                                        {#each designerFooterBlocks as b}
                                             <a
                                                 href={b.buttonUrl || '#'}
                                                 target="_blank"
                                                 rel="noreferrer"
                                                 style="
-                                                    display: block;
+                                                    display: flex;
+                                                    align-items: center;
+                                                    justify-content: center;
                                                     text-align: center;
                                                     text-decoration: none;
-                                                    padding: 0.65rem 1rem;
-                                                    font-size: 0.88rem;
-                                                    font-weight: 800;
-                                                    border-radius: 10px;
-                                                    transition: all 0.15s ease;
+                                                    height: 38px;
+                                                    font-size: 0.86rem;
+                                                    font-weight: 700;
+                                                    border-radius: 4px;
                                                     background: {b.buttonStyle === 'outline' ? '#ffffff' : b.buttonStyle === 'gold' ? '#d97706' : b.buttonStyle === 'secondary' ? '#475569' : '#166534'};
                                                     color: {b.buttonStyle === 'outline' ? '#166534' : '#ffffff'};
-                                                    border: 1.5px solid {b.buttonStyle === 'outline' ? '#166534' : 'transparent'};
-                                                    box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+                                                    border: {b.buttonStyle === 'outline' ? '1px solid #166534' : 'none'};
+                                                    box-sizing: border-box;
+                                                    letter-spacing: 0.01em;
                                                 "
                                             >
                                                 {b.buttonLabel}
                                             </a>
-                                        </div>
-                                    {/if}
-                                {/each}
+                                        {/each}
+                                    </div>
+                                {/if}
 
-                                <div style="height: 0.5rem;"></div>
+                                {#if !designerHeroBlock && designerBodyBlocks.length === 0 && designerFooterBlocks.length === 0}
+                                    <div style="padding: 2.5rem 1rem; text-align: center; color: #94a3b8; font-size: 0.85rem;">
+                                        ยังไม่มีเนื้อหาในการ์ด กรุณากดเพิ่มบล็อกจากฝั่งซ้ายค่ะ
+                                    </div>
+                                {/if}
                             </div>
 
                             <!-- เวลาจำลองใต้บอลลูน -->
