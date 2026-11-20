@@ -1375,13 +1375,66 @@
         buttonAction?: 'custom' | 'register' | 'menu' | 'loyalty' | 'order';
     }
 
+    // 🐱 คลังรูปภาพมาสคอตน้องแมว 2D Home Matcha Cafe (ตามอารมณ์ต่างๆ)
+    const catMascots = [
+        {
+            id: 'welcome',
+            shortName: '👋 ต้อนรับ',
+            name: '👋 ต้อนรับเพื่อนใหม่',
+            desc: 'แมวยกมือทักทายถือถ้วยมัทฉะ ยิ้มต้อนรับอบอุ่น',
+            url: 'https://homematchacafe.store/image/mascot/cat-welcome.jpg'
+        },
+        {
+            id: 'brewing',
+            shortName: '🍵 กำลังชง',
+            name: '🍵 บาริสต้ากำลังชง',
+            desc: 'แมวใส่ผ้ากันเปื้อนบาริสต้า ตีมัทฉะควันกรุ่นด้วยแปรงชาเซ็น',
+            url: 'https://homematchacafe.store/image/mascot/cat-brewing.jpg'
+        },
+        {
+            id: 'ready',
+            shortName: '✨ ชงเสร็จ',
+            name: '✨ ชงเสร็จพร้อมส่ง',
+            desc: 'แมวยิ้มสดใสถือแก้วมัทฉะลาเต้เย็นประกายวิบวับ',
+            url: 'https://homematchacafe.store/image/mascot/cat-ready.jpg'
+        },
+        {
+            id: 'delivery',
+            shortName: '🛵 กำลังส่ง',
+            name: '🛵 ไรเดอร์กำลังส่ง',
+            desc: 'แมวใส่หมวกกันน็อกขี่มินิสกูตเตอร์ส่งชาพร้อมกล่องเดลิเวอรี่',
+            url: 'https://homematchacafe.store/image/mascot/cat-delivery.jpg'
+        },
+        {
+            id: 'completed',
+            shortName: '🎉 ส่งสำเร็จ',
+            name: '🎉 ส่งมอบสำเร็จ/ขอบคุณ',
+            desc: 'แมวดีใจสุดๆ แจกนิ้วโป้งเยี่ยมพร้อมหัวใจชมพูหวาน',
+            url: 'https://homematchacafe.store/image/mascot/cat-completed.jpg'
+        },
+        {
+            id: 'loyalty',
+            shortName: '⭐ สะสมแต้ม',
+            name: '⭐ สะสมแต้ม/สิทธิพิเศษ',
+            desc: 'แมวถือดาวทองและบัตรสะสมแต้มประกายระยิบระยับ',
+            url: 'https://homematchacafe.store/image/mascot/cat-loyalty.jpg'
+        },
+        {
+            id: 'cancelled',
+            shortName: '❌ ยกเลิก/ขออภัย',
+            name: '❌ ขออภัย/ยกเลิกออเดอร์',
+            desc: 'แมวหูตกตาละห้อยไหว้ขอโทษอย่างสุภาพ มีเหงื่อตกน่ารักน่าเอ็นดู',
+            url: 'https://homematchacafe.store/image/mascot/cat-cancelled.jpg'
+        }
+    ];
+
     let designerAltText = $state('🍵 Home Matcha Cafe มีข้อความใหม่ถึงคุณ');
     let designerCardBlocks = $state<DesignerCardBlock[]>([
         {
             id: 'b-banner',
             type: 'banner',
-            imageUrl: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80',
-            aspectRatio: '20:13'
+            imageUrl: 'https://homematchacafe.store/image/mascot/cat-welcome.jpg',
+            aspectRatio: '1:1'
         },
         {
             id: 'b-tag',
@@ -1461,7 +1514,7 @@
         const now = Date.now();
         if (preset === 'welcome') {
             designerCardBlocks = [
-                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80', aspectRatio: '20:13' },
+                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://homematchacafe.store/image/mascot/cat-welcome.jpg', aspectRatio: '1:1' },
                 { id: `b-${now}-2`, type: 'tag', tagText: '🍵 ยินดีต้อนรับสู่ Home Matcha Cafe', tagBg: '#dcfce7', tagColor: '#166534' },
                 { id: `b-${now}-3`, type: 'title', titleText: 'ยินดีต้อนรับเพื่อนใหม่นะคะ ✨', titleSize: 'lg' },
                 { id: `b-${now}-4`, type: 'body', bodyText: 'ขอบคุณที่แอดไลน์ร้าน Home Matcha Cafe ค่ะ คุณสามารถกดสั่งซื้อเครื่องดื่มออนไลน์ สะสมแต้ม หรือเช็คสถานะออเดอร์ได้ทันทีจากปุ่มด้านล่างเลยนะคะ' },
@@ -1472,7 +1525,7 @@
             ];
         } else if (preset === 'register') {
             designerCardBlocks = [
-                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=800&q=80', aspectRatio: '20:13' },
+                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://homematchacafe.store/image/mascot/cat-loyalty.jpg', aspectRatio: '1:1' },
                 { id: `b-${now}-2`, type: 'tag', tagText: '✨ สิทธิพิเศษสำหรับสมาชิก Home Matcha Cafe', tagBg: '#fdf2f8', tagColor: '#9d174d' },
                 { id: `b-${now}-3`, type: 'title', titleText: 'สมัครสมาชิกสะสมแต้ม 10 แก้วฟรี 🍵', titleSize: 'lg' },
                 { id: `b-${now}-4`, type: 'body', bodyText: 'ระบบบันทึกเบอร์โทรศัพท์ของคุณเรียบร้อยแล้วค่ะ! กดสมัครสมาชิกเพื่อรับแต้มสะสมทันทีทุกแก้วที่สั่ง และรับแจ้งเตือนสถานะออเดอร์สดผ่าน LINE ฟรี' },
@@ -1482,7 +1535,7 @@
             ];
         } else if (preset === 'promo') {
             designerCardBlocks = [
-                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80', aspectRatio: '20:13' },
+                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://homematchacafe.store/image/mascot/cat-ready.jpg', aspectRatio: '1:1' },
                 { id: `b-${now}-2`, type: 'tag', tagText: '🍵 เมนูใหม่ประจำสัปดาห์', tagBg: '#dcfce7', tagColor: '#166534' },
                 { id: `b-${now}-3`, type: 'title', titleText: 'Cold-Fermented Matcha Oat Latte', titleSize: 'lg' },
                 { id: `b-${now}-4`, type: 'body', bodyText: 'มัทฉะเกรดพิธีการสกัดเย็น 24 ชม. กลมกล่อมเข้ากับโอ๊ตมิลค์อย่างลงตัว สั่งล่วงหน้าได้แล้ววันนี้' },
@@ -1492,21 +1545,23 @@
             ];
         } else if (preset === 'loyalty') {
             designerCardBlocks = [
-                { id: `b-${now}-1`, type: 'tag', tagText: '🎉 สะสมแต้ม Home Matcha Cafe', tagBg: '#fef3c7', tagColor: '#92400e' },
-                { id: `b-${now}-2`, type: 'title', titleText: 'สะสมครบ 10 แต้ม แลกรับฟรี 1 แก้ว!', titleSize: 'xl' },
-                { id: `b-${now}-3`, type: 'body', bodyText: 'ทุกๆ การสั่งซื้อ 1 แก้ว รับทันที 1 สแตมป์ เมื่อสะสมครบ 10 สแตมป์ สามารถกดแลกเครื่องดื่มเมนูโปรดของคุณได้ฟรีทันทีค่ะ' },
-                { id: `b-${now}-4`, type: 'highlight', highlightText: '⭐ ตรวจสอบแต้มสะสมได้ง่ายๆ เพียงพิมพ์ "แต้ม" หรือกดปุ่มด้านล่าง' },
-                { id: `b-${now}-5`, type: 'button', buttonLabel: '📱 เปิดบัตรสะสมแต้มของฉัน', buttonUrl: 'https://homematchacafe.store/loyalty', buttonStyle: 'gold' },
-                { id: `b-${now}-6`, type: 'button', buttonLabel: '🍵 สั่งเครื่องดื่มเพื่อสะสมแต้ม', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary' }
+                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://homematchacafe.store/image/mascot/cat-loyalty.jpg', aspectRatio: '1:1' },
+                { id: `b-${now}-2`, type: 'tag', tagText: '🎉 สะสมแต้ม Home Matcha Cafe', tagBg: '#fef3c7', tagColor: '#92400e' },
+                { id: `b-${now}-3`, type: 'title', titleText: 'สะสมครบ 10 แต้ม แลกรับฟรี 1 แก้ว!', titleSize: 'xl' },
+                { id: `b-${now}-4`, type: 'body', bodyText: 'ทุกๆ การสั่งซื้อ 1 แก้ว รับทันที 1 สแตมป์ เมื่อสะสมครบ 10 สแตมป์ สามารถกดแลกเครื่องดื่มเมนูโปรดของคุณได้ฟรีทันทีค่ะ' },
+                { id: `b-${now}-5`, type: 'highlight', highlightText: '⭐ ตรวจสอบแต้มสะสมได้ง่ายๆ เพียงพิมพ์ "แต้ม" หรือกดปุ่มด้านล่าง' },
+                { id: `b-${now}-6`, type: 'button', buttonLabel: '📱 เปิดบัตรสะสมแต้มของฉัน', buttonUrl: 'https://homematchacafe.store/loyalty', buttonStyle: 'gold' },
+                { id: `b-${now}-7`, type: 'button', buttonLabel: '🍵 สั่งเครื่องดื่มเพื่อสะสมแต้ม', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary' }
             ];
         } else if (preset === 'delivery') {
             designerCardBlocks = [
-                { id: `b-${now}-1`, type: 'tag', tagText: '🛵 บริการจัดส่งถึงตึกและแผนก', tagBg: '#e0f2fe', tagColor: '#0369a1' },
-                { id: `b-${now}-2`, type: 'title', titleText: 'รอบจัดส่งร้าน Home Matcha Cafe', titleSize: 'lg' },
-                { id: `b-${now}-3`, type: 'body', bodyText: 'บริการส่งฟรีถึงตึกผู้ป่วย แผนก และบ้านพักในโรงพยาบาล:\n• รอบเช้า: 07:00–08:00 น.\n• รอบเที่ยง: 12:30–13:00 น.\n• วันหยุด/เสาร์-อาทิตย์: รอบสาย–บ่าย (09:00–13:00 น.)' },
-                { id: `b-${now}-4`, type: 'highlight', highlightText: '⏰ สามารถเลือกเวลานัดส่งที่สะดวกรับได้ตอนสั่งซื้อนะคะ' },
-                { id: `b-${now}-5`, type: 'button', buttonLabel: '🍵 สั่งเครื่องดื่มรอบถัดไป', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary' },
-                { id: `b-${now}-6`, type: 'button', buttonLabel: '🔍 ตรวจสอบสถานะออเดอร์', buttonUrl: 'https://homematchacafe.store/order', buttonStyle: 'outline' }
+                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://homematchacafe.store/image/mascot/cat-delivery.jpg', aspectRatio: '1:1' },
+                { id: `b-${now}-2`, type: 'tag', tagText: '🛵 บริการจัดส่งถึงตึกและแผนก', tagBg: '#e0f2fe', tagColor: '#0369a1' },
+                { id: `b-${now}-3`, type: 'title', titleText: 'รอบจัดส่งร้าน Home Matcha Cafe', titleSize: 'lg' },
+                { id: `b-${now}-4`, type: 'body', bodyText: 'บริการส่งฟรีถึงตึกผู้ป่วย แผนก และบ้านพักในโรงพยาบาล:\n• รอบเช้า: 07:00–08:00 น.\n• รอบเที่ยง: 12:30–13:00 น.\n• วันหยุด/เสาร์-อาทิตย์: รอบสาย–บ่าย (09:00–13:00 น.)' },
+                { id: `b-${now}-5`, type: 'highlight', highlightText: '⏰ สามารถเลือกเวลานัดส่งที่สะดวกรับได้ตอนสั่งซื้อนะคะ' },
+                { id: `b-${now}-6`, type: 'button', buttonLabel: '🍵 สั่งเครื่องดื่มรอบถัดไป', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary' },
+                { id: `b-${now}-7`, type: 'button', buttonLabel: '🔍 ตรวจสอบสถานะออเดอร์', buttonUrl: 'https://homematchacafe.store/order', buttonStyle: 'outline' }
             ];
         }
     }
@@ -5504,7 +5559,7 @@
 
                                     <!-- ฟิลด์แก้ไขของบล็อกแต่ละประเภท -->
                                     {#if block.type === 'banner'}
-                                        <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                                             <div style="display: flex; gap: 0.5rem; align-items: center;">
                                                 <input
                                                     type="text"
@@ -5522,6 +5577,41 @@
                                                     <option value="16:9">16:9 (แนวนอน)</option>
                                                     <option value="1:1">1:1 (จัตุรัส)</option>
                                                 </select>
+                                            </div>
+
+                                            <!-- 🐱 คลังเลือกมาสคอตน้องแมว (7 อารมณ์) -->
+                                            <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 0.5rem 0.6rem;">
+                                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;">
+                                                    <span style="font-size: 0.76rem; font-weight: 700; color: #475569;">🐱 เลือกรูปมาสคอตน้องแมว (7 อารมณ์สำหรับแจ้งเตือน):</span>
+                                                    <span style="font-size: 0.68rem; color: #94a3b8;">คลิกเพื่อนำรูปไปใส่</span>
+                                                </div>
+                                                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.4rem;">
+                                                    {#each catMascots as mascot}
+                                                        <button
+                                                            type="button"
+                                                            onclick={() => {
+                                                                block.imageUrl = mascot.url;
+                                                                block.aspectRatio = '1:1';
+                                                            }}
+                                                            style="display: flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.45rem; border-radius: 6px; border: {block.imageUrl === mascot.url ? '2px solid #16a34a' : '1px solid #e2e8f0'}; background: {block.imageUrl === mascot.url ? '#f0fdf4' : '#ffffff'}; text-align: left; cursor: pointer; transition: all 0.15s ease;"
+                                                            title="{mascot.name} - {mascot.desc}"
+                                                        >
+                                                            <img
+                                                                src={mascot.url}
+                                                                alt={mascot.name}
+                                                                style="width: 38px; height: 38px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background: #ffffff;"
+                                                            />
+                                                            <div style="min-width: 0; overflow: hidden;">
+                                                                <div style="font-size: 0.74rem; font-weight: 700; color: {block.imageUrl === mascot.url ? '#15803d' : '#334155'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                                                    {mascot.shortName}
+                                                                </div>
+                                                                <div style="font-size: 0.65rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                                                    {mascot.desc}
+                                                                </div>
+                                                            </div>
+                                                        </button>
+                                                    {/each}
+                                                </div>
                                             </div>
                                         </div>
                                     {:else if block.type === 'tag'}
