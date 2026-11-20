@@ -490,6 +490,46 @@ export async function sendLineRawFlexMessage(
 }
 
 /**
+ * ส่ง Flex Message แบบ Broadcast ไปยังเพื่อนทุกคนของ LINE OA
+ */
+export async function sendLineBroadcastFlexMessage(
+    channelAccessToken: string,
+    altText: string,
+    flexContents: any
+): Promise<boolean> {
+    if (!channelAccessToken) return false;
+
+    try {
+        const res = await fetch('https://api.line.me/v2/bot/message/broadcast', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${channelAccessToken}`
+            },
+            body: JSON.stringify({
+                messages: [
+                    {
+                        type: 'flex',
+                        altText: (altText || 'Home Matcha Cafe').slice(0, 400),
+                        contents: flexContents
+                    }
+                ]
+            })
+        });
+
+        if (!res.ok) {
+            const errBody = await res.text();
+            console.error('❌ LINE API Broadcast Error:', res.status, errBody);
+            return false;
+        }
+        return true;
+    } catch (e) {
+        console.error('❌ Error broadcasting LINE OA Flex message:', e);
+        return false;
+    }
+}
+
+/**
  * แจ้งเตือนแอดมินทาง LINE เมื่อมีออเดอร์ใหม่ หรือมีการแนบสลิป
  */
 export async function notifyAdminLine(params: {

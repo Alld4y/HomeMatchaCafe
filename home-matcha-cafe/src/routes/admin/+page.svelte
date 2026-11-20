@@ -1339,6 +1339,328 @@
         saveAllSettings();
     }
 
+    // 🎨 ระบบออกแบบการ์ดลูกค้า Visual Flex Card Designer
+    interface DesignerCardBlock {
+        id: string;
+        type: 'banner' | 'tag' | 'title' | 'body' | 'highlight' | 'button';
+        imageUrl?: string;
+        aspectRatio?: '20:13' | '16:9' | '1:1';
+        tagText?: string;
+        tagColor?: string;
+        tagBg?: string;
+        titleText?: string;
+        titleSize?: 'md' | 'lg' | 'xl';
+        bodyText?: string;
+        highlightText?: string;
+        buttonLabel?: string;
+        buttonUrl?: string;
+        buttonStyle?: 'primary' | 'secondary' | 'gold' | 'outline';
+    }
+
+    let designerAltText = $state('🍵 Home Matcha Cafe มีข้อความใหม่ถึงคุณ');
+    let designerCardBlocks = $state<DesignerCardBlock[]>([
+        {
+            id: 'b-banner',
+            type: 'banner',
+            imageUrl: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80',
+            aspectRatio: '20:13'
+        },
+        {
+            id: 'b-tag',
+            type: 'tag',
+            tagText: '🍵 เมนูมัทฉะแนะนำประจำสัปดาห์',
+            tagBg: '#dcfce7',
+            tagColor: '#166534'
+        },
+        {
+            id: 'b-title',
+            type: 'title',
+            titleText: 'Cold-Fermented Matcha Oat Latte',
+            titleSize: 'lg'
+        },
+        {
+            id: 'b-body',
+            type: 'body',
+            bodyText: 'มัทฉะเกรดพิธีการสกัดเย็น 24 ชั่วโมง กลิ่นหอมอูมามิละมุน ผสานกับโอ๊ตมิลค์รสชาตินุ่มลึก สั่งจองล่วงหน้าได้เลยค่ะ'
+        },
+        {
+            id: 'b-highlight',
+            type: 'highlight',
+            highlightText: '✨ ราคาพิเศษ 65.- (ปกติ 75.-)'
+        },
+        {
+            id: 'b-btn-1',
+            type: 'button',
+            buttonLabel: '🍵 สั่งเครื่องดื่มทันที',
+            buttonUrl: 'https://homematchacafe.store/menu',
+            buttonStyle: 'primary'
+        },
+        {
+            id: 'b-btn-2',
+            type: 'button',
+            buttonLabel: '⭐ ตรวจสอบแต้มสะสม',
+            buttonUrl: 'https://homematchacafe.store/loyalty',
+            buttonStyle: 'outline'
+        }
+    ]);
+
+    let isSendingDesignerCard = $state(false);
+    let designerTarget = $state<'admin' | 'broadcast'>('admin');
+    let draggedBlockIdx = $state<number | null>(null);
+
+    function addDesignerBlock(type: DesignerCardBlock['type']) {
+        const id = `blk-${Date.now()}`;
+        if (type === 'banner') {
+            designerCardBlocks = [...designerCardBlocks, { id, type, imageUrl: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80', aspectRatio: '20:13' }];
+        } else if (type === 'tag') {
+            designerCardBlocks = [...designerCardBlocks, { id, type, tagText: '🔥 โปรโมชั่นพิเศษ', tagBg: '#fef3c7', tagColor: '#b45309' }];
+        } else if (type === 'title') {
+            designerCardBlocks = [...designerCardBlocks, { id, type, titleText: 'หัวข้อการ์ดโปรโมชั่น', titleSize: 'lg' }];
+        } else if (type === 'body') {
+            designerCardBlocks = [...designerCardBlocks, { id, type, bodyText: 'ระบุรายละเอียดข้อความที่คุณต้องการส่งให้ลูกค้าที่นี่...' }];
+        } else if (type === 'highlight') {
+            designerCardBlocks = [...designerCardBlocks, { id, type, highlightText: '🎉 ซื้อ 2 แถม 1 ถึงสิ้นเดือนนี้เท่านั้น!' }];
+        } else if (type === 'button') {
+            designerCardBlocks = [...designerCardBlocks, { id, type, buttonLabel: '👉 ดูรายละเอียดเพิ่มเติม', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary' }];
+        }
+    }
+
+    function removeDesignerBlock(id: string) {
+        designerCardBlocks = designerCardBlocks.filter(b => b.id !== id);
+    }
+
+    function moveDesignerBlock(idx: number, dir: 'up' | 'down') {
+        const targetIdx = dir === 'up' ? idx - 1 : idx + 1;
+        if (targetIdx < 0 || targetIdx >= designerCardBlocks.length) return;
+        const copy = [...designerCardBlocks];
+        const temp = copy[idx];
+        copy[idx] = copy[targetIdx];
+        copy[targetIdx] = temp;
+        designerCardBlocks = copy;
+    }
+
+    function loadDesignerPreset(preset: 'promo' | 'loyalty' | 'delivery') {
+        const now = Date.now();
+        if (preset === 'promo') {
+            designerCardBlocks = [
+                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80', aspectRatio: '20:13' },
+                { id: `b-${now}-2`, type: 'tag', tagText: '🍵 เมนูใหม่ประจำสัปดาห์', tagBg: '#dcfce7', tagColor: '#166534' },
+                { id: `b-${now}-3`, type: 'title', titleText: 'Cold-Fermented Matcha Oat Latte', titleSize: 'lg' },
+                { id: `b-${now}-4`, type: 'body', bodyText: 'มัทฉะเกรดพิธีการสกัดเย็น 24 ชม. กลมกล่อมเข้ากับโอ๊ตมิลค์อย่างลงตัว สั่งล่วงหน้าได้แล้ววันนี้' },
+                { id: `b-${now}-5`, type: 'highlight', highlightText: '✨ ราคาพิเศษ 65.- (ปกติ 75.-)' },
+                { id: `b-${now}-6`, type: 'button', buttonLabel: '🍵 สั่งเครื่องดื่มทันที', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary' },
+                { id: `b-${now}-7`, type: 'button', buttonLabel: '⭐ ตรวจสอบแต้มสะสม', buttonUrl: 'https://homematchacafe.store/loyalty', buttonStyle: 'outline' }
+            ];
+        } else if (preset === 'loyalty') {
+            designerCardBlocks = [
+                { id: `b-${now}-1`, type: 'tag', tagText: '🎉 สะสมแต้ม Home Matcha Cafe', tagBg: '#fef3c7', tagColor: '#92400e' },
+                { id: `b-${now}-2`, type: 'title', titleText: 'สะสมครบ 10 แต้ม แลกรับฟรี 1 แก้ว!', titleSize: 'xl' },
+                { id: `b-${now}-3`, type: 'body', bodyText: 'ทุกๆ การสั่งซื้อ 1 แก้ว รับทันที 1 สแตมป์ เมื่อสะสมครบ 10 สแตมป์ สามารถกดแลกเครื่องดื่มเมนูโปรดของคุณได้ฟรีทันทีค่ะ' },
+                { id: `b-${now}-4`, type: 'highlight', highlightText: '⭐ ตรวจสอบแต้มสะสมได้ง่ายๆ เพียงพิมพ์ "แต้ม" หรือกดปุ่มด้านล่าง' },
+                { id: `b-${now}-5`, type: 'button', buttonLabel: '📱 เปิดบัตรสะสมแต้มของฉัน', buttonUrl: 'https://homematchacafe.store/loyalty', buttonStyle: 'gold' },
+                { id: `b-${now}-6`, type: 'button', buttonLabel: '🍵 สั่งเครื่องดื่มเพื่อสะสมแต้ม', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary' }
+            ];
+        } else if (preset === 'delivery') {
+            designerCardBlocks = [
+                { id: `b-${now}-1`, type: 'tag', tagText: '🛵 บริการจัดส่งถึงตึกและแผนก', tagBg: '#e0f2fe', tagColor: '#0369a1' },
+                { id: `b-${now}-2`, type: 'title', titleText: 'รอบจัดส่งร้าน Home Matcha Cafe', titleSize: 'lg' },
+                { id: `b-${now}-3`, type: 'body', bodyText: 'บริการส่งฟรีถึงตึกผู้ป่วย แผนก และบ้านพักในโรงพยาบาล:\n• รอบเช้า: 07:00–08:00 น.\n• รอบเที่ยง: 12:30–13:00 น.\n• วันหยุด/เสาร์-อาทิตย์: รอบสาย–บ่าย (09:00–13:00 น.)' },
+                { id: `b-${now}-4`, type: 'highlight', highlightText: '⏰ สามารถเลือกเวลานัดส่งที่สะดวกรับได้ตอนสั่งซื้อนะคะ' },
+                { id: `b-${now}-5`, type: 'button', buttonLabel: '🍵 สั่งเครื่องดื่มรอบถัดไป', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary' },
+                { id: `b-${now}-6`, type: 'button', buttonLabel: '🔍 ตรวจสอบสถานะออเดอร์', buttonUrl: 'https://homematchacafe.store/order', buttonStyle: 'outline' }
+            ];
+        }
+    }
+
+    function buildDesignerFlexBubble() {
+        const banner = designerCardBlocks.find(b => b.type === 'banner');
+        const hero = banner && banner.imageUrl ? {
+            type: 'image',
+            url: banner.imageUrl,
+            size: 'full',
+            aspectRatio: banner.aspectRatio || '20:13',
+            aspectMode: 'cover'
+        } : undefined;
+
+        const bodyContents: any[] = [];
+        const footerContents: any[] = [];
+
+        for (const b of designerCardBlocks) {
+            if (b.type === 'tag' && b.tagText) {
+                bodyContents.push({
+                    type: 'box',
+                    layout: 'inline',
+                    contents: [
+                        {
+                            type: 'text',
+                            text: b.tagText,
+                            size: 'xs',
+                            weight: 'bold',
+                            color: b.tagColor || '#166534'
+                        }
+                    ],
+                    backgroundColor: b.tagBg || '#dcfce7',
+                    paddingAll: '4px',
+                    paddingStart: '8px',
+                    paddingEnd: '8px',
+                    cornerRadius: '999px',
+                    margin: bodyContents.length > 0 ? 'md' : 'none'
+                });
+            } else if (b.type === 'title' && b.titleText) {
+                bodyContents.push({
+                    type: 'text',
+                    text: b.titleText,
+                    weight: 'bold',
+                    size: b.titleSize === 'xl' ? 'xl' : b.titleSize === 'md' ? 'md' : 'lg',
+                    color: '#14532d',
+                    wrap: true,
+                    margin: bodyContents.length > 0 ? 'md' : 'none'
+                });
+            } else if (b.type === 'body' && b.bodyText) {
+                bodyContents.push({
+                    type: 'text',
+                    text: b.bodyText,
+                    size: 'sm',
+                    color: '#475569',
+                    wrap: true,
+                    lineSpacing: '4px',
+                    margin: bodyContents.length > 0 ? 'sm' : 'none'
+                });
+            } else if (b.type === 'highlight' && b.highlightText) {
+                bodyContents.push({
+                    type: 'box',
+                    layout: 'vertical',
+                    backgroundColor: '#fef3c7',
+                    borderWidth: '1.5px',
+                    borderColor: '#fde047',
+                    cornerRadius: '8px',
+                    paddingAll: '8px',
+                    margin: 'md',
+                    contents: [
+                        {
+                            type: 'text',
+                            text: b.highlightText,
+                            size: 'sm',
+                            weight: 'bold',
+                            color: '#92400e',
+                            wrap: true
+                        }
+                    ]
+                });
+            } else if (b.type === 'button' && b.buttonLabel) {
+                const btnColor = b.buttonStyle === 'gold' ? '#d97706' : b.buttonStyle === 'secondary' ? '#475569' : '#166534';
+                const isOutline = b.buttonStyle === 'outline';
+                footerContents.push({
+                    type: 'button',
+                    style: isOutline ? 'secondary' : 'primary',
+                    color: isOutline ? undefined : btnColor,
+                    height: 'sm',
+                    action: {
+                        type: 'uri',
+                        label: b.buttonLabel.slice(0, 40),
+                        uri: b.buttonUrl || 'https://homematchacafe.store/menu'
+                    }
+                });
+            }
+        }
+
+        const bubble: any = {
+            type: 'bubble',
+            size: 'mega',
+            body: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '20px',
+                contents: bodyContents.length > 0 ? bodyContents : [
+                    { type: 'text', text: 'Home Matcha Cafe', weight: 'bold', size: 'md', color: '#166534' }
+                ]
+            }
+        };
+
+        if (hero) bubble.hero = hero;
+        if (footerContents.length > 0) {
+            bubble.footer = {
+                type: 'box',
+                layout: 'vertical',
+                spacing: 'sm',
+                paddingAll: '16px',
+                contents: footerContents
+            };
+        }
+
+        return bubble;
+    }
+
+    async function sendDesignerCard() {
+        if (!settings.lineOa.channelAccessToken) {
+            swal.fire('ยังไม่มี Token', 'กรุณาระบุ Channel Access Token ในการตั้งค่า LINE OA ก่อนนะคะ', 'warning');
+            return;
+        }
+
+        const targetLabel = designerTarget === 'admin' ? 'LINE ของแอดมิน' : 'ลูกค้าทุกคน (บรอดแคสต์)';
+        const confirmResult = await swal.fire({
+            icon: 'question',
+            title: `ยืนยันส่งการ์ดไปยัง ${targetLabel}?`,
+            text: designerTarget === 'broadcast'
+                ? 'ระบบจะส่งการ์ดนี้เป็นข้อความบรอดแคสต์หาเพื่อนทุกคนใน LINE OA ทันทีค่ะ'
+                : 'ระบบจะส่งการ์ดทดสอบไปยัง LINE ID ของแอดมิน เพื่อให้ตรวจดูความสวยงามในแอป LINE จริงค่ะ',
+            showCancelButton: true,
+            confirmButtonColor: '#166534',
+            confirmButtonText: '✓ ยืนยันส่ง',
+            cancelButtonText: 'ยกเลิก'
+        });
+
+        if (!confirmResult.isConfirmed) return;
+
+        isSendingDesignerCard = true;
+        try {
+            const flexBubble = buildDesignerFlexBubble();
+            const res = await fetch('/api/line/send-card', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    target: designerTarget,
+                    flexBubble,
+                    altText: designerAltText
+                })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                swal.fire({
+                    icon: 'success',
+                    title: 'ส่งการ์ดสำเร็จ! 💬',
+                    text: data.message,
+                    confirmButtonColor: '#166534'
+                });
+            } else {
+                swal.fire({
+                    icon: 'error',
+                    title: 'ส่งไม่สำเร็จ',
+                    text: data.message || 'โปรดตรวจสอบ Channel Access Token อีกครั้งค่ะ',
+                    confirmButtonColor: '#dc2626'
+                });
+            }
+        } catch (e: any) {
+            swal.fire('ข้อผิดพลาด', e?.message || 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', 'error');
+        } finally {
+            isSendingDesignerCard = false;
+        }
+    }
+
+    function copyDesignerFlexJson() {
+        const bubble = buildDesignerFlexBubble();
+        navigator.clipboard.writeText(JSON.stringify(bubble, null, 2));
+        swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'คัดลอก LINE Flex JSON เรียบร้อย! 📋',
+            showConfirmButton: false,
+            timer: 2000
+        });
+    }
+
     function getStatusName(status: string) {
         switch (status) {
             case 'pending': return 'รอตรวจสลิป';
@@ -4854,12 +5176,563 @@
                 </div>
             </div>
 
-            <!-- กล่องที่ 5: บัญชี LINE ที่เชื่อมต่อแล้ว (Connected LINE Users) -->
+            <!-- กล่องที่ 6: 🎨 ระบบออกแบบ Card Layout ส่งหาลูกค้าแบบ Drag & Drop & ปุ่มลิงก์ -->
+            <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 2px solid #86efac; border-radius: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                            <span style="background: #166534; color: #ffffff; font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.55rem; border-radius: 6px;">
+                                Flex Message Builder
+                            </span>
+                            <span style="background: #dcfce7; color: #15803d; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 6px;">
+                                Drag &amp; Drop / Interactive
+                            </span>
+                        </div>
+                        <h3 style="margin: 0; font-size: 1.25rem; color: #14532d; font-weight: 800;">
+                            🎨 6. ออกแบบการ์ดโปรโมชั่น &amp; ปุ่มลิงก์ส่งหาลูกค้า (Card Designer)
+                        </h3>
+                        <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #64748b;">
+                            ออกแบบการ์ดโปรโมชั่น ข่าวสาร หรือเมนูแนะนำได้อิสระ จัดเรียงบล็อกด้วยการลากวาง (Drag &amp; Drop) พร้อมปรับปุ่มกดและลิงก์หน้าเว็บได้ตามใจชอบ
+                        </p>
+                    </div>
+
+                    <!-- แถบเลือกเทมเพลตด่วน -->
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;">
+                        <span style="font-size: 0.78rem; color: #475569; font-weight: 700;">เทมเพลตด่วน:</span>
+                        <button type="button" onclick={() => loadDesignerPreset('promo')} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #f0fdf4; border: 1.5px solid #86efac; color: #166534; border-radius: 8px; cursor: pointer;">
+                            🍵 เมนูแนะนำ
+                        </button>
+                        <button type="button" onclick={() => loadDesignerPreset('loyalty')} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #fefce8; border: 1.5px solid #fde047; color: #854d0e; border-radius: 8px; cursor: pointer;">
+                            ⭐ สะสมแต้ม
+                        </button>
+                        <button type="button" onclick={() => loadDesignerPreset('delivery')} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #f0f9ff; border: 1.5px solid #7dd3fc; color: #0369a1; border-radius: 8px; cursor: pointer;">
+                            🛵 รอบส่ง
+                        </button>
+                    </div>
+                </div>
+
+                <!-- พื้นที่ทำงาน 2 ฝั่ง: ฝั่งซ้ายตัวแก้ไขบล็อก, ฝั่งขวาพรีวิวเสมือนจริง -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; align-items: start;">
+                    
+                    <!-- ฝั่งซ้าย: บล็อกส่วนประกอบ และการแก้ไข -->
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 0.5rem;">
+                            <strong style="color: #1e293b; font-size: 0.95rem;">
+                                🧱 บล็อกเนื้อหาของการ์ด ({designerCardBlocks.length} บล็อก)
+                            </strong>
+                            <span style="font-size: 0.75rem; color: #64748b;">
+                                💡 ลากสลับตำแหน่ง หรือกด ⬆️ ⬇️ เพื่อเลื่อนบล็อกได้
+                            </span>
+                        </div>
+
+                        <!-- รายการบล็อกที่สามารถลากวางได้ -->
+                        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+                            {#each designerCardBlocks as block, idx (block.id)}
+                                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                <div
+                                    draggable="true"
+                                    ondragstart={() => (draggedBlockIdx = idx)}
+                                    ondragover={(e) => e.preventDefault()}
+                                    ondrop={() => {
+                                        if (draggedBlockIdx !== null && draggedBlockIdx !== idx) {
+                                            const copy = [...designerCardBlocks];
+                                            const [moved] = copy.splice(draggedBlockIdx, 1);
+                                            copy.splice(idx, 0, moved);
+                                            designerCardBlocks = copy;
+                                            draggedBlockIdx = null;
+                                        }
+                                    }}
+                                    style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 0.75rem 0.85rem; transition: all 0.15s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.03);"
+                                >
+                                    <!-- แถบหัวบล็อก -->
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; cursor: grab;">
+                                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                                            <span style="cursor: grab; color: #94a3b8; font-size: 1rem; user-select: none;">☰</span>
+                                            {#if block.type === 'banner'}
+                                                <span style="background: #dbeafe; color: #1e40af; font-size: 0.75rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 6px;">🖼️ แบนเนอร์รูปภาพ</span>
+                                            {:else if block.type === 'tag'}
+                                                <span style="background: #dcfce7; color: #166534; font-size: 0.75rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 6px;">🏷️ ป้ายแท็ก</span>
+                                            {:else if block.type === 'title'}
+                                                <span style="background: #f3e8ff; color: #6b21a8; font-size: 0.75rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 6px;">📝 หัวข้อหลัก</span>
+                                            {:else if block.type === 'body'}
+                                                <span style="background: #f1f5f9; color: #334155; font-size: 0.75rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 6px;">📄 ข้อความคำอธิบาย</span>
+                                            {:else if block.type === 'highlight'}
+                                                <span style="background: #fef3c7; color: #92400e; font-size: 0.75rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 6px;">💰 ไฮไลต์ / ราคา</span>
+                                            {:else if block.type === 'button'}
+                                                <span style="background: #bbf7d0; color: #14532d; font-size: 0.75rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 6px;">🔘 ปุ่มลิงก์แอ็กชัน</span>
+                                            {/if}
+                                        </div>
+
+                                        <div style="display: flex; align-items: center; gap: 0.25rem;">
+                                            <button
+                                                type="button"
+                                                onclick={() => moveDesignerBlock(idx, 'up')}
+                                                disabled={idx === 0}
+                                                style="padding: 0.15rem 0.4rem; font-size: 0.72rem; border-radius: 4px; border: 1px solid #cbd5e1; background: #ffffff; cursor: {idx === 0 ? 'not-allowed' : 'pointer'}; opacity: {idx === 0 ? '0.4' : '1'};"
+                                                title="เลื่อนขึ้น"
+                                            >
+                                                ⬆️
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onclick={() => moveDesignerBlock(idx, 'down')}
+                                                disabled={idx === designerCardBlocks.length - 1}
+                                                style="padding: 0.15rem 0.4rem; font-size: 0.72rem; border-radius: 4px; border: 1px solid #cbd5e1; background: #ffffff; cursor: {idx === designerCardBlocks.length - 1 ? 'not-allowed' : 'pointer'}; opacity: {idx === designerCardBlocks.length - 1 ? '0.4' : '1'};"
+                                                title="เลื่อนลง"
+                                            >
+                                                ⬇️
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onclick={() => removeDesignerBlock(block.id)}
+                                                style="padding: 0.15rem 0.4rem; font-size: 0.72rem; border-radius: 4px; border: 1px solid #fecaca; background: #fee2e2; color: #dc2626; cursor: pointer; margin-left: 0.25rem;"
+                                                title="ลบบล็อกนี้"
+                                            >
+                                                🗑️
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- ฟิลด์แก้ไขของบล็อกแต่ละประเภท -->
+                                    {#if block.type === 'banner'}
+                                        <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                                <input
+                                                    type="text"
+                                                    class="form-input"
+                                                    bind:value={block.imageUrl}
+                                                    placeholder="URL รูปภาพแบนเนอร์ (https://...)"
+                                                    style="font-size: 0.82rem; padding: 0.35rem 0.65rem;"
+                                                />
+                                                <select
+                                                    class="form-input"
+                                                    bind:value={block.aspectRatio}
+                                                    style="width: 120px; font-size: 0.8rem; padding: 0.35rem 0.5rem;"
+                                                >
+                                                    <option value="20:13">20:13 (กว้าง)</option>
+                                                    <option value="16:9">16:9 (แนวนอน)</option>
+                                                    <option value="1:1">1:1 (จัตุรัส)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    {:else if block.type === 'tag'}
+                                        <div style="display: flex; gap: 0.4rem; align-items: center;">
+                                            <input
+                                                type="text"
+                                                class="form-input"
+                                                bind:value={block.tagText}
+                                                placeholder="ข้อความป้าย เช่น 🍵 เมนูใหม่แนะนำ"
+                                                style="font-size: 0.82rem; padding: 0.35rem 0.65rem;"
+                                            />
+                                            <input
+                                                type="color"
+                                                bind:value={block.tagBg}
+                                                title="สีพื้นหลังป้าย"
+                                                style="width: 38px; height: 34px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;"
+                                            />
+                                            <input
+                                                type="color"
+                                                bind:value={block.tagColor}
+                                                title="สีตัวอักษรป้าย"
+                                                style="width: 38px; height: 34px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;"
+                                            />
+                                        </div>
+                                    {:else if block.type === 'title'}
+                                        <div style="display: flex; gap: 0.4rem; align-items: center;">
+                                            <input
+                                                type="text"
+                                                class="form-input"
+                                                bind:value={block.titleText}
+                                                placeholder="หัวข้อการ์ด เช่น Cold-Fermented Matcha Oat Latte"
+                                                style="font-size: 0.85rem; font-weight: 700; padding: 0.4rem 0.65rem;"
+                                            />
+                                            <select
+                                                class="form-input"
+                                                bind:value={block.titleSize}
+                                                style="width: 100px; font-size: 0.8rem; padding: 0.4rem 0.5rem;"
+                                            >
+                                                <option value="md">ขนาดปกติ</option>
+                                                <option value="lg">ขนาดใหญ่</option>
+                                                <option value="xl">ใหญ่พิเศษ</option>
+                                            </select>
+                                        </div>
+                                    {:else if block.type === 'body'}
+                                        <div>
+                                            <textarea
+                                                class="form-input"
+                                                bind:value={block.bodyText}
+                                                rows="2"
+                                                placeholder="รายละเอียดข้อความ หรือคำโปรยสินค้า..."
+                                                style="font-size: 0.82rem; padding: 0.4rem 0.65rem; line-height: 1.45;"
+                                            ></textarea>
+                                        </div>
+                                    {:else if block.type === 'highlight'}
+                                        <div>
+                                            <input
+                                                type="text"
+                                                class="form-input"
+                                                bind:value={block.highlightText}
+                                                placeholder="ข้อความเน้น เช่น ✨ ราคาพิเศษ 65.- หรือ ซื้อ 2 ฟรี 1"
+                                                style="font-size: 0.85rem; font-weight: 700; color: #92400e; padding: 0.4rem 0.65rem; background: #fffdf5; border-color: #fde047;"
+                                            />
+                                        </div>
+                                    {:else if block.type === 'button'}
+                                        <div style="display: flex; flex-direction: column; gap: 0.45rem; background: #ffffff; padding: 0.65rem; border-radius: 8px; border: 1px solid #e2e8f0;">
+                                            <div style="display: grid; grid-template-columns: 1fr 140px; gap: 0.4rem;">
+                                                <div>
+                                                    <span style="font-size: 0.72rem; color: #64748b; font-weight: 600;">ข้อความบนปุ่ม (Label):</span>
+                                                    <input
+                                                        type="text"
+                                                        class="form-input"
+                                                        bind:value={block.buttonLabel}
+                                                        placeholder="เช่น 🍵 สั่งเครื่องดื่มทันที"
+                                                        style="font-size: 0.82rem; padding: 0.35rem 0.6rem; font-weight: 700;"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <span style="font-size: 0.72rem; color: #64748b; font-weight: 600;">สไตล์สีปุ่ม:</span>
+                                                    <select
+                                                        class="form-input"
+                                                        bind:value={block.buttonStyle}
+                                                        style="font-size: 0.8rem; padding: 0.35rem 0.5rem;"
+                                                    >
+                                                        <option value="primary">เขียวมัทฉะ (Primary)</option>
+                                                        <option value="outline">ขาวขอบเขียว (Outline)</option>
+                                                        <option value="gold">สีทอง (Gold)</option>
+                                                        <option value="secondary">สีเทา (Secondary)</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.15rem;">
+                                                    <span style="font-size: 0.72rem; color: #64748b; font-weight: 600;">ลิงก์หน้าเว็บ (Action URL):</span>
+                                                    <div style="display: flex; gap: 0.25rem;">
+                                                        <button type="button" onclick={() => (block.buttonUrl = 'https://homematchacafe.store/menu')} style="font-size: 0.68rem; padding: 0.1rem 0.35rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 4px; cursor: pointer;">
+                                                            /menu
+                                                        </button>
+                                                        <button type="button" onclick={() => (block.buttonUrl = 'https://homematchacafe.store/loyalty')} style="font-size: 0.68rem; padding: 0.1rem 0.35rem; background: #fefce8; border: 1px solid #fde047; color: #854d0e; border-radius: 4px; cursor: pointer;">
+                                                            /loyalty
+                                                        </button>
+                                                        <button type="button" onclick={() => (block.buttonUrl = 'https://homematchacafe.store/order')} style="font-size: 0.68rem; padding: 0.1rem 0.35rem; background: #f0f9ff; border: 1px solid #bae6fd; color: #0284c7; border-radius: 4px; cursor: pointer;">
+                                                            /order
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <input
+                                                    type="url"
+                                                    class="form-input"
+                                                    bind:value={block.buttonUrl}
+                                                    placeholder="https://homematchacafe.store/..."
+                                                    style="font-size: 0.82rem; padding: 0.35rem 0.6rem;"
+                                                />
+                                            </div>
+                                        </div>
+                                    {/if}
+                                </div>
+                            {/each}
+                        </div>
+
+                        <!-- ปุ่มเพิ่มบล็อกใหม่ -->
+                        <div style="background: #f1f5f9; border: 1.5px dashed #cbd5e1; border-radius: 12px; padding: 0.85rem; margin-top: 0.25rem;">
+                            <span style="display: block; font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.5rem;">
+                                ➕ เพิ่มส่วนประกอบใหม่ลงในการ์ด:
+                            </span>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                                <button type="button" onclick={() => addDesignerBlock('banner')} style="padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
+                                    🖼️ รูปแบนเนอร์
+                                </button>
+                                <button type="button" onclick={() => addDesignerBlock('tag')} style="padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
+                                    🏷️ ป้ายแท็ก
+                                </button>
+                                <button type="button" onclick={() => addDesignerBlock('title')} style="padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
+                                    📝 หัวข้อ
+                                </button>
+                                <button type="button" onclick={() => addDesignerBlock('body')} style="padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
+                                    📄 คำอธิบาย
+                                </button>
+                                <button type="button" onclick={() => addDesignerBlock('highlight')} style="padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
+                                    💰 ไฮไลต์/ราคา
+                                </button>
+                                <button type="button" onclick={() => addDesignerBlock('button')} style="padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 800; background: #166534; color: #ffffff; border: 1px solid #14532d; border-radius: 6px; cursor: pointer;">
+                                    🔘 ปุ่มแอ็กชัน
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ฝั่งขวา: Live LINE Mobile Preview & การส่ง -->
+                    <div style="display: flex; flex-direction: column; gap: 1rem; position: sticky; top: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <strong style="color: #14532d; font-size: 0.95rem; display: flex; align-items: center; gap: 0.35rem;">
+                                📱 หน้าจอพรีวิวใน LINE (Live Preview)
+                            </strong>
+                            <span style="font-size: 0.75rem; background: #e2e8f0; color: #475569; padding: 0.15rem 0.5rem; border-radius: 6px; font-weight: 600;">
+                                Flex Bubble
+                            </span>
+                        </div>
+
+                        <!-- กรอบจำลองหน้าจอ LINE Chat -->
+                        <div style="background: #849ebf; border-radius: 24px; padding: 1.25rem 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.15); max-width: 360px; margin: 0 auto; width: 100%;">
+                            
+                            <!-- ตัวการ์ด Flex Message สีขาว -->
+                            <div style="background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.12);">
+                                
+                                {#each designerCardBlocks as b}
+                                    {#if b.type === 'banner' && b.imageUrl}
+                                        <div style="width: 100%; aspect-ratio: {b.aspectRatio === '1:1' ? '1/1' : b.aspectRatio === '16:9' ? '16/9' : '20/13'}; overflow: hidden; background: #e2e8f0;">
+                                            <img
+                                                src={b.imageUrl}
+                                                alt="Banner"
+                                                style="width: 100%; height: 100%; object-fit: cover; display: block;"
+                                                onerror={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80'; }}
+                                            />
+                                        </div>
+                                    {:else if b.type === 'tag' && b.tagText}
+                                        <div style="padding: 0.5rem 1rem 0 1rem;">
+                                            <span style="display: inline-block; background: {b.tagBg || '#dcfce7'}; color: {b.tagColor || '#166534'}; font-size: 0.72rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 999px;">
+                                                {b.tagText}
+                                            </span>
+                                        </div>
+                                    {:else if b.type === 'title' && b.titleText}
+                                        <div style="padding: 0.4rem 1rem 0.2rem 1rem;">
+                                            <strong style="color: #14532d; font-size: {b.titleSize === 'xl' ? '1.25rem' : b.titleSize === 'md' ? '1rem' : '1.12rem'}; line-height: 1.35; display: block;">
+                                                {b.titleText}
+                                            </strong>
+                                        </div>
+                                    {:else if b.type === 'body' && b.bodyText}
+                                        <div style="padding: 0.2rem 1rem 0.4rem 1rem;">
+                                            <p style="margin: 0; color: #475569; font-size: 0.82rem; line-height: 1.5; white-space: pre-line;">
+                                                {b.bodyText}
+                                            </p>
+                                        </div>
+                                    {:else if b.type === 'highlight' && b.highlightText}
+                                        <div style="padding: 0.25rem 1rem 0.4rem 1rem;">
+                                            <div style="background: #fef3c7; border: 1.5px solid #fde047; border-radius: 8px; padding: 0.5rem 0.75rem; color: #92400e; font-size: 0.82rem; font-weight: 800; text-align: center;">
+                                                {b.highlightText}
+                                            </div>
+                                        </div>
+                                    {:else if b.type === 'button' && b.buttonLabel}
+                                        <div style="padding: 0.25rem 1rem 0.45rem 1rem;">
+                                            <a
+                                                href={b.buttonUrl || '#'}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                style="
+                                                    display: block;
+                                                    text-align: center;
+                                                    text-decoration: none;
+                                                    padding: 0.65rem 1rem;
+                                                    font-size: 0.88rem;
+                                                    font-weight: 800;
+                                                    border-radius: 10px;
+                                                    transition: all 0.15s ease;
+                                                    background: {b.buttonStyle === 'outline' ? '#ffffff' : b.buttonStyle === 'gold' ? '#d97706' : b.buttonStyle === 'secondary' ? '#475569' : '#166534'};
+                                                    color: {b.buttonStyle === 'outline' ? '#166534' : '#ffffff'};
+                                                    border: 1.5px solid {b.buttonStyle === 'outline' ? '#166534' : 'transparent'};
+                                                    box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+                                                "
+                                            >
+                                                {b.buttonLabel}
+                                            </a>
+                                        </div>
+                                    {/if}
+                                {/each}
+
+                                <div style="height: 0.5rem;"></div>
+                            </div>
+
+                            <!-- เวลาจำลองใต้บอลลูน -->
+                            <div style="text-align: right; margin-top: 0.35rem; padding-right: 0.25rem;">
+                                <span style="font-size: 0.68rem; color: #ffffff; opacity: 0.85;">12:00</span>
+                            </div>
+                        </div>
+
+                        <!-- กล่องส่งข้อความ & Export -->
+                        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 1rem;">
+                            <div style="margin-bottom: 0.65rem;">
+                                <span style="font-size: 0.75rem; color: #475569; font-weight: 700; display: block; margin-bottom: 0.25rem;">
+                                    ข้อความแจ้งเตือน (Alt Text บนหน้าจอมือถือ):
+                                </span>
+                                <input
+                                    type="text"
+                                    class="form-input"
+                                    bind:value={designerAltText}
+                                    placeholder="เช่น 🍵 Home Matcha Cafe มีโปรโมชั่นใหม่!"
+                                    style="font-size: 0.82rem; padding: 0.35rem 0.65rem;"
+                                />
+                            </div>
+
+                            <div style="margin-bottom: 0.85rem;">
+                                <span style="font-size: 0.75rem; color: #475569; font-weight: 700; display: block; margin-bottom: 0.25rem;">
+                                    เป้าหมายการส่ง:
+                                </span>
+                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                    <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; font-weight: 700; color: #166534; cursor: pointer;">
+                                        <input type="radio" bind:group={designerTarget} value="admin" style="accent-color: #166534;" />
+                                        📱 ส่งทดสอบเข้า LINE แอดมิน
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; font-weight: 700; color: #0284c7; cursor: pointer;">
+                                        <input type="radio" bind:group={designerTarget} value="broadcast" style="accent-color: #0284c7;" />
+                                        📢 ส่งบรอดแคสต์หาลูกค้าทุกคน
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button
+                                    type="button"
+                                    onclick={sendDesignerCard}
+                                    disabled={isSendingDesignerCard}
+                                    class="btn-matcha-primary"
+                                    style="flex: 1; padding: 0.55rem 0.9rem; font-size: 0.88rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;"
+                                >
+                                    🚀 {isSendingDesignerCard ? 'กำลังส่ง...' : designerTarget === 'admin' ? 'ส่งทดสอบเข้า LINE แอดมิน' : 'บรอดแคสต์ส่งหาลูกค้าทุกคน'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onclick={copyDesignerFlexJson}
+                                    class="btn-matcha-outline"
+                                    style="padding: 0.55rem 0.85rem; font-size: 0.82rem; font-weight: 700; white-space: nowrap;"
+                                    title="คัดลอก JSON โค้ด Flex เพื่อนำไปใช้ต่อ"
+                                >
+                                    📋 คัดลอก JSON
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- กล่องที่ 7: 📱 คำแนะนำและวิธีทำ "เมนูรูปภาพด้านล่าง (LINE Rich Menu)" -->
+            <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                            <span style="background: #0284c7; color: #ffffff; font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.55rem; border-radius: 6px;">
+                                LINE Rich Menu Guide
+                            </span>
+                            <span style="background: #e0f2fe; color: #0369a1; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 6px;">
+                                เมนูกราฟิกตรึงล่างแชท
+                            </span>
+                        </div>
+                        <h3 style="margin: 0; font-size: 1.25rem; color: #0c4a6e; font-weight: 800;">
+                            📱 7. วิธีทำเมนูรูปภาพด้านล่างเหมือนร้านค้าอื่นๆ (LINE Rich Menu)
+                        </h3>
+                        <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #64748b;">
+                            เมนูกราฟิกด้านล่างหน้าต่างแชท (Rich Menu) คือเครื่องมือที่ดีที่สุดในการให้ลูกค้ากดสั่งซื้อ ตรวจแต้ม หรือเช็คสถานะได้ทันทีโดยไม่ต้องพิมพ์
+                        </p>
+                    </div>
+
+                    <a
+                        href="https://manager.line.biz"
+                        target="_blank"
+                        rel="noreferrer"
+                        class="btn-matcha-primary"
+                        style="padding: 0.5rem 1rem; font-size: 0.85rem; text-decoration: none; font-weight: 800; background: #0284c7; display: inline-flex; align-items: center; gap: 0.35rem;"
+                    >
+                        🌐 เปิด LINE OA Manager ↗
+                    </a>
+                </div>
+
+                <!-- 3 ขั้นตอนการทำ -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem;">
+                        <div style="font-size: 1.1rem; font-weight: 800; color: #0284c7; margin-bottom: 0.35rem;">
+                            1. ออกแบบรูปภาพ (Canva) 🎨
+                        </div>
+                        <p style="font-size: 0.82rem; color: #475569; margin: 0; line-height: 1.5;">
+                            เข้าไปที่ <strong>Canva.com</strong> แล้วค้นหาคำว่า <em>"LINE Rich Menu"</em> จะมีขนาดมาตรฐานให้เลือก:<br/>
+                            • แบบใหญ่ (6 หรือ 4 ช่อง): <strong>2500 × 1686 px</strong><br/>
+                            • แบบกะทัดรัด (3 ช่อง): <strong>2500 × 843 px</strong>
+                        </p>
+                    </div>
+
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem;">
+                        <div style="font-size: 1.1rem; font-weight: 800; color: #166534; margin-bottom: 0.35rem;">
+                            2. ไปที่ LINE OA Manager ⚙️
+                        </div>
+                        <p style="font-size: 0.82rem; color: #475569; margin: 0; line-height: 1.5;">
+                            เข้าเว็บ <a href="https://manager.line.biz" target="_blank" rel="noreferrer" style="color: #0284c7; font-weight: 700;">manager.line.biz</a> เลือกร้าน <strong>HOMEMATCHA'CAFE 🍵</strong><br/>
+                            • เมนูซ้ายมือ เลือก <strong>"ริชเมนู" (Rich Menus)</strong><br/>
+                            • กดปุ่ม <strong>"สร้างริชเมนู" (Create)</strong> และอัปโหลดรูปภาพที่เตรียมไว้
+                        </p>
+                    </div>
+
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem;">
+                        <div style="font-size: 1.1rem; font-weight: 800; color: #92400e; margin-bottom: 0.35rem;">
+                            3. กำหนด Action แต่ละช่อง 🔗
+                        </div>
+                        <p style="font-size: 0.82rem; color: #475569; margin: 0; line-height: 1.5;">
+                            กำหนดพื้นที่การคลิกให้ตรงกับปุ่มในรูปภาพ แล้วใส่ลิงก์หรือข้อความที่แนะนำตามตารางด้านล่างได้เลย ลูกค้าแตะแล้วจะเปิดเว็บหรือบอทจะตอบทันที!
+                        </p>
+                    </div>
+                </div>
+
+                <!-- ตารางค่า Action ที่แนะนำสำหรับร้าน Home Matcha Cafe -->
+                <div style="background: #fffdf5; border: 1.5px solid #fde047; border-radius: 12px; padding: 1rem;">
+                    <strong style="color: #854d0e; font-size: 0.92rem; display: block; margin-bottom: 0.6rem;">
+                        📋 ค่า Action ที่แนะนำสำหรับใส่ในแต่ละช่องของริชเมนูร้านเรา (คลิกเพื่อคัดลอกได้ทันที):
+                    </strong>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.65rem;">
+                        <!-- ช่อง 1: สั่งซื้อ -->
+                        <div style="background: #ffffff; border: 1px solid #fef08a; border-radius: 8px; padding: 0.65rem 0.8rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                <strong style="color: #166534; font-size: 0.85rem;">🍵 ช่อง 1: สั่งเครื่องดื่ม / เมนู</strong>
+                                <span style="font-size: 0.7rem; background: #dcfce7; color: #166534; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 700;">ประเภท: ลิงก์ (Link)</span>
+                            </div>
+                            <div style="display: flex; gap: 0.4rem; align-items: center;">
+                                <code style="font-size: 0.78rem; background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">https://homematchacafe.store/menu</code>
+                                <button type="button" onclick={() => { navigator.clipboard.writeText('https://homematchacafe.store/menu'); swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'คัดลอกลิงก์สำเร็จ', timer: 1500, showConfirmButton: false }); }} style="padding: 0.2rem 0.5rem; font-size: 0.75rem; background: #166534; color: #fff; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap;">คัดลอก</button>
+                            </div>
+                        </div>
+
+                        <!-- ช่อง 2: สถานะ -->
+                        <div style="background: #ffffff; border: 1px solid #fef08a; border-radius: 8px; padding: 0.65rem 0.8rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                <strong style="color: #0369a1; font-size: 0.85rem;">🔍 ช่อง 2: เช็คสถานะออเดอร์</strong>
+                                <span style="font-size: 0.7rem; background: #e0f2fe; color: #0369a1; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 700;">ประเภท: ข้อความ (Text)</span>
+                            </div>
+                            <div style="display: flex; gap: 0.4rem; align-items: center;">
+                                <code style="font-size: 0.78rem; background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; flex: 1;">สถานะ</code>
+                                <button type="button" onclick={() => { navigator.clipboard.writeText('สถานะ'); swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'คัดลอกคำว่า "สถานะ" แล้ว', timer: 1500, showConfirmButton: false }); }} style="padding: 0.2rem 0.5rem; font-size: 0.75rem; background: #0284c7; color: #fff; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap;">คัดลอก</button>
+                            </div>
+                        </div>
+
+                        <!-- ช่อง 3: สะสมแต้ม -->
+                        <div style="background: #ffffff; border: 1px solid #fef08a; border-radius: 8px; padding: 0.65rem 0.8rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                <strong style="color: #854d0e; font-size: 0.85rem;">⭐ ช่อง 3: บัตรสะสมแต้ม</strong>
+                                <span style="font-size: 0.7rem; background: #fefce8; color: #854d0e; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 700;">ประเภท: ลิงก์ (Link)</span>
+                            </div>
+                            <div style="display: flex; gap: 0.4rem; align-items: center;">
+                                <code style="font-size: 0.78rem; background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">https://homematchacafe.store/loyalty</code>
+                                <button type="button" onclick={() => { navigator.clipboard.writeText('https://homematchacafe.store/loyalty'); swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'คัดลอกลิงก์สำเร็จ', timer: 1500, showConfirmButton: false }); }} style="padding: 0.2rem 0.5rem; font-size: 0.75rem; background: #d97706; color: #fff; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap;">คัดลอก</button>
+                            </div>
+                        </div>
+
+                        <!-- ช่อง 4: เวลาส่ง -->
+                        <div style="background: #ffffff; border: 1px solid #fef08a; border-radius: 8px; padding: 0.65rem 0.8rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                <strong style="color: #475569; font-size: 0.85rem;">⏰ ช่อง 4: รอบจัดส่งของร้าน</strong>
+                                <span style="font-size: 0.7rem; background: #f1f5f9; color: #475569; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 700;">ประเภท: ข้อความ (Text)</span>
+                            </div>
+                            <div style="display: flex; gap: 0.4rem; align-items: center;">
+                                <code style="font-size: 0.78rem; background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; flex: 1;">เวลาส่ง</code>
+                                <button type="button" onclick={() => { navigator.clipboard.writeText('เวลาส่ง'); swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'คัดลอกคำว่า "เวลาส่ง" แล้ว', timer: 1500, showConfirmButton: false }); }} style="padding: 0.2rem 0.5rem; font-size: 0.75rem; background: #475569; color: #fff; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap;">คัดลอก</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- กล่องที่ 8: บัญชี LINE ที่เชื่อมต่อแล้ว (Connected LINE Users) -->
             <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 1px solid #cbd5e1;">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
                     <div>
                         <h3 style="margin: 0 0 0.25rem 0; font-size: 1.15rem; color: #14532d; font-weight: 800;">
-                            👥 6. บัญชี LINE ที่เชื่อมต่อแล้ว ({lineUsersList.length} บัญชี)
+                            👥 8. บัญชี LINE ที่เชื่อมต่อแล้ว ({lineUsersList.length} บัญชี)
                         </h3>
                         <p style="margin: 0; font-size: 0.85rem; color: #64748b;">
                             ลูกค้าที่ได้กดเพิ่มเพื่อนกับ LINE OA หรือพิมพ์เบอร์โทรศัพท์เพื่อผูกรับการแจ้งเตือน
