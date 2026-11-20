@@ -178,9 +178,7 @@
     <!-- แถบแจ้งเตือนสถานะผ่าน LINE OA 100% -->
     <div style="width: 100%; max-width: 720px; margin-bottom: 1.25rem; background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 1.5px solid #86efac; border-radius: 14px; padding: 0.85rem 1.15rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; box-sizing: border-box;">
         <div style="display: flex; align-items: center; gap: 0.65rem;">
-            <div style="width: 36px; height: 36px; border-radius: 50%; background: #06c755; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.1rem; flex-shrink: 0;">
-                L
-            </div>
+            <img src="/image/line-logo.png" alt="LINE" style="width: 38px; height: 38px; border-radius: 8px; flex-shrink: 0; object-fit: contain;" />
             <div style="text-align: left;">
                 <div style="font-size: 0.92rem; font-weight: 800; color: #14532d;">
                     แจ้งเตือนสถานะออเดอร์สดทาง LINE OA

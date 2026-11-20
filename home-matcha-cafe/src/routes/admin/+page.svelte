@@ -5050,7 +5050,7 @@
                             <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 10px; padding: 0.95rem 1.15rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
                                 <div>
                                     <strong style="font-size: 0.95rem; color: #166534; display: flex; align-items: center; gap: 0.45rem;">
-                                        <span style="display: inline-block; width: 22px; height: 22px; border-radius: 50%; background: #06c755; color: #fff; font-size: 0.8rem; text-align: center; line-height: 22px; font-weight: 900;">L</span>
+                                        <img src="/image/line-logo.png" alt="LINE" style="width: 22px; height: 22px; border-radius: 5px; flex-shrink: 0; object-fit: contain;" />
                                         ระบบแจ้งเตือนหลัก: ใช้ LINE Official Account 100%
                                     </strong>
                                     <div style="font-size: 0.82rem; color: #15803d; margin-top: 0.25rem; line-height: 1.4;">
@@ -7181,9 +7181,11 @@
                                                         style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;"
                                                     />
                                                 {:else}
-                                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: #06c755; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.75rem;">
-                                                        LINE
-                                                    </div>
+                                                    <img
+                                                        src="/image/line-logo.png"
+                                                        alt="LINE"
+                                                        style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;"
+                                                    />
                                                 {/if}
                                                 <strong style="color: #1e293b;">{u.display_name || 'ไม่ระบุชื่อ'}</strong>
                                             </div>
