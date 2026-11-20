@@ -1009,9 +1009,9 @@
                             </div>
                             <div class="profile-header-info">
                                 <div class="profile-header-name">
-                                    คุณ {currentMember.fullName}
+                                    <span class="profile-name-text">คุณ {currentMember.fullName}</span>
                                     {#if isCurrentMemberAdmin}
-                                        <span class="profile-badge-pill" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a;">👑 แอดมิน</span>
+                                        <span class="profile-badge-pill admin-badge">👑 แอดมิน</span>
                                     {:else}
                                         <span class="profile-badge-pill">สมาชิก</span>
                                     {/if}
@@ -1055,17 +1055,14 @@
                                 <button
                                     type="button"
                                     class="btn-admin-access"
-                                    style="width: 100%; padding: 0.75rem 1rem; font-size: 0.92rem; font-weight: 700; border-radius: 12px; background: linear-gradient(135deg, #1e293b, #0f172a); color: #ffffff; border: 1px solid #334155; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25); transition: all 0.15s ease;"
                                     onclick={() => {
                                         showMemberQuickModal = false;
                                         goto('/admin');
                                     }}
                                 >
-                                    <span>🛠️ เข้าสู่ระบบแอดมิน (Admin Dashboard)</span>
+                                    <span>🛠️ จัดการร้าน (Admin Dashboard)</span>
                                     {#if adminPendingReviewCount > 0}
-                                        <span style="background: #d97706; color: #ffffff; font-size: 0.72rem; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 999px; line-height: 1.2;">
-                                            🔔 {adminPendingReviewCount}
-                                        </span>
+                                        <span class="admin-badge-count">🔔 {adminPendingReviewCount}</span>
                                     {/if}
                                 </button>
                             {/if}
@@ -1073,7 +1070,7 @@
                             <button
                                 type="button"
                                 class="btn-matcha-primary"
-                                style="width: 100%; padding: 0.72rem; font-size: 0.92rem; border-radius: 12px;"
+                                style="width: 100%; padding: 0.65rem; font-size: 0.9rem; border-radius: 12px;"
                                 onclick={() => {
                                     showMemberQuickModal = false;
                                     goto('/loyalty');
@@ -1133,9 +1130,9 @@
                             </div>
                             <div class="profile-header-info">
                                 <div class="profile-header-name">
-                                    คุณ {currentMember.fullName}
+                                    <span class="profile-name-text">คุณ {currentMember.fullName}</span>
                                     {#if isCurrentMemberAdmin}
-                                        <span class="profile-badge-pill" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a;">👑 แอดมิน</span>
+                                        <span class="profile-badge-pill admin-badge">👑 แอดมิน</span>
                                     {:else}
                                         <span class="profile-badge-pill">สมาชิก</span>
                                     {/if}
@@ -1743,8 +1740,13 @@
         flex: 1;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
-        padding-right: 2px;
-        max-height: min(72vh, 480px);
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding-right: 0;
+    }
+
+    .profile-modal-body::-webkit-scrollbar {
+        display: none;
     }
 
     .profile-tabs-header {
@@ -1790,12 +1792,12 @@
     .profile-compact-header {
         display: flex;
         align-items: center;
-        gap: 0.85rem;
+        gap: 0.75rem;
         background: linear-gradient(135deg, #f4faee, #eaf4e3);
         border: 1.5px solid #cce4c2;
         border-radius: 14px;
-        padding: 0.75rem 0.95rem;
-        margin-bottom: 0.85rem;
+        padding: 0.65rem 0.85rem;
+        margin-bottom: 0.6rem;
     }
 
     .profile-avatar-circle {
@@ -1841,25 +1843,41 @@
     }
 
     .profile-header-name {
-        font-size: 0.96rem;
+        font-size: 0.95rem;
         font-weight: 800;
         color: var(--matcha-deep);
         display: flex;
         align-items: center;
-        gap: 0.4rem;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+        line-height: 1.3;
+    }
+
+    .profile-name-text {
+        max-width: 175px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
     .profile-badge-pill {
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
         background: #166534;
         color: #ffffff;
         font-size: 0.65rem;
         font-weight: 700;
         padding: 0.12rem 0.45rem;
         border-radius: 999px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .profile-badge-pill.admin-badge {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
+        font-weight: 800;
     }
 
     .profile-header-phone {
@@ -1883,8 +1901,8 @@
         background: linear-gradient(135deg, #f7fbf3, #edf7e7);
         border: 1.5px solid #badba1;
         border-radius: 14px;
-        padding: 0.85rem 1rem;
-        margin-bottom: 0.85rem;
+        padding: 0.7rem 0.85rem;
+        margin-bottom: 0.6rem;
     }
 
     .loyalty-progress-head {
@@ -2024,23 +2042,57 @@
         background: #cbd5e1;
     }
 
+    .btn-admin-access {
+        width: 100%;
+        padding: 0.65rem 0.85rem;
+        font-size: 0.88rem;
+        font-weight: 800;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #1e293b, #0f172a);
+        color: #ffffff;
+        border: 1px solid #334155;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.22);
+        transition: all 0.15s ease;
+        line-height: 1.2;
+    }
+
+    .btn-admin-access:hover {
+        background: linear-gradient(135deg, #334155, #1e293b);
+        transform: translateY(-1px);
+    }
+
+    .admin-badge-count {
+        background: #d97706;
+        color: #ffffff;
+        font-size: 0.7rem;
+        font-weight: 800;
+        padding: 0.1rem 0.45rem;
+        border-radius: 999px;
+        line-height: 1.2;
+    }
+
     /* Bottom Close Bar */
     .profile-modal-footer {
-        margin-top: 0.75rem;
-        padding-top: 0.6rem;
+        margin-top: 0.45rem;
+        padding-top: 0.4rem;
         border-top: 1px solid #e2e8f0;
         flex-shrink: 0;
     }
 
     .btn-profile-close-full {
         width: 100%;
-        padding: 0.6rem;
+        padding: 0.45rem;
         border-radius: 10px;
         border: 1px solid #cbd5e1;
         background: #f8fafc;
         color: #475569;
         font-family: inherit;
-        font-size: 0.84rem;
+        font-size: 0.82rem;
         font-weight: 700;
         cursor: pointer;
         transition: all 0.15s ease;
