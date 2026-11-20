@@ -275,8 +275,20 @@
                     loyaltySettings = data.loyaltySettings;
                 }
                 if (data.member) {
-                    currentMember = data.member;
-                    localStorage.setItem('hmc_member', JSON.stringify(data.member));
+                    // ป้องกันกระพริบ: เช็กก่อนว่ามีข้อมูลเปลี่ยนจริงหรือไม่ ถ้าเหมือนเดิมไม่ต้อง re-assign currentMember
+                    const isSame = currentMember &&
+                        currentMember.phone === data.member.phone &&
+                        currentMember.fullName === data.member.fullName &&
+                        currentMember.firstName === data.member.firstName &&
+                        currentMember.lastName === data.member.lastName &&
+                        currentMember.points === data.member.points &&
+                        currentMember.totalFreeRedeemed === data.member.totalFreeRedeemed &&
+                        currentMember.pictureUrl === data.member.pictureUrl;
+
+                    if (!isSame) {
+                        currentMember = data.member;
+                        localStorage.setItem('hmc_member', JSON.stringify(data.member));
+                    }
                 } else if (data.exists === false) {
                     currentMember = null;
                     localStorage.removeItem('hmc_member');
@@ -289,12 +301,13 @@
 
     function handleFloatingMemberClick() {
         if (currentMember) {
-            refreshCurrentMemberFromServer();
             editFirstName = currentMember.firstName || '';
             editLastName = currentMember.lastName || '';
             memberQuickTab = 'overview';
             profileSaveMsg = null;
             showMemberQuickModal = true;
+            // ดึงข้อมูลอัปเดตแบบเงียบๆ ไม่ให้กระพริบ
+            refreshCurrentMemberFromServer();
         } else {
             authMode = 'login';
             authStep = 'form';
@@ -1699,18 +1712,9 @@
     }
 
     .tab-content-fade {
-        animation: tabFadeIn 0.22s ease-out;
-    }
-
-    @keyframes tabFadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(4px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        /* ป้องกันการกระพริบวูบวาบเมื่อ re-render */
+        width: 100%;
+        box-sizing: border-box;
     }
 
     /* Compact Header Card */

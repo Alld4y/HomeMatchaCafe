@@ -553,19 +553,70 @@
             .reduce((sum, o) => sum + (o.totalPrice || 0), 0)
     );
     let manualReviewOrders = $derived(liveOrders.filter((o) => o.status === 'pending'));
-    let brewingCount = $derived(liveOrders.filter((o) => o.status === 'brewing' || o.status === 'paid').length);
+    let toBrewCount = $derived(liveOrders.filter((o) => o.status === 'paid' || o.status === 'brewing').length);
+    let brewingCount = $derived(toBrewCount);
     let readyToShipCount = $derived(liveOrders.filter((o) => o.status === 'ready_to_ship').length);
     let todayCompletedCount = $derived(liveOrders.filter((o) => o.status === 'completed').length);
     let completedCount = $derived(orders.filter((o) => o.status === 'completed').length);
 
+    // ฟังก์ชันช่วยแยกเวลาเป็นนาทีสำหรับจัดเรียงก่อน-หลัง
+    function extractMinutesFromString(str: string): number {
+        if (!str) return 9999;
+        const match = str.match(/(\d{1,2})[:.](\d{2})/);
+        return match ? parseInt(match[1], 10) * 60 + parseInt(match[2], 10) : 9999;
+    }
+
+    function extractOrderDeliveryMinutes(order: AdminOrder): number {
+        const raw = (order.deliveryRound || '').trim();
+        return extractMinutesFromString(raw);
+    }
+
+    function formatThaiDateDisplay(dateStr: string): string {
+        if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr || 'ไม่ระบุวันที่';
+        const thaiDays = ['วันอาทิตย์', 'วันจันทร์', 'วันอังคาร', 'วันพุธ', 'วันพฤหัสบดี', 'วันศุกร์', 'วันเสาร์'];
+        const thaiMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const dateObj = new Date(y, m - 1, d);
+        const dayName = thaiDays[dateObj.getDay()];
+        const monthName = thaiMonths[m - 1];
+        const yearBE = y + 543;
+        return `${dayName}ที่ ${d} ${monthName} ${yearBE}`;
+    }
+
+    function sortTimeBadges(entries: [string, number][]): [string, number][] {
+        return entries.slice().sort((a, b) => {
+            const minA = extractMinutesFromString(a[0]);
+            const minB = extractMinutesFromString(b[0]);
+            if (minA !== minB) return minA - minB;
+            return a[0].localeCompare(b[0]);
+        });
+    }
+
     let filteredOrders = $derived(
         selectedFilter === 'all'
             ? liveOrders
+            : selectedFilter === 'to_brew'
+            ? liveOrders.filter((o) => o.status === 'paid' || o.status === 'brewing')
             : liveOrders.filter((o) => o.status === selectedFilter)
     );
 
     // 📜 ตัวแปรและการคำนวณสำหรับแท็บประวัติคำสั่งซื้อ (Order History & Archive)
-    let historyDateRange = $state<'all' | 'today' | 'yesterday' | 'week' | 'custom'>('all');
+    // ดึงวันเปิดร้านทั้งหมดที่มีคำสั่งซื้อ เรียงจากล่าสุดไปเก่าสุด
+    let openDatesList = $derived.by(() => {
+        const datesSet = new Set<string>();
+        for (const o of orders) {
+            const d = (o.deliveryDate || o.createdAt.slice(0, 10)).trim();
+            if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+                datesSet.add(d);
+            }
+        }
+        return Array.from(datesSet).sort((a, b) => b.localeCompare(a));
+    });
+
+    // 7 วันล่าสุดที่เปิดร้าน
+    let recent7OpenDays = $derived(openDatesList.slice(0, 7));
+
+    let historyDateRange = $state<'recent7' | 'today' | 'yesterday' | 'week' | 'all' | 'custom'>('recent7');
     let historyCustomDate = $state<string>('');
     let historyStatusFilter = $state<string>('all'); // 'all' | 'completed' | 'cancelled' | 'pending' | 'active'
     let historySearchQuery = $state<string>('');
@@ -574,7 +625,10 @@
         let list = orders;
 
         // 1. กรองตามช่วงวันที่
-        if (historyDateRange === 'today') {
+        if (historyDateRange === 'recent7') {
+            const set7 = new Set(recent7OpenDays);
+            list = list.filter((o) => set7.has((o.deliveryDate || o.createdAt.slice(0, 10)).trim()));
+        } else if (historyDateRange === 'today') {
             list = list.filter((o) => (o.deliveryDate || o.createdAt.slice(0, 10)) === todayDateStr);
         } else if (historyDateRange === 'yesterday') {
             const yd = new Date();
@@ -617,6 +671,96 @@
         return [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     });
 
+    interface HistoryDayGroup {
+        date: string;
+        dateFormatted: string;
+        isToday: boolean;
+        isYesterday: boolean;
+        orders: AdminOrder[];
+        totalSales: number;
+        totalCups: number;
+        completedCount: number;
+        cancelledCount: number;
+        pendingCount: number;
+    }
+
+    let historyGroupedByDay = $derived.by<HistoryDayGroup[]>(() => {
+        const groups = new Map<string, AdminOrder[]>();
+        for (const o of historyFilteredOrders) {
+            const d = (o.deliveryDate || o.createdAt.slice(0, 10)).trim() || 'ไม่ระบุวันที่';
+            if (!groups.has(d)) {
+                groups.set(d, []);
+            }
+            groups.get(d)!.push(o);
+        }
+
+        const sortedDates = Array.from(groups.keys()).sort((a, b) => b.localeCompare(a));
+        const yd = new Date();
+        yd.setDate(yd.getDate() - 1);
+        const ydStr = `${yd.getFullYear()}-${String(yd.getMonth() + 1).padStart(2, '0')}-${String(yd.getDate()).padStart(2, '0')}`;
+
+        return sortedDates.map((date) => {
+            const dayOrders = groups.get(date)!;
+            const isToday = date === todayDateStr;
+            const isYesterday = date === ydStr;
+            const validOrders = dayOrders.filter((o) => o.status !== 'cancelled' && o.status !== 'pending');
+            const totalSales = validOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+            const totalCups = dayOrders.filter((o) => o.status !== 'cancelled').reduce(
+                (sum, o) => sum + (o.basket || []).reduce((bS, it) => bS + Math.max(1, Number(it.quantity) || 1), 0),
+                0
+            );
+            const completedCount = dayOrders.filter((o) => o.status === 'completed').length;
+            const cancelledCount = dayOrders.filter((o) => o.status === 'cancelled').length;
+            const pendingCount = dayOrders.filter((o) => o.status === 'pending').length;
+
+            return {
+                date,
+                dateFormatted: formatThaiDateDisplay(date),
+                isToday,
+                isYesterday,
+                orders: dayOrders,
+                totalSales,
+                totalCups,
+                completedCount,
+                cancelledCount,
+                pendingCount
+            };
+        });
+    });
+
+    let expandedHistoryDays = $state<Record<string, boolean>>({});
+
+    function isDayExpanded(date: string, index: number): boolean {
+        if (expandedHistoryDays[date] !== undefined) {
+            return expandedHistoryDays[date];
+        }
+        return index === 0;
+    }
+
+    function toggleHistoryDay(date: string, index: number) {
+        const current = isDayExpanded(date, index);
+        expandedHistoryDays = {
+            ...expandedHistoryDays,
+            [date]: !current
+        };
+    }
+
+    function expandAllHistoryDays() {
+        const next: Record<string, boolean> = {};
+        for (const g of historyGroupedByDay) {
+            next[g.date] = true;
+        }
+        expandedHistoryDays = next;
+    }
+
+    function collapseAllHistoryDays() {
+        const next: Record<string, boolean> = {};
+        for (const g of historyGroupedByDay) {
+            next[g.date] = false;
+        }
+        expandedHistoryDays = next;
+    }
+
     let historyTotalSales = $derived(
         historyFilteredOrders
             .filter((o) => o.status !== 'cancelled' && o.status !== 'pending')
@@ -636,6 +780,7 @@
         addonBreakdown: Record<string, number>;
         noteBreakdown: Record<string, number>;
         roundBreakdown: Record<string, number>;
+        timeBreakdown: Record<string, number>;
         dateBreakdown: Record<string, number>;
         normalAddonCount: number;
     }
@@ -649,6 +794,7 @@
         overallAddons: Record<string, number>;
         overallNotes: Record<string, number>;
         overallRounds: Record<string, number>;
+        overallTimes: Record<string, number>;
         totalNormalAddon: number;
     }
 
@@ -697,18 +843,24 @@
                 addonBreakdown: Record<string, number>;
                 noteBreakdown: Record<string, number>;
                 roundBreakdown: Record<string, number>;
+                timeBreakdown: Record<string, number>;
                 dateBreakdown: Record<string, number>;
                 normalAddonCount: number;
             }>;
             overallAddons: Record<string, number>;
             overallNotes: Record<string, number>;
             overallRounds: Record<string, number>;
+            overallTimes: Record<string, number>;
             totalNormalAddon: number;
         }>();
 
         for (const order of activeSummaryOrders) {
             if (!order.basket || !Array.isArray(order.basket)) continue;
-            const roundName = (order.deliveryRound || 'รอบปกติ').split('·')[0].trim();
+            const rawRound = (order.deliveryRound || 'รอบปกติ').trim();
+            const roundParts = rawRound.split('·').map((p) => p.trim());
+            const roundName = roundParts[0] || 'รอบปกติ';
+            const subTime = roundParts.length > 1 ? roundParts.slice(1).join(' · ').trim() : '';
+            const timeKey = subTime ? `${roundName} · ⏰ ${subTime.replace(/^(นัดส่ง|จัดส่ง)\s*/, '')}` : roundName;
             const dateStr = (order.deliveryDate || '').trim();
 
             for (const item of order.basket) {
@@ -738,6 +890,7 @@
                         overallAddons: {},
                         overallNotes: {},
                         overallRounds: {},
+                        overallTimes: {},
                         totalNormalAddon: 0
                     };
                     menuMap.set(name, group);
@@ -757,9 +910,12 @@
                     group.overallNotes[note] = (group.overallNotes[note] || 0) + qty;
                 }
 
-                // สรุป Rounds ภาพรวมของเมนูนี้
+                // สรุป Rounds & Times ภาพรวมของเมนูนี้
                 if (roundName) {
                     group.overallRounds[roundName] = (group.overallRounds[roundName] || 0) + qty;
+                }
+                if (timeKey) {
+                    group.overallTimes[timeKey] = (group.overallTimes[timeKey] || 0) + qty;
                 }
 
                 // สรุปจำแนกตามความหวาน
@@ -771,6 +927,7 @@
                         addonBreakdown: {},
                         noteBreakdown: {},
                         roundBreakdown: {},
+                        timeBreakdown: {},
                         dateBreakdown: {},
                         normalAddonCount: 0
                     };
@@ -789,6 +946,9 @@
                 if (roundName) {
                     sweetItem.roundBreakdown[roundName] = (sweetItem.roundBreakdown[roundName] || 0) + qty;
                 }
+                if (timeKey) {
+                    sweetItem.timeBreakdown[timeKey] = (sweetItem.timeBreakdown[timeKey] || 0) + qty;
+                }
                 if (dateStr) {
                     sweetItem.dateBreakdown[dateStr] = (sweetItem.dateBreakdown[dateStr] || 0) + qty;
                 }
@@ -805,6 +965,7 @@
                 overallAddons: g.overallAddons,
                 overallNotes: g.overallNotes,
                 overallRounds: g.overallRounds,
+                overallTimes: g.overallTimes,
                 totalNormalAddon: g.totalNormalAddon,
                 sweetnessList: Array.from(g.sweetnessMap.values()).sort((a, b) => a.sweetness - b.sweetness)
             }))
@@ -876,10 +1037,10 @@
         brewChecklist = updated;
     }
 
-    // ในแท็บ "ทั้งหมด" ปุ่มเลือกทั้งหมดจะเลือกเฉพาะรายการที่ "รับยอดแล้ว (รอชง)" (status === 'paid') เท่านั้น ไม่เลือกรายการที่ยกเลิกหรือเสร็จสิ้นแล้ว
+    // ในแท็บ "ทั้งหมด" หรือ "คิวที่ต้องชง" ปุ่มเลือกทั้งหมดจะเลือกเฉพาะรายการที่รอชง/กำลังชงเท่านั้น
     let selectableOrders = $derived(
-        selectedFilter === 'all'
-            ? filteredOrders.filter((o) => o.status === 'paid')
+        selectedFilter === 'all' || selectedFilter === 'to_brew'
+            ? filteredOrders.filter((o) => o.status === 'paid' || o.status === 'brewing')
             : filteredOrders.filter((o) => o.status !== 'cancelled' && o.status !== 'completed' && o.status !== 'pending')
     );
 
@@ -1146,10 +1307,16 @@
         });
     });
 
-    // ออเดอร์ที่ค้างส่ง (รอชง / กำลังชง / พร้อมส่ง / กำลังนำส่ง)
-    let pendingDeliveryOrders = $derived(
-        deliveryAssistantOrders.filter((o) => o.status !== 'completed')
-    );
+    // ออเดอร์ที่ค้างส่ง (รอชง / กำลังชง / พร้อมส่ง / กำลังนำส่ง) เรียงตามเวลาที่ต้องส่ง (เร็วไปช้า)
+    let pendingDeliveryOrders = $derived.by(() => {
+        const list = deliveryAssistantOrders.filter((o) => o.status !== 'completed');
+        return list.slice().sort((a, b) => {
+            const timeA = extractOrderDeliveryMinutes(a);
+            const timeB = extractOrderDeliveryMinutes(b);
+            if (timeA !== timeB) return timeA - timeB;
+            return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        });
+    });
 
     // ออเดอร์ที่ส่งเสร็จแล้วในรอบนี้
     let completedDeliveryOrders = $derived(
@@ -3502,7 +3669,12 @@
             <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                 <button 
                     type="button"
-                    onclick={() => (isBrewSummaryExpanded = !isBrewSummaryExpanded)} 
+                    onclick={() => {
+                        isBrewSummaryExpanded = !isBrewSummaryExpanded;
+                        if (isBrewSummaryExpanded) {
+                            selectedFilter = 'to_brew';
+                        }
+                    }} 
                     class="btn-matcha-primary" 
                     style="padding: 0.45rem 1.15rem; font-size: 0.85rem; font-weight: 800; background: {isBrewSummaryExpanded ? '#15803d' : '#047857'}; box-shadow: 0 3px 10px rgba(4, 120, 87, 0.25); display: inline-flex; align-items: center; gap: 0.4rem;"
                     title="คลิกเพื่อยุบหรือขยายการ์ดสรุปคิวชงเครื่องดื่ม"
@@ -3524,6 +3696,13 @@
         <div class="category-filter-bar" style="margin-bottom: 1.25rem; width: 100%;">
             <button class="category-tab-btn {selectedFilter === 'all' ? 'active' : ''}" onclick={() => { selectedFilter = 'all'; selectedOrderIds = []; }}>
                 ทั้งหมดในคิว ({liveOrders.length})
+            </button>
+            <button 
+                class="category-tab-btn {selectedFilter === 'to_brew' ? 'active' : ''}" 
+                onclick={() => { selectedFilter = 'to_brew'; selectedOrderIds = []; }}
+                style="background: {selectedFilter === 'to_brew' ? '#047857' : '#ecfdf5'}; color: {selectedFilter === 'to_brew' ? '#ffffff' : '#065f46'}; font-weight: 800; border: 1.5px solid {selectedFilter === 'to_brew' ? '#047857' : '#a7f3d0'};"
+            >
+                🍵 คิวที่ต้องชง ({toBrewCount})
             </button>
             <button 
                 class="category-tab-btn {selectedFilter === 'pending' ? 'active' : ''}" 
@@ -3555,7 +3734,12 @@
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
-                onclick={() => (isBrewSummaryExpanded = !isBrewSummaryExpanded)}
+                onclick={() => {
+                    isBrewSummaryExpanded = !isBrewSummaryExpanded;
+                    if (isBrewSummaryExpanded) {
+                        selectedFilter = 'to_brew';
+                    }
+                }}
                 style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.15rem; background: #f0fdf4; cursor: pointer; user-select: none; border-bottom: {isBrewSummaryExpanded ? '1px solid #dcfce7' : 'none'}; gap: 0.75rem; flex-wrap: wrap; width: 100%; box-sizing: border-box;"
             >
                 <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; flex: 1; min-width: 0;">
@@ -3750,12 +3934,12 @@
                                                             </div>
                                                         {/if}
 
-                                                        <!-- รอบจัดส่ง / วันจัดส่ง ของความหวานนี้ -->
-                                                        {#if Object.keys(sweet.roundBreakdown).length > 0}
+                                                        <!-- รอบจัดส่ง / วันจัดส่ง / เวลาส่งย่อย ของความหวานนี้ -->
+                                                        {#if Object.keys(sweet.timeBreakdown || sweet.roundBreakdown || {}).length > 0}
                                                             <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.25rem;">
-                                                                {#each Object.entries(sweet.roundBreakdown) as [round, count]}
-                                                                    <span style="display: inline-block; background: #e0f2fe; color: #0369a1; font-size: 0.72rem; font-weight: 700; padding: 0.08rem 0.45rem; border-radius: 999px; border: 1px solid #bae6fd; word-break: break-word;">
-                                                                        🚚 {round} ({count} แก้ว)
+                                                                {#each sortTimeBadges(Object.entries(sweet.timeBreakdown || sweet.roundBreakdown || {})) as [timeLabel, count]}
+                                                                    <span style="display: inline-flex; align-items: center; gap: 0.2rem; background: #e0f2fe; color: #0369a1; font-size: 0.72rem; font-weight: 700; padding: 0.08rem 0.45rem; border-radius: 999px; border: 1px solid #bae6fd; word-break: break-word;">
+                                                                        🚚 {timeLabel} ({count} แก้ว)
                                                                     </span>
                                                                 {/each}
                                                                 {#if Object.keys(sweet.dateBreakdown).length > 0}
@@ -3793,11 +3977,11 @@
                                     <!-- สรุปรวมช็อตและโน้ตของทั้งเมนู (ถ้ามีมากกว่า 1 ระดับความหวาน) -->
                                     {#if menu.sweetnessList.length > 1 && (Object.keys(menu.overallAddons).length > 0 || Object.keys(menu.overallNotes).length > 0 || Object.keys(menu.overallRounds).length > 0)}
                                         <div style="margin-top: 0.65rem; padding-top: 0.5rem; border-top: 1px solid #f1f5f9; font-size: 0.76rem; color: #64748b; display: flex; flex-direction: column; gap: 0.25rem; width: 100%; box-sizing: border-box;">
-                                            {#if Object.keys(menu.overallRounds).length > 0}
+                                            {#if Object.keys(menu.overallTimes || menu.overallRounds || {}).length > 0}
                                                 <div style="display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;">
-                                                    <strong style="color: #334155;">รอบจัดส่งในเมนูนี้:</strong>
-                                                    {#each Object.entries(menu.overallRounds) as [round, count]}
-                                                        <span style="color: #0369a1; font-weight: 700; background: #e0f2fe; padding: 0.05rem 0.4rem; border-radius: 999px;">🚚 {round} ({count} แก้ว)</span>
+                                                    <strong style="color: #334155;">รอบและเวลานัดส่งในเมนูนี้:</strong>
+                                                    {#each sortTimeBadges(Object.entries(menu.overallTimes || menu.overallRounds || {})) as [timeLabel, count]}
+                                                        <span style="color: #0369a1; font-weight: 700; background: #e0f2fe; padding: 0.05rem 0.4rem; border-radius: 999px; font-size: 0.72rem;">🚚 {timeLabel} ({count} แก้ว)</span>
                                                     {/each}
                                                 </div>
                                             {/if}
@@ -4235,13 +4419,14 @@
                                         {/if}
                                     </strong>
                                 </div>
-                                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.2rem;">
-                                    <span style="font-size: 0.75rem; background: #dcfce7; color: #166534; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 6px;">
+                                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem;">
+                                    <span style="font-size: 0.75rem; background: #dcfce7; color: #166534; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 6px;">
                                         {(order.deliveryRound || 'รอบปกติ').split('·')[0].trim()}
                                     </span>
                                     {#if (order.deliveryRound || '').includes('·')}
-                                        <span style="font-size: 0.72rem; background: #fef08a; color: #854d0e; font-weight: 800; padding: 0.15rem 0.45rem; border-radius: 6px; border: 1px solid #fde047; white-space: nowrap;">
-                                            ⏰ {(order.deliveryRound || '').split('·')[1].trim()}
+                                        {@const subTime = (order.deliveryRound || '').split('·').slice(1).join(' · ').trim()}
+                                        <span style="font-size: 0.75rem; background: #fef08a; color: #854d0e; font-weight: 800; padding: 0.18rem 0.55rem; border-radius: 6px; border: 1.5px solid #fde047; white-space: nowrap; box-shadow: 0 1px 3px rgba(133, 77, 14, 0.1);">
+                                            ⏰ {subTime}
                                         </span>
                                     {/if}
                                 </div>
@@ -4249,6 +4434,13 @@
 
                             <!-- เนื้อหาการ์ด: ที่อยู่ + เบอร์โทร + รายการเมนูและรายละเอียด -->
                             <div style="padding: 1rem;">
+                                {#if (order.deliveryRound || '').includes('·')}
+                                    {@const subTime = (order.deliveryRound || '').split('·').slice(1).join(' · ').trim()}
+                                    <div style="background: #fffbeb; border: 1.5px solid #fde68a; border-radius: 8px; padding: 0.4rem 0.65rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.4rem; color: #92400e; font-size: 0.82rem; font-weight: 800;">
+                                        <span>⏰</span>
+                                        <span>เวลานัดส่ง: <strong style="color: #b45309; text-decoration: underline;">{subTime}</strong></span>
+                                    </div>
+                                {/if}
                                 <!-- สถานที่จัดส่ง -->
                                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.65rem 0.8rem; margin-bottom: 0.85rem;">
                                     <div style="display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.92rem; color: #1e293b; font-weight: 700; line-height: 1.4;">
@@ -4409,10 +4601,10 @@
                         </span>
                         <button
                             type="button"
-                            onclick={() => (historyDateRange = 'all')}
-                            style="padding: 0.35rem 0.8rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.2s; border: 1.5px solid {historyDateRange === 'all' ? '#1e293b' : '#cbd5e1'}; background: {historyDateRange === 'all' ? '#1e293b' : '#ffffff'}; color: {historyDateRange === 'all' ? '#ffffff' : '#475569'};"
+                            onclick={() => (historyDateRange = 'recent7')}
+                            style="padding: 0.35rem 0.85rem; border-radius: 999px; font-size: 0.8rem; font-weight: 800; cursor: pointer; transition: all 0.2s; border: 1.5px solid {historyDateRange === 'recent7' ? '#047857' : '#cbd5e1'}; background: {historyDateRange === 'recent7' ? '#047857' : '#ffffff'}; color: {historyDateRange === 'recent7' ? '#ffffff' : '#475569'}; box-shadow: {historyDateRange === 'recent7' ? '0 2px 6px rgba(4,120,87,0.2)' : 'none'};"
                         >
-                            ทั้งหมดทุกวัน ({orders.length})
+                            🗓️ 7 วันล่าสุดที่เปิด ({recent7OpenDays.length} วัน)
                         </button>
                         <button
                             type="button"
@@ -4430,10 +4622,10 @@
                         </button>
                         <button
                             type="button"
-                            onclick={() => (historyDateRange = 'week')}
-                            style="padding: 0.35rem 0.8rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.2s; border: 1.5px solid {historyDateRange === 'week' ? '#1e293b' : '#cbd5e1'}; background: {historyDateRange === 'week' ? '#1e293b' : '#ffffff'}; color: {historyDateRange === 'week' ? '#ffffff' : '#475569'};"
+                            onclick={() => (historyDateRange = 'all')}
+                            style="padding: 0.35rem 0.8rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.2s; border: 1.5px solid {historyDateRange === 'all' ? '#1e293b' : '#cbd5e1'}; background: {historyDateRange === 'all' ? '#1e293b' : '#ffffff'}; color: {historyDateRange === 'all' ? '#ffffff' : '#475569'};"
                         >
-                            7 วันล่าสุด
+                            ทั้งหมดทุกวัน ({orders.length})
                         </button>
                         <div style="display: inline-flex; align-items: center; gap: 0.35rem;">
                             <input
@@ -4503,109 +4695,192 @@
                     </p>
                 </div>
             {:else}
-                <div class="admin-orders-container" style="display: flex; flex-direction: column; gap: 1.25rem; width: 100%; max-width: 100%; box-sizing: border-box;">
-                    {#each historyFilteredOrders as order (order.id)}
-                        <div 
-                            class="form-card admin-order-card" 
-                            style="
-                                padding: 1.5rem; 
-                                text-align: left; 
-                                border-left: 6px solid {
-                                    order.status === 'completed' ? 'var(--green-status)' : 
-                                    order.status === 'cancelled' ? '#ef4444' : 
-                                    order.status === 'ready_to_ship' ? '#0284c7' :
-                                    order.status === 'brewing' ? 'var(--matcha-primary)' : 
-                                    order.status === 'delivering' ? 'var(--gold-accent, #d97706)' : '#d97706'
-                                }; 
-                                {order.status === 'cancelled' ? 'background: #fff8f8; opacity: 0.9;' : ''}
-                                width: 100%;
-                                max-width: 100%;
-                                box-sizing: border-box;
-                            "
-                        >
-                            <!-- ส่วนหัวการ์ด -->
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-light);">
+                <div style="display: flex; flex-direction: column; gap: 1rem; width: 100%; max-width: 100%; box-sizing: border-box;">
+                    <!-- แถบควบคุมขยาย/ยุบทั้งหมด -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0 0.25rem;">
+                        <span style="font-size: 0.84rem; color: #475569; font-weight: 700;">
+                            📅 แสดงประวัติแยกตามวันที่เปิดร้าน ({historyGroupedByDay.length} วัน • {historyFilteredOrders.length} ออเดอร์):
+                        </span>
+                        <div style="display: flex; gap: 0.35rem;">
+                            <button
+                                type="button"
+                                onclick={expandAllHistoryDays}
+                                style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700; background: #ffffff; border: 1.5px solid #cbd5e1; color: #334155; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;"
+                            >
+                                ➕ ขยายทุกวัน
+                            </button>
+                            <button
+                                type="button"
+                                onclick={collapseAllHistoryDays}
+                                style="padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700; background: #ffffff; border: 1.5px solid #cbd5e1; color: #334155; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;"
+                            >
+                                ➖ ยุบทุกวัน
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- รายการกลุ่มแยกตามวัน (Daily Accordions) -->
+                    {#each historyGroupedByDay as dayGroup, groupIdx (dayGroup.date)}
+                        {@const isExpanded = isDayExpanded(dayGroup.date, groupIdx)}
+                        <div style="background: #ffffff; border: 1.5px solid {dayGroup.isToday ? '#86efac' : '#e2e8f0'}; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04); transition: all 0.2s ease;">
+                            <!-- หัวแถบประจำวัน (กดเปิด/ปิดได้) -->
+                            <button
+                                type="button"
+                                onclick={() => toggleHistoryDay(dayGroup.date, groupIdx)}
+                                style="width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.15rem; background: {dayGroup.isToday ? '#f0fdf4' : isExpanded ? '#f8fafc' : '#ffffff'}; border: none; cursor: pointer; text-align: left; gap: 0.75rem; flex-wrap: wrap; box-sizing: border-box; transition: background 0.15s ease;"
+                            >
                                 <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                    <h3 style="margin: 0; font-size: 1.15rem; color: var(--matcha-deep);">
-                                        {order.order_id || order.id}
-                                    </h3>
-                                    <span class="status-pill {order.status}">
-                                        <span class="pulse-dot"></span>
-                                        {getStatusName(order.status)}
+                                    <span style="font-size: 1rem; font-weight: 800; color: #1e293b;">
+                                        📅 {dayGroup.dateFormatted}
                                     </span>
-                                    {#if order.status === 'cancelled'}
-                                        <span style="background: #fee2e2; color: #b91c1c; font-size: 0.75rem; font-weight: 800; padding: 0.15rem 0.55rem; border-radius: 6px;">
-                                            🚫 ยกเลิกแล้ว
+                                    {#if dayGroup.isToday}
+                                        <span style="background: #dcfce7; color: #166534; font-size: 0.72rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 999px; border: 1px solid #86efac;">
+                                            วันนี้
+                                        </span>
+                                    {:else if dayGroup.isYesterday}
+                                        <span style="background: #e0f2fe; color: #0369a1; font-size: 0.72rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 999px;">
+                                            เมื่อวาน
+                                        </span>
+                                    {/if}
+                                    <span style="background: #f1f5f9; color: #475569; font-size: 0.76rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 999px;">
+                                        {dayGroup.orders.length} ออเดอร์ ({dayGroup.totalCups} แก้ว)
+                                    </span>
+                                    {#if dayGroup.completedCount > 0}
+                                        <span style="background: #dcfce7; color: #166534; font-size: 0.72rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 6px;">
+                                            ✅ ส่งแล้ว {dayGroup.completedCount}
+                                        </span>
+                                    {/if}
+                                    {#if dayGroup.cancelledCount > 0}
+                                        <span style="background: #fee2e2; color: #991b1b; font-size: 0.72rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 6px;">
+                                            🚫 ยกเลิก {dayGroup.cancelledCount}
                                         </span>
                                     {/if}
                                 </div>
 
-                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                    <span style="font-size: 0.8rem; color: var(--text-muted);">
-                                        สั่งเมื่อ: {formatTime(order.createdAt)}
+                                <div style="display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0;">
+                                    <span style="font-size: 1rem; font-weight: 800; color: #15803d; background: #ecfdf5; padding: 0.2rem 0.6rem; border-radius: 8px; border: 1px solid #a7f3d0;">
+                                        ฿{dayGroup.totalSales.toLocaleString()}
                                     </span>
-                                    <select 
-                                        class="form-select" 
-                                        style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: 8px;"
-                                        value={order.status}
-                                        onchange={(e) => updateStatus(order.id, (e.target as HTMLSelectElement).value as any)}
-                                    >
-                                        <option value="pending">รอตรวจสลิป</option>
-                                        <option value="paid">รับยอดแล้ว</option>
-                                        <option value="brewing">กำลังชง</option>
-                                        <option value="ready_to_ship">ชงเสร็จแล้ว</option>
-                                        <option value="delivering">กำลังส่ง</option>
-                                        <option value="completed">ส่งสำเร็จ</option>
-                                        <option value="cancelled">ยกเลิก</option>
-                                    </select>
+                                    <span style="font-size: 0.8rem; color: #64748b; font-weight: 800; background: #f1f5f9; padding: 0.2rem 0.5rem; border-radius: 6px;">
+                                        {isExpanded ? '▲ ยุบเก็บ' : '▼ ขยายดูรายการ'}
+                                    </span>
                                 </div>
-                            </div>
+                            </button>
 
-                            <!-- ข้อมูลลูกค้า & วันจัดส่ง -->
-                            <div style="margin: 0.85rem 0; font-size: 0.9rem; display: flex; flex-direction: column; gap: 0.35rem;">
-                                <div>
-                                    <strong>ลูกค้า:</strong> {order.name}{#if order.memberName && order.memberName.trim() !== order.name.trim()} <span style="color: #166534; font-weight: 700;">({order.memberName})</span>{/if} (โทร: <a href="tel:{order.phone}" style="color: var(--matcha-deep); font-weight: 700;">{order.phone}</a>)
-                                </div>
-                                <div><strong>สถานที่จัดส่ง:</strong> {order.address}</div>
-                                <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: #475569;">
-                                    <span>📅 วันที่ส่ง: <strong>{order.deliveryDate || order.createdAt.slice(0, 10)}</strong></span>
-                                    <span>⏰ รอบส่ง: <strong>{order.deliveryRound || 'รอบปกติ'}</strong></span>
-                                </div>
-                                {#if order.message}
-                                    <div style="background: #f8fafc; border-radius: 6px; padding: 0.35rem 0.6rem; font-size: 0.82rem; color: #64748b;">
-                                        <strong>โน้ต:</strong> {order.message}
-                                    </div>
-                                {/if}
-                            </div>
+                            <!-- รายการออเดอร์ในวันนี้ (แสดงเมื่อขยาย) -->
+                            {#if isExpanded}
+                                <div style="padding: 1rem 1.15rem; border-top: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 1rem; background: #fafaf9; width: 100%; box-sizing: border-box;">
+                                    {#each dayGroup.orders as order (order.id)}
+                                        <div 
+                                            class="form-card admin-order-card" 
+                                            style="
+                                                padding: 1.25rem; 
+                                                text-align: left; 
+                                                border-left: 6px solid {
+                                                    order.status === 'completed' ? 'var(--green-status)' : 
+                                                    order.status === 'cancelled' ? '#ef4444' : 
+                                                    order.status === 'ready_to_ship' ? '#0284c7' :
+                                                    order.status === 'brewing' ? 'var(--matcha-primary)' : 
+                                                    order.status === 'delivering' ? 'var(--gold-accent, #d97706)' : '#d97706'
+                                                }; 
+                                                {order.status === 'cancelled' ? 'background: #fff8f8; opacity: 0.9;' : ''}
+                                                width: 100%;
+                                                max-width: 100%;
+                                                box-sizing: border-box;
+                                            "
+                                        >
+                                            <!-- ส่วนหัวการ์ด -->
+                                            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; padding-bottom: 0.65rem; border-bottom: 1px solid var(--border-light);">
+                                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                                    <h3 style="margin: 0; font-size: 1.1rem; color: var(--matcha-deep);">
+                                                        {order.order_id || order.id}
+                                                    </h3>
+                                                    <span class="status-pill {order.status}">
+                                                        <span class="pulse-dot"></span>
+                                                        {getStatusName(order.status)}
+                                                    </span>
+                                                    {#if order.status === 'cancelled'}
+                                                        <span style="background: #fee2e2; color: #b91c1c; font-size: 0.75rem; font-weight: 800; padding: 0.15rem 0.55rem; border-radius: 6px;">
+                                                            🚫 ยกเลิกแล้ว
+                                                        </span>
+                                                    {/if}
+                                                </div>
 
-                            <!-- รายการเครื่องดื่ม & สลิป -->
-                            <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-light);">
-                                <div style="flex: 1; min-width: 200px;">
-                                    <div style="font-size: 0.82rem; font-weight: 700; color: var(--matcha-deep); margin-bottom: 0.35rem;">รายการสินค้า:</div>
-                                    {#each order.basket as item}
-                                        <div style="font-size: 0.85rem; color: #334155; margin-bottom: 0.2rem;">
-                                            • {item.thaiName || item.name} x{item.quantity} (หวาน {item.sweetness ?? 50}%)
-                                            {#if item.addonName} <span style="color: #15803d; font-size: 0.8rem;">(+{item.addonName})</span>{/if}
-                                            {#if item.note} <span style="color: #b45309; font-size: 0.8rem;">[{item.note}]</span>{/if}
+                                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                                    <span style="font-size: 0.8rem; color: var(--text-muted);">
+                                                        สั่งเมื่อ: {formatTime(order.createdAt)}
+                                                    </span>
+                                                    <select 
+                                                        class="form-select" 
+                                                        style="padding: 0.35rem 0.65rem; font-size: 0.8rem; border-radius: 8px;"
+                                                        value={order.status}
+                                                        onchange={(e) => updateStatus(order.id, (e.target as HTMLSelectElement).value as any)}
+                                                    >
+                                                        <option value="pending">รอตรวจสลิป</option>
+                                                        <option value="paid">รับยอดแล้ว</option>
+                                                        <option value="brewing">กำลังชง</option>
+                                                        <option value="ready_to_ship">ชงเสร็จแล้ว</option>
+                                                        <option value="delivering">กำลังส่ง</option>
+                                                        <option value="completed">ส่งสำเร็จ</option>
+                                                        <option value="cancelled">ยกเลิก</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <!-- ข้อมูลลูกค้า & วันจัดส่ง -->
+                                            <div style="margin: 0.75rem 0; font-size: 0.88rem; display: flex; flex-direction: column; gap: 0.3rem;">
+                                                <div>
+                                                    <strong>ลูกค้า:</strong> {order.name}{#if order.memberName && order.memberName.trim() !== order.name.trim()} <span style="color: #166534; font-weight: 700;">({order.memberName})</span>{/if} (โทร: <a href="tel:{order.phone}" style="color: var(--matcha-deep); font-weight: 700;">{order.phone}</a>)
+                                                </div>
+                                                <div><strong>สถานที่จัดส่ง:</strong> {order.address}</div>
+                                                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: 0.82rem; color: #475569; align-items: center;">
+                                                    <span>📅 วันที่ส่ง: <strong>{order.deliveryDate || order.createdAt.slice(0, 10)}</strong></span>
+                                                    <span>⏰ รอบส่ง: <strong>{(order.deliveryRound || 'รอบปกติ').split('·')[0].trim()}</strong></span>
+                                                    {#if (order.deliveryRound || '').includes('·')}
+                                                        <span style="background: #fef08a; color: #854d0e; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 6px; border: 1px solid #fde047;">
+                                                            ⏰ {(order.deliveryRound || '').split('·').slice(1).join(' · ').trim()}
+                                                        </span>
+                                                    {/if}
+                                                </div>
+                                                {#if order.message}
+                                                    <div style="background: #f8fafc; border-radius: 6px; padding: 0.35rem 0.6rem; font-size: 0.82rem; color: #64748b;">
+                                                        <strong>โน้ต:</strong> {order.message}
+                                                    </div>
+                                                {/if}
+                                            </div>
+
+                                            <!-- รายการเครื่องดื่ม & สลิป -->
+                                            <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem; padding-top: 0.65rem; border-top: 1px dashed var(--border-light);">
+                                                <div style="flex: 1; min-width: 200px;">
+                                                    <div style="font-size: 0.82rem; font-weight: 700; color: var(--matcha-deep); margin-bottom: 0.35rem;">รายการสินค้า:</div>
+                                                    {#each order.basket as item}
+                                                        <div style="font-size: 0.85rem; color: #334155; margin-bottom: 0.2rem;">
+                                                            • {item.thaiName || item.name} x{item.quantity} (หวาน {item.sweetness ?? 50}%)
+                                                            {#if item.addonName} <span style="color: #15803d; font-size: 0.8rem;">(+{item.addonName})</span>{/if}
+                                                            {#if item.note} <span style="color: #b45309; font-size: 0.8rem;">[{item.note}]</span>{/if}
+                                                        </div>
+                                                    {/each}
+                                                    <div style="margin-top: 0.45rem; font-size: 0.95rem; font-weight: 800; color: var(--matcha-dark);">
+                                                        ยอดรวม: {order.totalPrice} บาท
+                                                    </div>
+                                                </div>
+
+                                                {#if order.slipImage}
+                                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                                    <div 
+                                                        onclick={() => (selectedSlip = order.slipImage || null)}
+                                                        style="cursor: pointer; position: relative; border-radius: 8px; overflow: hidden; border: 1.5px solid #cbd5e1; width: 68px; height: 80px;"
+                                                        title="คลิกเพื่อดูสลิป"
+                                                    >
+                                                        <img src={order.slipImage} alt="Slip" style="width: 100%; height: 100%; object-fit: cover;" />
+                                                    </div>
+                                                {/if}
+                                            </div>
                                         </div>
                                     {/each}
-                                    <div style="margin-top: 0.45rem; font-size: 0.95rem; font-weight: 800; color: var(--matcha-dark);">
-                                        ยอดรวม: {order.totalPrice} บาท
-                                    </div>
                                 </div>
-
-                                {#if order.slipImage}
-                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                    <div 
-                                        onclick={() => (selectedSlip = order.slipImage || null)}
-                                        style="cursor: pointer; position: relative; border-radius: 8px; overflow: hidden; border: 1.5px solid #cbd5e1; width: 68px; height: 80px;"
-                                        title="คลิกเพื่อดูสลิป"
-                                    >
-                                        <img src={order.slipImage} alt="Slip" style="width: 100%; height: 100%; object-fit: cover;" />
-                                    </div>
-                                {/if}
-                            </div>
+                            {/if}
                         </div>
                     {/each}
                 </div>
