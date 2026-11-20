@@ -2,12 +2,6 @@
     import { goto } from '$app/navigation';
     import { getContext, onMount } from 'svelte';
     import swal from 'sweetalert2';
-    import {
-        isPushNotificationSupported,
-        subscribeToPush,
-        unsubscribeFromPush,
-        checkServerSubscription
-    } from '$lib/pushClient';
 
     const memberCtx = getContext<any>('memberData');
 
@@ -24,68 +18,6 @@
     let availableFreeCups = $derived(Math.floor(currentPoints / stampsRequired));
 
     let stampSlots = $derived(Array.from({ length: stampsRequired }, (_, i) => i + 1));
-
-    let isPushSupported = $state(false);
-    let isSubscribedToPush = $state(false);
-    let isUpdatingPush = $state(false);
-
-    async function checkPushStatus() {
-        if (typeof window === 'undefined') return;
-        isPushSupported = isPushNotificationSupported();
-        if (isPushSupported && member?.phone) {
-            isSubscribedToPush = await checkServerSubscription(member.phone);
-        }
-    }
-
-    $effect(() => {
-        if (member?.phone) {
-            checkPushStatus();
-        } else {
-            isSubscribedToPush = false;
-        }
-    });
-
-    async function handleTogglePush() {
-        if (!member) {
-            memberCtx?.openAuthModal('login');
-            return;
-        }
-
-        isUpdatingPush = true;
-        try {
-            if (isSubscribedToPush) {
-                const res = await unsubscribeFromPush(member.phone);
-                if (res.success) {
-                    isSubscribedToPush = false;
-                    swal.fire({
-                        icon: 'success',
-                        title: 'ปิดการแจ้งเตือนแล้ว',
-                        text: 'คุณจะไม่ได้รับการแจ้งเตือน Web Push บนอุปกรณ์เครื่องนี้นะคะ',
-                        confirmButtonColor: '#15803d'
-                    });
-                } else {
-                    swal.fire({ icon: 'error', title: 'ขัดข้อง', text: res.message });
-                }
-            } else {
-                const res = await subscribeToPush(member.phone);
-                if (res.success) {
-                    isSubscribedToPush = true;
-                    swal.fire({
-                        icon: 'success',
-                        title: 'เปิดรับการแจ้งเตือนสำเร็จ! 🔔',
-                        text: 'ระบบจะส่งการแจ้งเตือนเมื่อกำลังออกจัดส่ง และเมื่อส่งมอบเรียบร้อยนะคะ',
-                        confirmButtonColor: '#15803d'
-                    });
-                } else {
-                    swal.fire({ icon: 'warning', title: 'ไม่สามารถเปิดแจ้งเตือนได้', text: res.message });
-                }
-            }
-        } catch (e: any) {
-            swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: e.message || 'ไม่สามารถตั้งค่าแจ้งเตือนได้' });
-        } finally {
-            isUpdatingPush = false;
-        }
-    }
 
     function formatThaiDate(isoStr: string | null) {
         if (!isoStr) return '-';
@@ -308,33 +240,29 @@
                 </div>
             </div>
 
-            <!-- กล่องตั้งค่าการแจ้งเตือนสถานะสำหรับสมาชิก (Web Push) -->
-            <div class="push-notification-card">
-                <div class="push-card-icon">🔔</div>
-                <div class="push-card-content">
-                    <h3 class="push-card-title">การแจ้งเตือนสถานะออเดอร์ (Web Push)</h3>
-                    <p class="push-card-desc">
-                        {#if isSubscribedToPush}
-                            <span style="color: #16a34a; font-weight: 700;">🟢 เปิดรับการแจ้งเตือนอยู่</span> — เมื่อร้านกำลังนำส่งหรือส่งมอบเรียบร้อย ระบบจะแจ้งเตือนทันที
-                        {:else}
-                            เปิดรับแจ้งเตือนเมื่อออเดอร์เริ่มออกจัดส่ง และส่งถึงที่หมาย (ส่งฟรีเฉพาะเบอร์โทรสมาชิกนี้)
-                        {/if}
-                    </p>
+            <!-- ข้อมูลการแจ้งเตือนทาง LINE OA 100% -->
+            <div style="width: 100%; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 14px; padding: 0.9rem 1.15rem; display: flex; align-items: center; justify-content: space-between; gap: 0.85rem; flex-wrap: wrap; margin-bottom: 1.25rem; box-sizing: border-box;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div style="width: 38px; height: 38px; border-radius: 50%; background: #06c755; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.15rem; flex-shrink: 0;">
+                        L
+                    </div>
+                    <div>
+                        <h4 style="margin: 0; font-size: 0.92rem; font-weight: 800; color: #14532d;">
+                            รับแจ้งเตือนสถานะออเดอร์ทาง LINE OA 100%
+                        </h4>
+                        <p style="margin: 0.15rem 0 0 0; font-size: 0.78rem; color: #166534; line-height: 1.35;">
+                            ระบบจะส่งการ์ดแจ้งเตือนสถานะชง นำส่ง และแต้มสะสมตรงเข้า LINE ทันทีที่ผูกเบอร์ {member.phone}
+                        </p>
+                    </div>
                 </div>
-                <button
-                    type="button"
-                    class="btn-push-action {isSubscribedToPush ? 'subscribed' : ''}"
-                    onclick={handleTogglePush}
-                    disabled={isUpdatingPush}
+                <a
+                    href="https://line.me/R/ti/p/@719wvlgi"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style="display: inline-flex; align-items: center; gap: 0.35rem; background: #06c755; color: #ffffff; padding: 0.45rem 0.95rem; border-radius: 999px; font-size: 0.82rem; font-weight: 800; text-decoration: none; white-space: nowrap;"
                 >
-                    {#if isUpdatingPush}
-                        <span>กำลังประมวลผล...</span>
-                    {:else if isSubscribedToPush}
-                        <span>✓ รับแจ้งเตือนอยู่ (แตะเพื่อปิด)</span>
-                    {:else}
-                        <span>🔔 เปิดรับการแจ้งเตือน</span>
-                    {/if}
-                </button>
+                    💬 แชท LINE OA
+                </a>
             </div>
 
             <div class="loyalty-bottom-actions">
@@ -635,76 +563,5 @@
     @keyframes stampPop {
         0% { transform: scale(1.4); opacity: 0.4; }
         100% { transform: scale(1); opacity: 1; }
-    }
-
-    .push-notification-card {
-        margin-top: 1.25rem;
-        width: 100%;
-        max-width: 460px;
-        background: #ffffff;
-        border: 1.5px solid #86efac;
-        border-radius: 16px;
-        padding: 1.15rem 1.25rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        box-shadow: 0 4px 15px rgba(22, 101, 52, 0.06);
-        text-align: left;
-        flex-wrap: wrap;
-        box-sizing: border-box;
-    }
-    .push-card-icon {
-        font-size: 1.65rem;
-        background: #f0fdf4;
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-    }
-    .push-card-content {
-        flex: 1;
-        min-width: 180px;
-    }
-    .push-card-title {
-        margin: 0 0 0.2rem 0;
-        font-size: 0.95rem;
-        font-weight: 800;
-        color: #14532d;
-    }
-    .push-card-desc {
-        margin: 0;
-        font-size: 0.8rem;
-        color: #64748b;
-        line-height: 1.4;
-    }
-    .btn-push-action {
-        padding: 0.5rem 1rem;
-        border-radius: 999px;
-        font-size: 0.82rem;
-        font-weight: 800;
-        cursor: pointer;
-        border: 1.5px solid #15803d;
-        background: #15803d;
-        color: #ffffff;
-        transition: all 0.2s;
-        white-space: nowrap;
-    }
-    .btn-push-action:hover {
-        background: #166534;
-        border-color: #166534;
-    }
-    .btn-push-action.subscribed {
-        background: #f0fdf4;
-        color: #15803d;
-        border-color: #86efac;
-    }
-    .btn-push-action.subscribed:hover {
-        background: #fef2f2;
-        color: #dc2626;
-        border-color: #fca5a5;
     }
 </style>

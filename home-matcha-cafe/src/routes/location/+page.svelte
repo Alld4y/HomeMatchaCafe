@@ -532,9 +532,23 @@
                                     <strong style="color: {selectedRoundId === round.id && status.available ? 'var(--matcha-deep)' : '#334155'}; font-size: 0.95rem;">
                                         {isAllDay ? '🕘 ' : round.id === 'morning' ? '🌤 ' : '☀️ '}{round.name}
                                     </strong>
-                                    {#if selectedRoundId === round.id && status.available}
-                                        <span style="color: var(--matcha-primary); font-weight: 800; font-size: 0.85rem;">✓ เลือกแล้ว</span>
-                                    {/if}
+                                    <span style="
+                                        width: 22px; 
+                                        height: 22px; 
+                                        border-radius: 50%; 
+                                        display: flex; 
+                                        align-items: center; 
+                                        justify-content: center; 
+                                        font-size: 0.75rem; 
+                                        font-weight: 800; 
+                                        flex-shrink: 0;
+                                        border: 2px solid {selectedRoundId === round.id && status.available ? 'var(--matcha-primary)' : '#cbd5e1'}; 
+                                        background: {selectedRoundId === round.id && status.available ? 'var(--matcha-primary)' : '#ffffff'}; 
+                                        color: #ffffff;
+                                        transition: background 0.15s, border-color 0.15s;
+                                    ">
+                                        {selectedRoundId === round.id && status.available ? '✓' : ''}
+                                    </span>
                                 </div>
                                 <div style="font-size: 0.825rem; color: #475569; font-weight: 600;">
                                     เวลาส่ง: {round.timeSlot}
@@ -568,7 +582,7 @@
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; flex-wrap: wrap; gap: 0.25rem;">
                                     <label class="form-label" for="customPreferredTime" style="margin-bottom: 0; color: #166534; font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 0.35rem;">
                                         <span>⏰ นัดเวลาจัดส่งที่ต้องการ</span>
-                                        <span style="font-size: 0.75rem; color: #15803d; font-weight: normal;">(ระบุเวลาหรือเลือกเวลาสะดวกรับ)</span>
+                                        <span style="font-size: 0.75rem; color: #15803d; font-weight: normal;">(แตะเลือกเวลา หรือพิมพ์ระบุ)</span>
                                     </label>
                                     <span style="font-size: 0.75rem; color: #166534; font-weight: 700; background: #dcfce7; padding: 0.15rem 0.55rem; border-radius: 999px;">
                                         ช่วงรอบ: {currentRoundObj.timeSlot}
@@ -577,46 +591,55 @@
                                 <p style="margin: 0 0 0.5rem 0; font-size: 0.78rem; color: #374151;">
                                     คุณสามารถแตะเลือกเวลาที่สะดวกรับเครื่องดื่ม หรือพิมพ์เวลาเฉพาะเจาะจงได้ค่ะ:
                                 </p>
-                                <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.65rem;">
+                                
+                                <!-- Suggested Time Grid: ปุ่มขนาดคงที่ ไม่ไหล ไม่กระตุกเวลาคลิก -->
+                                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 0.45rem; margin-bottom: 0.65rem;">
                                     {#each getSuggestedTimes(currentRoundObj) as t}
                                         <button
                                             type="button"
                                             onclick={() => (preferredDeliveryTime = preferredDeliveryTime === t ? '' : t)}
                                             style="
-                                                padding: 0.3rem 0.65rem;
-                                                font-size: 0.8rem;
-                                                font-weight: 700;
+                                                padding: 0.4rem 0.25rem;
+                                                font-size: 0.82rem;
+                                                font-weight: {preferredDeliveryTime === t ? '800' : '600'};
+                                                text-align: center;
                                                 border-radius: 8px;
-                                                border: 1.5px solid {preferredDeliveryTime === t ? 'var(--matcha-primary)' : '#bbf7d0'};
-                                                background: {preferredDeliveryTime === t ? 'var(--matcha-primary)' : '#ffffff'};
-                                                color: {preferredDeliveryTime === t ? '#ffffff' : '#166534'};
+                                                border: 1.5px solid {preferredDeliveryTime === t ? '#15803d' : '#86efac'};
+                                                background: {preferredDeliveryTime === t ? '#15803d' : '#ffffff'};
+                                                color: {preferredDeliveryTime === t ? '#ffffff' : '#14532d'};
                                                 cursor: pointer;
-                                                transition: all 0.15s ease;
+                                                box-shadow: {preferredDeliveryTime === t ? '0 2px 6px rgba(21, 128, 61, 0.25)' : 'none'};
+                                                transition: background 0.12s, color 0.12s, border-color 0.12s;
+                                                white-space: nowrap;
                                             "
                                         >
-                                            {preferredDeliveryTime === t ? '✓ ' : ''}{t}
+                                            {t}
                                         </button>
                                     {/each}
                                 </div>
+
                                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                                     <span style="font-size: 0.8rem; color: #475569; font-weight: 600; white-space: nowrap;">หรือพิมพ์ระบุ:</span>
-                                    <input
-                                        id="customPreferredTime"
-                                        type="text"
-                                        class="form-input"
-                                        bind:value={preferredDeliveryTime}
-                                        placeholder="เช่น 10:15 น., ช่วง 10:00–10:30 น."
-                                        style="font-size: 0.85rem; padding: 0.35rem 0.65rem; border-color: #86efac; background: #ffffff;"
-                                    />
-                                    {#if preferredDeliveryTime}
-                                        <button
-                                            type="button"
-                                            onclick={() => (preferredDeliveryTime = '')}
-                                            style="padding: 0.35rem 0.55rem; font-size: 0.75rem; color: #ef4444; background: #fee2e2; border: none; border-radius: 6px; cursor: pointer; white-space: nowrap; font-weight: 600;"
-                                        >
-                                            ล้างเวลา
-                                        </button>
-                                    {/if}
+                                    <div style="position: relative; flex: 1; display: flex; align-items: center;">
+                                        <input
+                                            id="customPreferredTime"
+                                            type="text"
+                                            class="form-input"
+                                            bind:value={preferredDeliveryTime}
+                                            placeholder="เช่น 10:15 น., ช่วง 10:00–10:30 น."
+                                            style="font-size: 0.85rem; padding: 0.4rem 2rem 0.4rem 0.65rem; border-color: #86efac; background: #ffffff; width: 100%; box-sizing: border-box;"
+                                        />
+                                        {#if preferredDeliveryTime}
+                                            <button
+                                                type="button"
+                                                onclick={() => (preferredDeliveryTime = '')}
+                                                title="ล้างเวลา"
+                                                style="position: absolute; right: 8px; background: #fee2e2; border: none; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #dc2626; cursor: pointer; padding: 0;"
+                                            >
+                                                ✕
+                                            </button>
+                                        {/if}
+                                    </div>
                                 </div>
                             </div>
                         {/if}

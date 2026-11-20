@@ -5018,44 +5018,23 @@
                             📡 2. ช่องทางการส่งข้อความแจ้งเตือน:
                         </h4>
                         <div style="display: flex; flex-direction: column; gap: 0.85rem;">
-                            <!-- Web Push -->
-                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.85rem 1rem;">
-                                <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer;">
-                                    <input
-                                        type="checkbox"
-                                        bind:checked={settings.notifications.enableWebPush}
-                                        style="width: 18px; height: 18px; accent-color: #15803d;"
-                                    />
-                                    <div>
-                                        <strong style="font-size: 0.9rem; color: #0f172a;">
-                                            🌐 Web Push Notifications (เปิดใช้งานฟรี 100%)
-                                        </strong>
-                                        <div style="font-size: 0.8rem; color: #15803d; font-weight: 600;">
-                                            ✓ รองรับ Chrome, Safari (iOS 16.4+ / macOS), Edge, Firefox, Android
-                                        </div>
-                                    </div>
-                                </label>
-                                <div style="font-size: 0.78rem; color: #64748b; margin-top: 0.35rem; margin-left: 1.7rem;">
-                                    ส่งแจ้งเตือนตรงไปยังหน้าจอหรือโทรศัพท์ของลูกค้าที่ล็อกอินสมาชิกและกดเปิดรับการแจ้งเตือน
-                                </div>
-                            </div>
-
-                            <!-- ลิงก์ไปยังแท็บ LINE OA -->
-                            <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 10px; padding: 0.9rem 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                            <!-- LINE OA 100% Notice -->
+                            <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 10px; padding: 0.95rem 1.15rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
                                 <div>
-                                    <strong style="font-size: 0.92rem; color: #166534; display: flex; align-items: center; gap: 0.4rem;">
-                                        💬 ระบบ LINE Official Account (LINE OA)
+                                    <strong style="font-size: 0.95rem; color: #166534; display: flex; align-items: center; gap: 0.45rem;">
+                                        <span style="display: inline-block; width: 22px; height: 22px; border-radius: 50%; background: #06c755; color: #fff; font-size: 0.8rem; text-align: center; line-height: 22px; font-weight: 900;">L</span>
+                                        ระบบแจ้งเตือนหลัก: ใช้ LINE Official Account 100%
                                     </strong>
-                                    <div style="font-size: 0.8rem; color: #15803d; margin-top: 0.2rem;">
-                                        การตั้งค่า Channel Secret, Token, ข้อความตอบกลับอัตโนมัติ และการแจ้งเตือน ได้ย้ายไปที่แท็บเฉพาะแล้วค่ะ
+                                    <div style="font-size: 0.82rem; color: #15803d; margin-top: 0.25rem; line-height: 1.4;">
+                                        ระบบส่งการแจ้งเตือนสถานะออเดอร์และการ์ด Flex Message หาแอดมินและลูกค้าผ่าน LINE OA ทั้งหมดโดยตรง (ยกเลิก Web Push แล้ว)
                                     </div>
                                 </div>
                                 <button
                                     type="button"
                                     onclick={() => { activeTab = 'line_oa'; loadLineUsers(); }}
-                                    style="padding: 0.45rem 0.9rem; background: #166534; color: #ffffff; border: none; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;"
+                                    style="padding: 0.5rem 1rem; background: #06c755; color: #ffffff; border: none; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;"
                                 >
-                                    👉 ไปที่เมนู LINE OA
+                                    💬 จัดการ LINE OA & Card Designer
                                 </button>
                             </div>
                         </div>

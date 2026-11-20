@@ -153,7 +153,7 @@ export async function getLineUserIdByPhone(phone: string): Promise<string | null
 }
 
 /**
- * ส่งการแจ้งเตือนไปยังลูกค้าตามการตั้งค่าในระบบ (Web Push + LINE OA)
+ * ส่งการแจ้งเตือนไปยังลูกค้าผ่าน LINE Official Account 100%
  */
 export async function sendCustomerNotification(payload: CustomerNotificationPayload): Promise<{
     webPushSent: number;
@@ -170,54 +170,9 @@ export async function sendCustomerNotification(payload: CustomerNotificationPayl
     const notifSettings = settings.notifications;
     const lineOaSettings = settings.lineOa;
 
-    let webPushCount = 0;
     let lineOaSuccess = false;
 
-    // 1. ส่งผ่าน Web Push Notification (ถ้าเปิดใช้งาน)
-    const isWebPushAllowedForEvent =
-        eventType === 'slip_approved' ? notifSettings?.notifyOnSlipApproved !== false :
-        eventType === 'delivering' ? notifSettings?.notifyOnDelivering !== false :
-        eventType === 'completed' ? notifSettings?.notifyOnCompleted !== false : true;
-
-    if (notifSettings?.enabled && notifSettings?.enableWebPush !== false && isWebPushAllowedForEvent) {
-        const subs = await getSubscriptionsByPhone(cleanPhone);
-        if (subs.length > 0) {
-            const pushData = JSON.stringify({
-                title,
-                body,
-                icon: '/icon-192.png',
-                badge: '/icon-192.png',
-                url
-            });
-
-            await Promise.all(
-                subs.map(async (sub) => {
-                    try {
-                        await sendNotification(
-                            {
-                                endpoint: sub.endpoint,
-                                keys: {
-                                    p256dh: sub.p256dh,
-                                    auth: sub.auth
-                                }
-                            },
-                            pushData,
-                            { TTL: 60 * 60 * 24 } // 24 ชั่วโมง
-                        );
-                        webPushCount++;
-                    } catch (err: any) {
-                        if (err?.statusCode === 410 || err?.statusCode === 404) {
-                            await removePushSubscription(sub.endpoint);
-                        } else {
-                            console.warn('⚠️ Push notification delivery error:', err?.message || err);
-                        }
-                    }
-                })
-            );
-        }
-    }
-
-    // 2. ส่งผ่าน LINE Official Account
+    // ส่งผ่าน LINE Official Account 100%
     const isLineOaAllowed = lineOaSettings?.enabled && (
         eventType === 'order_created' ? lineOaSettings.notifyOnOrderCreated !== false :
         eventType === 'slip_approved' ? lineOaSettings.notifyOnSlipApproved !== false :
@@ -254,7 +209,7 @@ export async function sendCustomerNotification(payload: CustomerNotificationPayl
         }
     }
 
-    return { webPushSent: webPushCount, lineOaSent: lineOaSuccess };
+    return { webPushSent: 0, lineOaSent: lineOaSuccess };
 }
 
 /**
