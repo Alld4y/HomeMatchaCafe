@@ -239,8 +239,16 @@
                     </div>
                 </div>
             </div>
-            <br>
 
+            <div class="loyalty-bottom-actions">
+                <button type="button" class="btn-matcha-primary" onclick={() => goto('/menu')}>
+                    🍵 สั่งเครื่องดื่มเพิ่มแต้ม
+                </button>
+                <button type="button" class="btn-matcha-outline" onclick={() => goto('/')}>
+                    กลับหน้าแรก
+                </button>
+            </div>
+            <br>
             <!-- ข้อมูลการแจ้งเตือนทาง LINE OA 100% -->
             <div style="width: 100%; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 14px; padding: 0.9rem 1.15rem; display: flex; align-items: center; justify-content: space-between; gap: 0.85rem; flex-wrap: wrap; margin-bottom: 1.25rem; box-sizing: border-box;">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
@@ -264,15 +272,6 @@
                 >
                     💬 แชท LINE OA
                 </a>
-            </div>
-
-            <div class="loyalty-bottom-actions">
-                <button type="button" class="btn-matcha-primary" onclick={() => goto('/menu')}>
-                    🍵 สั่งเครื่องดื่มเพิ่มแต้ม
-                </button>
-                <button type="button" class="btn-matcha-outline" onclick={() => goto('/')}>
-                    กลับหน้าแรก
-                </button>
             </div>
         {/if}
     </div>
