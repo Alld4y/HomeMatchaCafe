@@ -519,17 +519,21 @@
     }
 
     async function handleInstallPwa() {
-        if (deferredInstallPrompt) {
+        const promptEvent = deferredInstallPrompt || (typeof window !== 'undefined' ? (window as any).__deferredInstallPrompt : null);
+        if (promptEvent) {
             try {
-                deferredInstallPrompt.prompt();
-                const { outcome } = await deferredInstallPrompt.userChoice;
+                promptEvent.prompt();
+                const { outcome } = await promptEvent.userChoice;
                 if (outcome === 'accepted') {
                     console.log('User accepted PWA installation');
                     showInstallBanner = false;
                     showInstallModal = false;
+                    deferredInstallPrompt = null;
+                    if (typeof window !== 'undefined') (window as any).__deferredInstallPrompt = null;
                     try {
                         localStorage.setItem(PWA_PROMPT_KEY, 'true');
                     } catch {}
+                    return;
                 } else {
                     // หากผู้ใช้กดยกเลิกในหน้าต่างของเบราว์เซอร์ ให้เปิด Modal แนะนำขั้นตอนแบบละเอียดให้อัตโนมัติ
                     openInstallModal();
@@ -539,6 +543,7 @@
                 openInstallModal();
             }
             deferredInstallPrompt = null;
+            if (typeof window !== 'undefined') (window as any).__deferredInstallPrompt = null;
         } else {
             openInstallModal();
         }
@@ -642,10 +647,27 @@
             showInstallBanner = true;
         }
 
-        // ดักจับ Event สำหรับปุ่มติดตั้งแอปบน Chrome/Android
+        // ตรวจสอบ early captured beforeinstallprompt สำหรับ Android และ PC
+        if (typeof window !== 'undefined' && (window as any).__deferredInstallPrompt) {
+            deferredInstallPrompt = (window as any).__deferredInstallPrompt;
+            if (!hasDismissedPrompt && !isStandalone && !isLine && !isOtherInApp && !window.location.pathname.startsWith('/admin')) {
+                showInstallBanner = true;
+            }
+        }
+
+        const handlePwaCanInstall = (e: any) => {
+            deferredInstallPrompt = e.detail || (window as any).__deferredInstallPrompt;
+            if (!hasDismissedPrompt && !isStandalone && !isLine && !isOtherInApp && !window.location.pathname.startsWith('/admin')) {
+                showInstallBanner = true;
+            }
+        };
+        window.addEventListener('pwa-can-install', handlePwaCanInstall);
+
+        // ดักจับ Event สำหรับปุ่มติดตั้งแอปบน Chrome/Android/PC
         const handleBeforeInstall = (e: Event) => {
             e.preventDefault();
             deferredInstallPrompt = e;
+            if (typeof window !== 'undefined') (window as any).__deferredInstallPrompt = e;
             if (!hasDismissedPrompt && !isStandalone && !isLine && !isOtherInApp && !window.location.pathname.startsWith('/admin')) {
                 showInstallBanner = true;
             }
@@ -673,6 +695,7 @@
         }, 15000);
 
         return () => {
+            window.removeEventListener('pwa-can-install', handlePwaCanInstall);
             window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
             window.removeEventListener('storage', handleStorageChange);
             window.removeEventListener('cart-updated', handleStorageChange);
@@ -863,11 +886,14 @@
                 {currentMember.points}/{loyaltySettings.stampsRequired}
             </div>
             {#if currentMember.pictureUrl}
-                <img src={currentMember.pictureUrl} alt="Avatar" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1.5px solid #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.2); flex-shrink: 0;" />
+                <div class="fab-avatar-full-wrap">
+                    <img src={currentMember.pictureUrl} alt={currentMember.firstName} class="fab-avatar-full-img" />
+                    <div class="fab-avatar-name-overlay">{currentMember.firstName.slice(0, 8)}</div>
+                </div>
             {:else}
                 <span class="fab-icon">🍵</span>
+                <span class="fab-label">{currentMember.firstName.slice(0, 8)}</span>
             {/if}
-            <span class="fab-label">{currentMember.firstName.slice(0, 8)}</span>
         {:else}
             <span class="fab-icon">👤</span>
             <span class="fab-label">Guest</span>
@@ -880,251 +906,273 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="member-modal-backdrop" onclick={() => (showMemberQuickModal = false)} onkeydown={() => {}}>
         <div class="member-modal-card profile-modal-card" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
-            <button class="member-modal-close" onclick={() => (showMemberQuickModal = false)} aria-label="ปิด">✕</button>
-
-            <!-- Navigation Tabs -->
-            <div class="profile-tabs-header">
+            <!-- Top Bar: Tabs & Prominent Close Button -->
+            <div class="profile-modal-top-bar">
+                <div class="profile-tabs-header">
+                    <button
+                        type="button"
+                        class="profile-tab-btn"
+                        class:active={memberQuickTab === 'overview'}
+                        onclick={() => { memberQuickTab = 'overview'; profileSaveMsg = null; }}
+                    >
+                        <span>✨</span> สะสมแต้ม
+                    </button>
+                    <button
+                        type="button"
+                        class="profile-tab-btn"
+                        class:active={memberQuickTab === 'profile'}
+                        onclick={() => {
+                            memberQuickTab = 'profile';
+                            editFirstName = currentMember?.firstName || '';
+                            editLastName = currentMember?.lastName || '';
+                            profileSaveMsg = null;
+                        }}
+                    >
+                        <span>👤</span> ข้อมูลโปรไฟล์
+                    </button>
+                </div>
                 <button
                     type="button"
-                    class="profile-tab-btn"
-                    class:active={memberQuickTab === 'overview'}
-                    onclick={() => { memberQuickTab = 'overview'; profileSaveMsg = null; }}
+                    class="member-modal-close-btn"
+                    onclick={() => (showMemberQuickModal = false)}
+                    aria-label="ปิด"
+                    title="ปิดหน้าต่าง"
                 >
-                    <span>✨</span> บัตรสะสมแต้ม
-                </button>
-                <button
-                    type="button"
-                    class="profile-tab-btn"
-                    class:active={memberQuickTab === 'profile'}
-                    onclick={() => {
-                        memberQuickTab = 'profile';
-                        editFirstName = currentMember?.firstName || '';
-                        editLastName = currentMember?.lastName || '';
-                        profileSaveMsg = null;
-                    }}
-                >
-                    <span>👤</span> ข้อมูลโปรไฟล์
+                    ✕
                 </button>
             </div>
 
-            {#if memberQuickTab === 'overview'}
-                <!-- Overview Tab -->
-                <div class="tab-content-fade">
-                    <div style="text-align: center; margin-bottom: 1rem;">
-                        <div class="profile-avatar-circle" style="overflow: hidden;">
-                            {#if currentMember.pictureUrl}
-                                <img src={currentMember.pictureUrl} alt={currentMember.fullName} style="width: 100%; height: 100%; object-fit: cover;" />
+            <!-- Scrollable Body -->
+            <div class="profile-modal-body">
+                {#if memberQuickTab === 'overview'}
+                    <!-- Overview Tab -->
+                    <div class="tab-content-fade">
+                        <!-- Compact Header Card -->
+                        <div class="profile-compact-header">
+                            <div class="profile-avatar-circle compact">
+                                {#if currentMember.pictureUrl}
+                                    <img src={currentMember.pictureUrl} alt={currentMember.fullName} />
+                                {:else}
+                                    {(currentMember.firstName || 'M').charAt(0).toUpperCase()}
+                                {/if}
+                            </div>
+                            <div class="profile-header-info">
+                                <div class="profile-header-name">
+                                    คุณ {currentMember.fullName}
+                                    <span class="profile-badge-pill">สมาชิก</span>
+                                </div>
+                                <div class="profile-header-phone">
+                                    📱 {currentMember.phone}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Progress / Points Card -->
+                        <div class="loyalty-progress-compact-card">
+                            <div class="loyalty-progress-head">
+                                <span class="loyalty-card-label">แต้มสะสมปัจจุบัน</span>
+                                <span class="loyalty-card-stamps">{currentMember.points} / {loyaltySettings.stampsRequired} ดวง</span>
+                            </div>
+                            <div class="loyalty-progress-bar-bg">
+                                <div
+                                    class="loyalty-progress-bar-fill"
+                                    style="width: {Math.min(100, (currentMember.points / loyaltySettings.stampsRequired) * 100)}%;"
+                                ></div>
+                            </div>
+                            {#if currentMember.points >= loyaltySettings.stampsRequired}
+                                <div class="loyalty-reward-tag is-ready">
+                                    🎁 แลกเครื่องดื่มฟรีได้ {Math.floor(currentMember.points / loyaltySettings.stampsRequired)} แก้ว!
+                                </div>
+                            {:else if currentMember.cardExpiresAt}
+                                <div class="loyalty-reward-tag">
+                                    ⏳ บัตรหมดอายุ: {new Date(currentMember.cardExpiresAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </div>
                             {:else}
-                                {(currentMember.firstName || 'M').charAt(0).toUpperCase()}
+                                <div class="loyalty-reward-tag">
+                                    สะสมอีก {Math.max(0, loyaltySettings.stampsRequired - currentMember.points)} ดวง เพื่อรับฟรี 1 แก้ว
+                                </div>
                             {/if}
                         </div>
-                        <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--matcha-deep);">
-                            คุณ {currentMember.fullName}
-                        </h3>
-                        <div class="profile-verified-badge">
-                            <span class="badge-dot"></span> 🌿 สมาชิก Home Matcha Cafe
-                        </div>
-                        <p style="margin: 0.25rem 0 0 0; font-size: 0.82rem; color: var(--text-muted);">
-                            📱 {currentMember.phone}
-                        </p>
-                    </div>
 
-                    <div style="background: linear-gradient(135deg, #f3f9ee, #e6f3dc); border: 1.5px solid #b8dba0; border-radius: 14px; padding: 0.9rem; text-align: center; margin-bottom: 1rem;">
-                        <p style="margin: 0; font-size: 0.78rem; color: #3d6329; font-weight: 700;">แต้มสะสมปัจจุบัน</p>
-                        <p style="margin: 0.2rem 0; font-size: 1.75rem; font-weight: 900; color: #1e4214;">
-                            {currentMember.points} <span style="font-size: 1rem; font-weight: 700; color: #4d7a36;">/ {loyaltySettings.stampsRequired} ดวง</span>
-                        </p>
-                        {#if currentMember.points >= loyaltySettings.stampsRequired}
-                            <span style="display: inline-block; background: #16a34a; color: #fff; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.65rem; border-radius: 999px;">
-                                🎁 แลกฟรีได้ {Math.floor(currentMember.points / loyaltySettings.stampsRequired)} แก้ว!
-                            </span>
-                        {:else if currentMember.cardExpiresAt}
-                            <p style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: #527043;">
-                                หมดอายุบัตร: {new Date(currentMember.cardExpiresAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </p>
-                        {:else}
-                            <p style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: #527043;">
-                                บัตรมีอายุ {loyaltySettings.expireDays} วัน นับตั้งแต่ซื้อแก้วแรก
-                            </p>
-                        {/if}
-                    </div>
-
-                    <div style="display: flex; flex-direction: column; gap: 0.55rem;">
-                        <button
-                            type="button"
-                            class="btn-matcha-primary"
-                            style="width: 100%; padding: 0.8rem;"
-                            onclick={() => {
-                                showMemberQuickModal = false;
-                                goto('/loyalty');
-                            }}
-                        >
-                            🎫 เปิดดูบัตรสะสมแต้ม ({currentMember.points}/{loyaltySettings.stampsRequired})
-                        </button>
-
-                        <button
-                            type="button"
-                            class="btn-profile-edit-toggle"
-                            onclick={() => {
-                                memberQuickTab = 'profile';
-                                editFirstName = currentMember?.firstName || '';
-                                editLastName = currentMember?.lastName || '';
-                                profileSaveMsg = null;
-                            }}
-                        >
-                            ✏️ ข้อมูลโปรไฟล์ & แก้ไขชื่อ
-                        </button>
-
-                        {#if !isStandalone}
+                        <!-- Actions Stack -->
+                        <div class="profile-actions-stack">
                             <button
                                 type="button"
-                                class="btn-install-member"
+                                class="btn-matcha-primary"
+                                style="width: 100%; padding: 0.72rem; font-size: 0.92rem; border-radius: 12px;"
                                 onclick={() => {
                                     showMemberQuickModal = false;
-                                    openInstallModal();
+                                    goto('/loyalty');
                                 }}
                             >
-                                📲 ติดตั้งแอป Home Matcha Cafe
+                                🎫 เปิดดูบัตรสะสมแต้มแบบเต็ม
                             </button>
+
+                            <div class="profile-dual-buttons">
+                                <button
+                                    type="button"
+                                    class="btn-profile-secondary"
+                                    onclick={() => {
+                                        memberQuickTab = 'profile';
+                                        editFirstName = currentMember?.firstName || '';
+                                        editLastName = currentMember?.lastName || '';
+                                        profileSaveMsg = null;
+                                    }}
+                                >
+                                    ✏️ แก้ไขข้อมูล
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn-profile-logout"
+                                    onclick={handleMemberLogout}
+                                >
+                                    🚪 ออกจากระบบ
+                                </button>
+                            </div>
+
+                            {#if !isStandalone}
+                                <button
+                                    type="button"
+                                    class="btn-install-member"
+                                    style="padding: 0.65rem; border-radius: 12px; margin-top: 0.1rem;"
+                                    onclick={() => {
+                                        showMemberQuickModal = false;
+                                        openInstallModal();
+                                    }}
+                                >
+                                    📲 ติดตั้งแอป Home Matcha Cafe
+                                </button>
+                            {/if}
+                        </div>
+                    </div>
+                {:else}
+                    <!-- Profile Edit Tab -->
+                    <div class="tab-content-fade">
+                        <!-- Compact Header Card -->
+                        <div class="profile-compact-header">
+                            <div class="profile-avatar-circle compact">
+                                {#if currentMember.pictureUrl}
+                                    <img src={currentMember.pictureUrl} alt={currentMember.fullName} />
+                                {:else}
+                                    {(editFirstName || currentMember.firstName || 'M').charAt(0).toUpperCase()}
+                                {/if}
+                            </div>
+                            <div class="profile-header-info">
+                                <div class="profile-header-name">
+                                    คุณ {currentMember.fullName}
+                                    <span class="profile-badge-pill">สมาชิก</span>
+                                </div>
+                                <div class="profile-header-phone">
+                                    📱 {currentMember.phone}
+                                    <span class="locked-hint-tag">🔒 บัญชีสมาชิก</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {#if profileSaveMsg}
+                            <div class="profile-alert" class:is-success={profileSaveMsg.type === 'success'} class:is-error={profileSaveMsg.type === 'error'}>
+                                <span>{profileSaveMsg.type === 'success' ? '✓' : '⚠️'}</span>
+                                <span>{profileSaveMsg.text}</span>
+                            </div>
                         {/if}
 
-                        <button
-                            type="button"
-                            class="btn-danger"
-                            style="width: 100%; padding: 0.65rem;"
-                            onclick={handleMemberLogout}
-                        >
-                            🚪 ออกจากระบบ (Logout)
-                        </button>
-                    </div>
-                </div>
-            {:else}
-                <!-- Profile Settings Tab (Professional) -->
-                <div class="tab-content-fade">
-                    <div class="profile-edit-hero">
-                        <div class="profile-avatar-circle small" style="overflow: hidden;">
-                            {#if currentMember.pictureUrl}
-                                <img src={currentMember.pictureUrl} alt={currentMember.fullName} style="width: 100%; height: 100%; object-fit: cover;" />
-                            {:else}
-                                {(editFirstName || currentMember.firstName || 'M').charAt(0).toUpperCase()}
-                            {/if}
+                        <!-- Editable Names -->
+                        <div class="reg-name-grid" style="margin-top: 0.5rem; margin-bottom: 0.65rem;">
+                            <div class="reg-field-col">
+                                <label class="matcha-input-label" for="profile-firstname-input">
+                                    ชื่อจริง <span class="required-star">*</span>
+                                </label>
+                                <input
+                                    id="profile-firstname-input"
+                                    type="text"
+                                    class="matcha-input"
+                                    placeholder="เช่น พัชร"
+                                    bind:value={editFirstName}
+                                    maxlength={60}
+                                    style="padding: 0.65rem 0.85rem;"
+                                />
+                            </div>
+                            <div class="reg-field-col">
+                                <label class="matcha-input-label" for="profile-lastname-input">
+                                    นามสกุล <span class="required-star">*</span>
+                                </label>
+                                <input
+                                    id="profile-lastname-input"
+                                    type="text"
+                                    class="matcha-input"
+                                    placeholder="เช่น นันทวานิช"
+                                    bind:value={editLastName}
+                                    maxlength={60}
+                                    style="padding: 0.65rem 0.85rem;"
+                                />
+                            </div>
                         </div>
-                        <div class="profile-hero-info">
-                            <h4 class="profile-edit-title">โปรไฟล์สมาชิก (Profile)</h4>
-                            <p class="profile-edit-sub">จัดการข้อมูลส่วนตัวและชื่อผู้รับสำหรับออเดอร์</p>
-                        </div>
-                    </div>
 
-                    {#if profileSaveMsg}
-                        <div class="profile-alert" class:is-success={profileSaveMsg.type === 'success'} class:is-error={profileSaveMsg.type === 'error'}>
-                            <span>{profileSaveMsg.type === 'success' ? '✓' : '⚠️'}</span>
-                            <span>{profileSaveMsg.text}</span>
+                        <!-- 1-Row Stats Strip -->
+                        <div class="profile-stats-strip">
+                            <div class="stat-strip-item">
+                                <span class="stat-strip-num">{currentMember.totalStampsEarned || currentMember.points}</span>
+                                <span class="stat-strip-label">🍵 แต้มรวม</span>
+                            </div>
+                            <div class="stat-strip-divider"></div>
+                            <div class="stat-strip-item">
+                                <span class="stat-strip-num">{currentMember.points}</span>
+                                <span class="stat-strip-label">✨ ปัจจุบัน</span>
+                            </div>
+                            <div class="stat-strip-divider"></div>
+                            <div class="stat-strip-item">
+                                <span class="stat-strip-num">{currentMember.totalFreeRedeemed || 0}</span>
+                                <span class="stat-strip-label">🎁 แลกฟรี</span>
+                            </div>
                         </div>
-                    {/if}
 
-                    <div class="profile-field-group">
-                        <label class="matcha-input-label" for="profile-phone-input">
-                            เบอร์โทรศัพท์ (ID บัญชีสมาชิก)
-                        </label>
-                        <div class="locked-input-wrapper">
-                            <span class="locked-icon">🔒</span>
-                            <input
-                                id="profile-phone-input"
-                                type="text"
-                                class="matcha-input locked-input"
-                                value={currentMember.phone}
-                                disabled
-                                readonly
-                            />
-                        </div>
-                        <span class="profile-field-hint">
-                            * เบอร์โทรใช้เป็นรหัสสมาชิกและเชื่อมโยงแต้มสะสม ไม่สามารถแก้ไขได้
-                        </span>
-                    </div>
+                        <!-- Actions -->
+                        <div class="profile-actions-stack" style="margin-top: 0.85rem;">
+                            <button
+                                type="button"
+                                class="btn-matcha-primary"
+                                style="width: 100%; padding: 0.75rem; font-size: 0.95rem; border-radius: 12px;"
+                                onclick={handleSaveProfile}
+                                disabled={isSavingProfile}
+                            >
+                                {#if isSavingProfile}
+                                    ⏳ กำลังบันทึกข้อมูล...
+                                {:else}
+                                    💾 บันทึกการเปลี่ยนแปลง
+                                {/if}
+                            </button>
 
-                    <div class="reg-name-grid" style="margin-top: 0.85rem;">
-                        <div class="reg-field-col">
-                            <label class="matcha-input-label" for="profile-firstname-input">
-                                ชื่อจริง <span class="required-star">*</span>
-                            </label>
-                            <input
-                                id="profile-firstname-input"
-                                type="text"
-                                class="matcha-input"
-                                placeholder="เช่น พัชร"
-                                bind:value={editFirstName}
-                                maxlength={60}
-                            />
-                        </div>
-                        <div class="reg-field-col">
-                            <label class="matcha-input-label" for="profile-lastname-input">
-                                นามสกุล <span class="required-star">*</span>
-                            </label>
-                            <input
-                                id="profile-lastname-input"
-                                type="text"
-                                class="matcha-input"
-                                placeholder="เช่น นันทวานิช"
-                                bind:value={editLastName}
-                                maxlength={60}
-                            />
-                        </div>
-                    </div>
-
-                    <!-- Member Meta Info Stats Card -->
-                    <div class="profile-stats-card">
-                        <div class="profile-stat-item">
-                            <span class="stat-label">📅 สมัครเมื่อ</span>
-                            <span class="stat-value">
-                                {currentMember.createdAt ? new Date(currentMember.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : 'สมาชิกใหม่'}
-                            </span>
-                        </div>
-                        <div class="profile-stat-divider"></div>
-                        <div class="profile-stat-item">
-                            <span class="stat-label">🍵 แต้มรวมสะสม</span>
-                            <span class="stat-value">{currentMember.totalStampsEarned || currentMember.points} แก้ว</span>
-                        </div>
-                        <div class="profile-stat-divider"></div>
-                        <div class="profile-stat-item">
-                            <span class="stat-label">🎁 แลกฟรี</span>
-                            <span class="stat-value">{currentMember.totalFreeRedeemed || 0} แก้ว</span>
+                            <div class="profile-dual-buttons">
+                                <button
+                                    type="button"
+                                    class="btn-profile-secondary"
+                                    onclick={() => { memberQuickTab = 'overview'; profileSaveMsg = null; }}
+                                >
+                                    ⬅️ กลับหน้าแต้ม
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn-profile-logout"
+                                    onclick={handleMemberLogout}
+                                >
+                                    🚪 ออกจากระบบ
+                                </button>
+                            </div>
                         </div>
                     </div>
+                {/if}
+            </div>
 
-                    <div style="display: flex; flex-direction: column; gap: 0.55rem; margin-top: 1.1rem;">
-                        <button
-                            type="button"
-                            class="btn-matcha-primary"
-                            style="width: 100%; padding: 0.85rem;"
-                            onclick={handleSaveProfile}
-                            disabled={isSavingProfile}
-                        >
-                            {#if isSavingProfile}
-                                ⏳ กำลังบันทึกข้อมูล...
-                            {:else}
-                                💾 บันทึกการเปลี่ยนแปลง
-                            {/if}
-                        </button>
-
-                        <button
-                            type="button"
-                            class="btn-profile-back"
-                            onclick={() => { memberQuickTab = 'overview'; profileSaveMsg = null; }}
-                        >
-                            ⬅️ กลับหน้าบัตรสะสมแต้ม
-                        </button>
-
-                        <button
-                            type="button"
-                            class="btn-danger"
-                            style="width: 100%; padding: 0.6rem; margin-top: 0.2rem;"
-                            onclick={handleMemberLogout}
-                        >
-                            🚪 ออกจากระบบ (Logout)
-                        </button>
-                    </div>
-                </div>
-            {/if}
+            <!-- Bottom Close Bar -->
+            <div class="profile-modal-footer">
+                <button
+                    type="button"
+                    class="btn-profile-close-full"
+                    onclick={() => (showMemberQuickModal = false)}
+                >
+                    ✕ ปิดหน้าต่าง
+                </button>
+            </div>
         </div>
     </div>
 {/if}
@@ -1151,14 +1199,14 @@
                         class="install-tab-btn {activeInstallTab === 'android' ? 'active' : ''}"
                         onclick={() => (activeInstallTab = 'android')}
                     >
-                        Android (Chrome)
+                        🤖 Android / 💻 PC
                     </button>
                     <button
                         type="button"
                         class="install-tab-btn {activeInstallTab === 'ios' ? 'active' : ''}"
                         onclick={() => (activeInstallTab = 'ios')}
                     >
-                        iPhone / iPad (Safari)
+                        🍎 iPhone / iPad
                     </button>
                 </div>
             {:else}
@@ -1169,29 +1217,30 @@
                 </div>
             {/if}
 
-            <!-- เนื้อหาแท็บ Android -->
+            <!-- เนื้อหาแท็บ Android / PC -->
             {#if activeInstallTab === 'android'}
                 <div class="install-guide-body">
-                    {#if deferredInstallPrompt}
-                        <button
-                            type="button"
-                            class="install-direct-action-btn"
-                            onclick={() => {
-                                handleInstallPwa();
-                            }}
-                        >
-                            📲 กดเพื่อติดตั้งลงหน้าจอโฮมทันที
-                        </button>
-                        <div class="install-divider">
-                            <span>หรือติดตั้งผ่านเมนูของ Chrome ด้านล่าง</span>
-                        </div>
-                    {/if}
+                    <button
+                        type="button"
+                        class="install-direct-action-btn"
+                        onclick={handleInstallPwa}
+                    >
+                        📲 กดเพื่อติดตั้งลงเครื่องทันที (Install App)
+                    </button>
+                    <p style="text-align: center; font-size: 0.76rem; color: #64748b; margin: 0.35rem 0 0.85rem 0;">
+                        รองรับทั้งโทรศัพท์ Android และ คอมพิวเตอร์ PC (Chrome / Edge)
+                    </p>
+
+                    <div class="install-divider">
+                        <span>หรือทำตามขั้นตอนผ่านเบราว์เซอร์ด้านล่าง</span>
+                    </div>
+
                     <div class="install-step-list">
                         <div class="install-step-item">
                             <span class="install-step-num">1</span>
                             <div class="install-step-content">
-                                <strong>เปิดผ่าน Google Chrome</strong>
-                                <p>แตะปุ่มเมนู <strong style="display: inline;">⋮ "จุดสามจุด"</strong> ที่มุมบนขวาของเบราว์เซอร์</p>
+                                <strong>เปิดผ่าน Google Chrome หรือ Edge</strong>
+                                <p>แตะหรือคลิกปุ่มเมนู <strong style="display: inline;">⋮ "จุดสามจุด"</strong> ที่มุมบนขวาของเบราว์เซอร์</p>
                             </div>
                         </div>
 
@@ -1199,7 +1248,7 @@
                             <span class="install-step-num">2</span>
                             <div class="install-step-content">
                                 <strong>เลือก "ติดตั้งแอป" หรือ "เพิ่มลงในหน้าจอหลัก"</strong>
-                                <p>แตะเมนู <strong style="display: inline;">"ติดตั้งแอปพลิเคชัน" (Install app)</strong> หรือ <strong style="display: inline;">"เพิ่มลงในหน้าจอหลัก" (Add to Home screen)</strong></p>
+                                <p>เลือกเมนู <strong style="display: inline;">"ติดตั้ง Home Matcha Cafe"</strong> หรือ <strong style="display: inline;">"เพิ่มลงในหน้าจอหลัก"</strong></p>
                             </div>
                         </div>
 
@@ -1207,7 +1256,7 @@
                             <span class="install-step-num">3</span>
                             <div class="install-step-content">
                                 <strong>กดยืนยันการติดตั้ง</strong>
-                                <p>แตะ <strong style="display: inline;">"ติดตั้ง"</strong> ในหน้าต่างยืนยัน ไอคอนแอปจะไปอยู่ที่หน้าจอโฮมทันที</p>
+                                <p>แตะ <strong style="display: inline;">"ติดตั้ง"</strong> ในหน้าต่างยืนยัน ไอคอนแอปจะไปอยู่ที่หน้าจอโฮมหรือเดสก์ท็อปทันที</p>
                             </div>
                         </div>
                     </div>
@@ -1455,6 +1504,44 @@
         z-index: 95;
         transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), bottom 0.25s ease, box-shadow 0.2s ease;
         padding: 0;
+        overflow: visible;
+    }
+
+    .fab-avatar-full-wrap {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .fab-avatar-full-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .fab-avatar-name-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(to top, rgba(16, 44, 18, 0.96) 0%, rgba(16, 44, 18, 0.65) 60%, transparent 100%);
+        color: #ffffff;
+        font-size: 0.62rem;
+        font-weight: 800;
+        text-align: center;
+        padding: 8px 2px 2px 2px;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        pointer-events: none;
     }
 
     .floating-member-fab:hover {
@@ -1493,6 +1580,7 @@
         border-radius: 999px;
         border: 2px solid #ffffff;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        z-index: 10;
     }
 
     .member-modal-backdrop {
@@ -1522,8 +1610,59 @@
     }
 
     .member-modal-card.profile-modal-card {
-        max-width: 420px;
-        padding: 1.35rem 1.3rem 1.45rem;
+        max-width: 410px;
+        max-height: min(90vh, 600px);
+        display: flex;
+        flex-direction: column;
+        padding: 1.15rem 1.15rem 0.85rem;
+        border-radius: 22px;
+    }
+
+    .profile-modal-top-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.65rem;
+        margin-bottom: 0.85rem;
+        flex-shrink: 0;
+    }
+
+    .profile-modal-top-bar .profile-tabs-header {
+        flex: 1;
+        margin-bottom: 0;
+    }
+
+    .member-modal-close-btn {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        border-radius: 50%;
+        border: 1.5px solid #cbd5e1;
+        background: #f1f5f9;
+        color: #334155;
+        font-size: 1.05rem;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.18s ease;
+        padding: 0;
+        line-height: 1;
+    }
+
+    .member-modal-close-btn:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+        transform: scale(1.05);
+    }
+
+    .profile-modal-body {
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-right: 2px;
+        max-height: min(72vh, 480px);
     }
 
     .profile-tabs-header {
@@ -1532,7 +1671,6 @@
         background: #f1f6ed;
         padding: 0.3rem;
         border-radius: 14px;
-        margin-bottom: 1.15rem;
         border: 1px solid #dcebd4;
     }
 
@@ -1575,6 +1713,18 @@
         }
     }
 
+    /* Compact Header Card */
+    .profile-compact-header {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        background: linear-gradient(135deg, #f4faee, #eaf4e3);
+        border: 1.5px solid #cce4c2;
+        border-radius: 14px;
+        padding: 0.75rem 0.95rem;
+        margin-bottom: 0.85rem;
+    }
+
     .profile-avatar-circle {
         width: 62px;
         height: 62px;
@@ -1586,148 +1736,246 @@
         justify-content: center;
         font-size: 1.6rem;
         font-weight: 900;
-        margin: 0 auto 0.65rem auto;
         box-shadow: 0 8px 18px rgba(45, 90, 39, 0.28);
         border: 2px solid #ffffff;
     }
 
-    .profile-avatar-circle.small {
-        width: 48px;
-        height: 48px;
-        font-size: 1.3rem;
+    .profile-avatar-circle.compact {
+        width: 46px;
+        height: 46px;
+        min-width: 46px;
+        border-radius: 50%;
+        overflow: hidden;
+        border: 2px solid #ffffff;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
         margin: 0;
+        font-size: 1.25rem;
         flex-shrink: 0;
     }
 
-    .profile-verified-badge {
-        display: inline-flex;
+    .profile-avatar-circle.compact img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .profile-header-info {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+    }
+
+    .profile-header-name {
+        font-size: 0.96rem;
+        font-weight: 800;
+        color: var(--matcha-deep);
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .profile-badge-pill {
+        display: inline-block;
+        background: #166534;
+        color: #ffffff;
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 0.12rem 0.45rem;
+        border-radius: 999px;
+    }
+
+    .profile-header-phone {
+        font-size: 0.78rem;
+        color: #4b6342;
+        display: flex;
         align-items: center;
         gap: 0.35rem;
-        margin-top: 0.35rem;
-        background: #ecf8e5;
-        color: #27671a;
-        font-size: 0.74rem;
+    }
+
+    .locked-hint-tag {
+        font-size: 0.68rem;
+        color: #64748b;
+        background: rgba(0,0,0,0.04);
+        padding: 0.08rem 0.35rem;
+        border-radius: 4px;
+    }
+
+    /* Loyalty Progress Compact Card */
+    .loyalty-progress-compact-card {
+        background: linear-gradient(135deg, #f7fbf3, #edf7e7);
+        border: 1.5px solid #badba1;
+        border-radius: 14px;
+        padding: 0.85rem 1rem;
+        margin-bottom: 0.85rem;
+    }
+
+    .loyalty-progress-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.45rem;
+    }
+
+    .loyalty-card-label {
+        font-size: 0.76rem;
         font-weight: 700;
-        padding: 0.2rem 0.65rem;
-        border-radius: 999px;
-        border: 1px solid #bfe3b1;
+        color: #3d6329;
     }
 
-    .badge-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: #22c55e;
-        display: inline-block;
+    .loyalty-card-stamps {
+        font-size: 0.95rem;
+        font-weight: 900;
+        color: #1e4214;
     }
 
-    .btn-profile-edit-toggle {
+    .loyalty-progress-bar-bg {
         width: 100%;
-        padding: 0.72rem;
-        border-radius: 12px;
+        height: 8px;
+        background: #d5ebd0;
+        border-radius: 999px;
+        overflow: hidden;
+        margin-bottom: 0.5rem;
+    }
+
+    .loyalty-progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #22c55e, #15803d);
+        border-radius: 999px;
+        transition: width 0.3s ease;
+    }
+
+    .loyalty-reward-tag {
+        font-size: 0.75rem;
+        color: #47633a;
+        font-weight: 600;
+        text-align: center;
+    }
+
+    .loyalty-reward-tag.is-ready {
+        color: #166534;
+        font-weight: 800;
+        background: #dcfce7;
+        padding: 0.25rem 0.65rem;
+        border-radius: 8px;
+    }
+
+    /* Actions Stack & Dual Buttons */
+    .profile-actions-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .profile-dual-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+
+    .btn-profile-secondary {
+        padding: 0.68rem 0.5rem;
+        border-radius: 11px;
         border: 1.5px solid #bdd7b1;
         background: #f7faf5;
         color: #2e5522;
         font-family: inherit;
-        font-size: 0.88rem;
+        font-size: 0.84rem;
         font-weight: 700;
         cursor: pointer;
         transition: all 0.15s ease;
+        text-align: center;
     }
 
-    .btn-profile-edit-toggle:hover {
+    .btn-profile-secondary:hover {
         background: #edf5ea;
         border-color: #9ec58f;
-        transform: translateY(-1px);
     }
 
-    .profile-edit-hero {
-        display: flex;
-        align-items: center;
-        gap: 0.85rem;
-        background: linear-gradient(135deg, #f4faef, #eaf4e4);
-        border: 1.5px solid #c9e2be;
-        border-radius: 14px;
-        padding: 0.85rem 1rem;
-        margin-bottom: 0.95rem;
+    .btn-profile-logout {
+        padding: 0.68rem 0.5rem;
+        border-radius: 11px;
+        border: 1.5px solid #fecaca;
+        background: #fef2f2;
+        color: #b91c1c;
+        font-family: inherit;
+        font-size: 0.84rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        text-align: center;
     }
 
-    .profile-edit-title {
-        margin: 0;
-        font-size: 0.96rem;
-        font-weight: 800;
-        color: var(--matcha-deep);
+    .btn-profile-logout:hover {
+        background: #fee2e2;
+        border-color: #fca5a5;
     }
 
-    .profile-edit-sub {
-        margin: 0.15rem 0 0 0;
-        font-size: 0.75rem;
-        color: #4e6b43;
-    }
-
-    .locked-input-wrapper {
-        position: relative;
-        display: flex;
-        align-items: center;
-    }
-
-    .locked-icon {
-        position: absolute;
-        left: 0.75rem;
-        font-size: 0.9rem;
-        pointer-events: none;
-        opacity: 0.65;
-    }
-
-    .locked-input {
-        padding-left: 2.2rem !important;
-        background: #f1f4ee !important;
-        color: #5d6d59 !important;
-        cursor: not-allowed;
-        border-color: #d1ded0 !important;
-    }
-
-    .profile-field-hint {
-        display: block;
-        margin-top: 0.25rem;
-        font-size: 0.7rem;
-        color: #687964;
-    }
-
-    .profile-stats-card {
-        margin-top: 1rem;
-        background: #fdfefe;
-        border: 1px solid #dbe8d6;
+    /* 1-Row Stats Strip */
+    .profile-stats-strip {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
         border-radius: 12px;
-        padding: 0.65rem 0.8rem;
+        padding: 0.6rem 0.75rem;
         display: flex;
         align-items: center;
         justify-content: space-around;
         text-align: center;
     }
 
-    .profile-stat-item {
+    .stat-strip-item {
         display: flex;
         flex-direction: column;
-        gap: 0.15rem;
+        gap: 0.1rem;
     }
 
-    .profile-stat-divider {
-        width: 1px;
-        height: 28px;
-        background: #e2ede0;
+    .stat-strip-num {
+        font-size: 0.95rem;
+        font-weight: 900;
+        color: #1e293b;
     }
 
-    .stat-label {
+    .stat-strip-label {
         font-size: 0.68rem;
-        color: #667e60;
         font-weight: 600;
+        color: #64748b;
     }
 
-    .stat-value {
-        font-size: 0.82rem;
-        color: #1f3718;
-        font-weight: 800;
+    .stat-strip-divider {
+        width: 1px;
+        height: 24px;
+        background: #cbd5e1;
+    }
+
+    /* Bottom Close Bar */
+    .profile-modal-footer {
+        margin-top: 0.75rem;
+        padding-top: 0.6rem;
+        border-top: 1px solid #e2e8f0;
+        flex-shrink: 0;
+    }
+
+    .btn-profile-close-full {
+        width: 100%;
+        padding: 0.6rem;
+        border-radius: 10px;
+        border: 1px solid #cbd5e1;
+        background: #f8fafc;
+        color: #475569;
+        font-family: inherit;
+        font-size: 0.84rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .btn-profile-close-full:hover {
+        background: #f1f5f9;
+        color: #1e293b;
     }
 
     .profile-alert {
@@ -1753,24 +2001,6 @@
         color: #991b1b;
     }
 
-    .btn-profile-back {
-        width: 100%;
-        padding: 0.68rem;
-        border-radius: 12px;
-        border: 1.5px solid #d4dec0;
-        background: #ffffff;
-        color: #4b6343;
-        font-family: inherit;
-        font-size: 0.85rem;
-        font-weight: 700;
-        cursor: pointer;
-        transition: all 0.15s ease;
-    }
-
-    .btn-profile-back:hover {
-        background: #f5f8f3;
-        color: #27401d;
-    }
 
     .reg-name-grid {
         display: grid;
@@ -2172,23 +2402,24 @@
         position: absolute;
         top: 0.85rem;
         right: 0.85rem;
-        width: 32px;
-        height: 32px;
+        width: 36px;
+        height: 36px;
         border-radius: 50%;
-        border: none;
+        border: 1.5px solid #cbd5e1;
         background: #f1f5f9;
-        color: #64748b;
-        font-size: 1rem;
+        color: #475569;
+        font-size: 1.05rem;
         font-weight: 800;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: all 0.12s ease;
+        transition: all 0.15s ease;
     }
     .install-modal-close:hover {
         background: #e2e8f0;
-        color: #334155;
+        color: #0f172a;
+        transform: scale(1.05);
     }
     .install-modal-header {
         text-align: center;

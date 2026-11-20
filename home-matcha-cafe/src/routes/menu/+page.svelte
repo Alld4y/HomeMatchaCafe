@@ -202,7 +202,7 @@
 <main class="menu-page-wrapper">
 	<div class="menu-header">
 		<span class="menu-header-badge">🍵 ARTISANAL MATCHA MENU</span>
-		<h1 class="menu-main-title">เมนูเครื่องดื่มมัทฉะ</h1>
+		<h1 class="menu-main-title" style="color: var(--matcha-dark);">เมนูเครื่องดื่มมัทฉะ</h1>
 		<p class="menu-subtitle">
 			คัดสรรผงมัทฉะแท้เกรดพรีเมียม ชงสดแก้วต่อแก้ว เลือกระดับความหวานและนมได้ตามใจคุณ
 		</p>
