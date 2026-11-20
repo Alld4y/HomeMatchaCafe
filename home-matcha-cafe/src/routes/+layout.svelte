@@ -540,6 +540,34 @@
         loadMemberFromStorage();
         checkAdminPendingReviews();
 
+        // 📱 ตรวจสอบการเปิดจาก LINE ด้วย query param ?action=register หรือ ?phone=...
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const phoneParam = urlParams.get('phone');
+            const actionParam = urlParams.get('action');
+
+            if (phoneParam) {
+                const cleanPhone = phoneParam.replace(/\D/g, '').slice(0, 10);
+                if (cleanPhone.length >= 9) {
+                    authPhone = cleanPhone;
+                    // หากมี action=register หรือลูกค้ายังไม่ได้ล็อกอิน ให้เปิดหน้าต่างสมัครสมาชิกและกรอกเบอร์ให้อัตโนมัติทันที
+                    if (actionParam === 'register' || (!currentMember && !localStorage.getItem('hmc_member'))) {
+                        authMode = 'register';
+                        authStep = 'form';
+                        authError = '';
+                        showMemberAuthModal = true;
+                    }
+                }
+            } else if (actionParam === 'register') {
+                authMode = 'register';
+                authStep = 'form';
+                authError = '';
+                showMemberAuthModal = true;
+            }
+        } catch (e) {
+            console.warn('Error reading URL params for member auth:', e);
+        }
+
         // 📲 ลงทะเบียน Service Worker สำหรับ PWA
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch((err) => {
@@ -1297,7 +1325,7 @@
                             inputmode="numeric"
                             maxlength="10"
                             class="matcha-input"
-                            placeholder="กรอกเบอร์โทรศัพท์ 10 หลัก"
+                            placeholder={authPhone || "กรอกเบอร์โทรศัพท์ 10 หลัก"}
                             bind:value={authPhone}
                             required
                         />

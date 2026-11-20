@@ -51,6 +51,9 @@ export interface LineOaSettings {
     useCustomWelcomeCard?: boolean;
     welcomeCardBubble?: any;
     welcomeCardBlocks?: any[] | null;
+    useCustomRegisterCard?: boolean;
+    registerCardBubble?: any;
+    registerCardBlocks?: any[] | null;
     defaultReplyMessage: string;
     keywordReplies: LineOaKeywordReply[];
 
@@ -140,6 +143,9 @@ const DEFAULT_SETTINGS: StoreSettings = {
         useCustomWelcomeCard: false,
         welcomeCardBubble: null,
         welcomeCardBlocks: null,
+        useCustomRegisterCard: false,
+        registerCardBubble: null,
+        registerCardBlocks: null,
         defaultReplyMessage: 'ขออภัยค่ะ หากต้องการดูรายการเครื่องดื่ม พิมพ์ "เมนู" หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อระบบสมาชิกและรับแจ้งเตือนสถานะออเดอร์นะคะ 🍵',
         keywordReplies: [
             {
@@ -331,6 +337,9 @@ function normalizeSettings(parsed: any): StoreSettings {
             useCustomWelcomeCard: Boolean(parsedLineOa.useCustomWelcomeCard),
             welcomeCardBubble: parsedLineOa.welcomeCardBubble || null,
             welcomeCardBlocks: Array.isArray(parsedLineOa.welcomeCardBlocks) ? parsedLineOa.welcomeCardBlocks : null,
+            useCustomRegisterCard: Boolean(parsedLineOa.useCustomRegisterCard),
+            registerCardBubble: parsedLineOa.registerCardBubble || null,
+            registerCardBlocks: Array.isArray(parsedLineOa.registerCardBlocks) ? parsedLineOa.registerCardBlocks : null,
             defaultReplyMessage: defaultReplyMsg,
             keywordReplies,
             notifyOnOrderCreated: parsedLineOa.notifyOnOrderCreated !== false,

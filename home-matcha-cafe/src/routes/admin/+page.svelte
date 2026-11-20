@@ -96,6 +96,9 @@
         useCustomWelcomeCard?: boolean;
         welcomeCardBubble?: any;
         welcomeCardBlocks?: any[] | null;
+        useCustomRegisterCard?: boolean;
+        registerCardBubble?: any;
+        registerCardBlocks?: any[] | null;
         defaultReplyMessage: string;
         keywordReplies: LineOaKeywordReply[];
         notifyOnOrderCreated: boolean;
@@ -169,6 +172,9 @@
             useCustomWelcomeCard: false,
             welcomeCardBubble: null,
             welcomeCardBlocks: null,
+            useCustomRegisterCard: false,
+            registerCardBubble: null,
+            registerCardBlocks: null,
             defaultReplyMessage: 'ขออภัยค่ะ หากต้องการดูรายการเครื่องดื่ม พิมพ์ "เมนู" หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อระบบสมาชิกและรับแจ้งเตือนสถานะออเดอร์นะคะ 🍵',
             keywordReplies: [
                 { id: 'kw-1', keyword: 'เมนู', matchType: 'exact', replyType: 'flex_menu', replyText: 'รายการเครื่องดื่ม Home Matcha Cafe', enabled: true },
@@ -1364,6 +1370,7 @@
         buttonLabel?: string;
         buttonUrl?: string;
         buttonStyle?: 'primary' | 'secondary' | 'gold' | 'outline';
+        buttonAction?: 'custom' | 'register' | 'menu' | 'loyalty' | 'order';
     }
 
     let designerAltText = $state('🍵 Home Matcha Cafe มีข้อความใหม่ถึงคุณ');
@@ -1448,7 +1455,7 @@
         designerCardBlocks = copy;
     }
 
-    function loadDesignerPreset(preset: 'promo' | 'loyalty' | 'delivery' | 'welcome') {
+    function loadDesignerPreset(preset: 'promo' | 'loyalty' | 'delivery' | 'welcome' | 'register') {
         const now = Date.now();
         if (preset === 'welcome') {
             designerCardBlocks = [
@@ -1460,6 +1467,16 @@
                 { id: `b-${now}-6`, type: 'button', buttonLabel: '🍵 สั่งเครื่องดื่มออนไลน์', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary' },
                 { id: `b-${now}-7`, type: 'button', buttonLabel: '⭐ เปิดบัตรสะสมแต้ม 10 แก้วฟรี', buttonUrl: 'https://homematchacafe.store/loyalty', buttonStyle: 'gold' },
                 { id: `b-${now}-8`, type: 'button', buttonLabel: '📍 เช็ครอบจัดส่งวันนี้', buttonUrl: 'https://homematchacafe.store/order', buttonStyle: 'outline' }
+            ];
+        } else if (preset === 'register') {
+            designerCardBlocks = [
+                { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=800&q=80', aspectRatio: '20:13' },
+                { id: `b-${now}-2`, type: 'tag', tagText: '✨ สิทธิพิเศษสำหรับสมาชิก Home Matcha Cafe', tagBg: '#fdf2f8', tagColor: '#9d174d' },
+                { id: `b-${now}-3`, type: 'title', titleText: 'สมัครสมาชิกสะสมแต้ม 10 แก้วฟรี 🍵', titleSize: 'lg' },
+                { id: `b-${now}-4`, type: 'body', bodyText: 'ระบบบันทึกเบอร์โทรศัพท์ของคุณเรียบร้อยแล้วค่ะ! กดสมัครสมาชิกเพื่อรับแต้มสะสมทันทีทุกแก้วที่สั่ง และรับแจ้งเตือนสถานะออเดอร์สดผ่าน LINE ฟรี' },
+                { id: `b-${now}-5`, type: 'highlight', highlightText: '💡 กดปุ่มด้านล่างเพื่อเปิดหน้าสมัคร (ระบบจะกรอกเบอร์โทรให้อัตโนมัติค่ะ)' },
+                { id: `b-${now}-6`, type: 'button', buttonLabel: '✨ สมัครสมาชิกสะสมแต้มทันที', buttonUrl: 'https://homematchacafe.store/loyalty?action=register&phone={phone}', buttonStyle: 'gold', buttonAction: 'register' },
+                { id: `b-${now}-7`, type: 'button', buttonLabel: '🍵 ดูเมนูสั่งเครื่องดื่ม', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary', buttonAction: 'menu' }
             ];
         } else if (preset === 'promo') {
             designerCardBlocks = [
@@ -1705,6 +1722,50 @@
             text: 'ระบบจะส่งข้อความตัวหนังสือแบบเดิมเมื่อมีลูกค้าเพิ่มเพื่อน',
             confirmButtonColor: '#166534'
         });
+    }
+
+    async function setAsRegisterCard() {
+        const bubble = buildDesignerFlexBubble();
+        settings.lineOa.useCustomRegisterCard = true;
+        settings.lineOa.registerCardBubble = bubble;
+        settings.lineOa.registerCardBlocks = JSON.parse(JSON.stringify(designerCardBlocks));
+
+        await saveAllSettings();
+        swal.fire({
+            icon: 'success',
+            title: 'ตั้งเป็นการ์ดชวนสมัครสมาชิกสำเร็จ! 🎉',
+            text: 'เมื่อลูกค้าพิมพ์เบอร์ 10 หลักที่ยังไม่ได้สมัครสมาชิก ระบบจะส่งการ์ดนี้พร้อมนำเบอร์ไปกรอกให้อัตโนมัติทันทีค่ะ 🍵',
+            confirmButtonColor: '#be185d'
+        });
+    }
+
+    async function unsetRegisterCard() {
+        settings.lineOa.useCustomRegisterCard = false;
+        await saveAllSettings();
+        swal.fire({
+            icon: 'info',
+            title: 'เปลี่ยนกลับเป็นการ์ดสมัครสมาชิกมาตรฐานแล้วค่ะ',
+            text: 'ระบบจะส่งการ์ดสมัครสมาชิกแบบเริ่มต้นเมื่อลูกค้าพิมพ์เบอร์โทรใหม่',
+            confirmButtonColor: '#166534'
+        });
+    }
+
+    function loadSavedWelcomeCard() {
+        if (Array.isArray(settings.lineOa.welcomeCardBlocks) && settings.lineOa.welcomeCardBlocks.length > 0) {
+            designerCardBlocks = JSON.parse(JSON.stringify(settings.lineOa.welcomeCardBlocks));
+            swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'โหลดการ์ดต้อนรับที่บันทึกไว้แล้ว 🍵', showConfirmButton: false, timer: 1500 });
+        } else {
+            loadDesignerPreset('welcome');
+        }
+    }
+
+    function loadSavedRegisterCard() {
+        if (Array.isArray(settings.lineOa.registerCardBlocks) && settings.lineOa.registerCardBlocks.length > 0) {
+            designerCardBlocks = JSON.parse(JSON.stringify(settings.lineOa.registerCardBlocks));
+            swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'โหลดการ์ดสมัครสมาชิกที่บันทึกไว้แล้ว ✨', showConfirmButton: false, timer: 1500 });
+        } else {
+            loadDesignerPreset('register');
+        }
     }
 
     function getStatusName(status: string) {
@@ -5142,6 +5203,41 @@
                     </div>
                 </div>
 
+                <!-- การ์ดแจ้งสถานะการตอบกลับเมื่อพิมพ์เบอร์โทร 10 หลัก -->
+                <div style="background: #fdf2f8; border: 1.5px solid #fbcfe8; border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.65rem;">
+                    <div style="display: flex; align-items: center; gap: 0.65rem;">
+                        <span style="font-size: 1.3rem;">✨</span>
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 0.45rem;">
+                                <strong style="font-size: 0.88rem; color: #831843;">การตอบกลับเมื่อลูกค้าพิมพ์เบอร์โทร 10 หลัก:</strong>
+                                {#if settings.lineOa.useCustomRegisterCard}
+                                    <span style="font-size: 0.72rem; background: #db2777; color: #ffffff; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 9999px;">
+                                        ● ใช้การ์ดออกแบบเอง (Flex)
+                                    </span>
+                                {:else}
+                                    <span style="font-size: 0.72rem; background: #ffffff; color: #9d174d; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 9999px; border: 1px solid #fbcfe8;">
+                                        ○ ใช้การ์ดมาตรฐานของระบบ
+                                    </span>
+                                {/if}
+                            </div>
+                            <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; color: #701a75; line-height: 1.4;">
+                                หากเบอร์ที่พิมพ์มายังไม่เคยเป็นสมาชิก ระบบจะตอบกลับด้วยการ์ดชวนสมัครสมาชิกพร้อมนำเบอร์ไปกรอกใส่ฟอร์มสมัครให้อัตโนมัติ (สามารถออกแบบการ์ดนี้ได้ในข้อ 6)
+                            </p>
+                        </div>
+                    </div>
+                    <div>
+                        {#if settings.lineOa.useCustomRegisterCard}
+                            <button
+                                type="button"
+                                onclick={unsetRegisterCard}
+                                style="font-size: 0.75rem; background: #ffffff; color: #dc2626; border: 1px solid #fecaca; border-radius: 6px; padding: 0.25rem 0.6rem; cursor: pointer; font-weight: 700;"
+                            >
+                                สลับไปใช้การ์ดระบบ
+                            </button>
+                        {/if}
+                    </div>
+                </div>
+
                 <!-- ตารางคีย์เวิร์ดตอบกลับ -->
                 <div style="border-top: 1px solid #e2e8f0; padding-top: 1.25rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
@@ -5265,6 +5361,9 @@
                         <button type="button" onclick={() => loadDesignerPreset('welcome')} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 800; background: #ecfdf5; border: 1.5px solid #10b981; color: #065f46; border-radius: 8px; cursor: pointer;">
                             👋 บัตรต้อนรับเพิ่มเพื่อน
                         </button>
+                        <button type="button" onclick={() => loadDesignerPreset('register')} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 800; background: #fdf2f8; border: 1.5px solid #f472b6; color: #9d174d; border-radius: 8px; cursor: pointer;">
+                            ✨ ชวนสมัครสมาชิก
+                        </button>
                         <button type="button" onclick={() => loadDesignerPreset('promo')} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #f0fdf4; border: 1.5px solid #86efac; color: #166534; border-radius: 8px; cursor: pointer;">
                             🍵 เมนูแนะนำ
                         </button>
@@ -5274,6 +5373,16 @@
                         <button type="button" onclick={() => loadDesignerPreset('delivery')} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #f0f9ff; border: 1.5px solid #7dd3fc; color: #0369a1; border-radius: 8px; cursor: pointer;">
                             🛵 รอบส่ง
                         </button>
+                        {#if settings.lineOa.useCustomWelcomeCard}
+                            <button type="button" onclick={loadSavedWelcomeCard} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 800; background: #ffffff; border: 1.5px solid #166534; color: #166534; border-radius: 8px; cursor: pointer;">
+                                📂 โหลดการ์ดต้อนรับของฉัน
+                            </button>
+                        {/if}
+                        {#if settings.lineOa.useCustomRegisterCard}
+                            <button type="button" onclick={loadSavedRegisterCard} style="padding: 0.3rem 0.65rem; font-size: 0.78rem; font-weight: 800; background: #ffffff; border: 1.5px solid #be185d; color: #be185d; border-radius: 8px; cursor: pointer;">
+                                📂 โหลดการ์ดสมัครของฉัน
+                            </button>
+                        {/if}
                     </div>
                 </div>
 
@@ -5471,16 +5580,30 @@
                                             </div>
 
                                             <div>
-                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.15rem;">
+                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; flex-wrap: wrap; gap: 0.25rem;">
                                                     <span style="font-size: 0.72rem; color: #64748b; font-weight: 600;">ลิงก์หน้าเว็บ (Action URL):</span>
-                                                    <div style="display: flex; gap: 0.25rem;">
-                                                        <button type="button" onclick={() => (block.buttonUrl = 'https://homematchacafe.store/menu')} style="font-size: 0.68rem; padding: 0.1rem 0.35rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 4px; cursor: pointer;">
+                                                    <div style="display: flex; gap: 0.25rem; flex-wrap: wrap;">
+                                                        <button
+                                                            type="button"
+                                                            onclick={() => {
+                                                                block.buttonUrl = 'https://homematchacafe.store/loyalty?action=register&phone={phone}';
+                                                                if (!block.buttonLabel || block.buttonLabel.includes('สั่ง') || block.buttonLabel.includes('รายละเอียด')) {
+                                                                    block.buttonLabel = '✨ สมัครสมาชิกสะสมแต้ม';
+                                                                }
+                                                                block.buttonStyle = 'gold';
+                                                            }}
+                                                            style="font-size: 0.68rem; padding: 0.15rem 0.45rem; background: #fdf2f8; border: 1px solid #fbcfe8; color: #9d174d; border-radius: 4px; cursor: pointer; font-weight: 800;"
+                                                            title="ตั้งเป็นปุ่มสมัครสมาชิก ดึงเบอร์จาก LINE ไปกรอกให้อัตโนมัติ"
+                                                        >
+                                                            ✨ สมัครสมาชิก (+เบอร์)
+                                                        </button>
+                                                        <button type="button" onclick={() => (block.buttonUrl = 'https://homematchacafe.store/menu')} style="font-size: 0.68rem; padding: 0.15rem 0.35rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 4px; cursor: pointer;">
                                                             /menu
                                                         </button>
-                                                        <button type="button" onclick={() => (block.buttonUrl = 'https://homematchacafe.store/loyalty')} style="font-size: 0.68rem; padding: 0.1rem 0.35rem; background: #fefce8; border: 1px solid #fde047; color: #854d0e; border-radius: 4px; cursor: pointer;">
+                                                        <button type="button" onclick={() => (block.buttonUrl = 'https://homematchacafe.store/loyalty')} style="font-size: 0.68rem; padding: 0.15rem 0.35rem; background: #fefce8; border: 1px solid #fde047; color: #854d0e; border-radius: 4px; cursor: pointer;">
                                                             /loyalty
                                                         </button>
-                                                        <button type="button" onclick={() => (block.buttonUrl = 'https://homematchacafe.store/order')} style="font-size: 0.68rem; padding: 0.1rem 0.35rem; background: #f0f9ff; border: 1px solid #bae6fd; color: #0284c7; border-radius: 4px; cursor: pointer;">
+                                                        <button type="button" onclick={() => (block.buttonUrl = 'https://homematchacafe.store/order')} style="font-size: 0.68rem; padding: 0.15rem 0.35rem; background: #f0f9ff; border: 1px solid #bae6fd; color: #0284c7; border-radius: 4px; cursor: pointer;">
                                                             /order
                                                         </button>
                                                     </div>
@@ -5492,6 +5615,11 @@
                                                     placeholder="https://homematchacafe.store/..."
                                                     style="font-size: 0.82rem; padding: 0.35rem 0.6rem;"
                                                 />
+                                                {#if block.buttonUrl && block.buttonUrl.includes('{phone}')}
+                                                    <span style="display: block; font-size: 0.7rem; color: #9d174d; margin-top: 0.2rem; font-weight: 600;">
+                                                        💡 ระบบจะแทนที่ {'{phone}'} ด้วยเบอร์โทรที่ลูกค้าพิมพ์เข้ามาใน LINE และกรอกใส่ช่องสมัครสมาชิกให้อัตโนมัติ
+                                                    </span>
+                                                {/if}
                                             </div>
                                         </div>
                                     {/if}
@@ -5649,6 +5777,48 @@
                                         onclick={unsetWelcomeCard}
                                         style="padding: 0.5rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; border-radius: 8px; cursor: pointer; white-space: nowrap;"
                                         title="ยกเลิกการใช้การ์ดและกลับไปใช้ข้อความตัวอักษรธรรมดา"
+                                    >
+                                        ปิดใช้การ์ด
+                                    </button>
+                                {/if}
+                            </div>
+                        </div>
+
+                        <!-- กล่องตั้งเป็นการ์ดชวนสมัครสมาชิกเมื่อพิมพ์เบอร์ใหม่ -->
+                        <div style="background: {settings.lineOa.useCustomRegisterCard ? '#fdf2f8' : '#ffffff'}; border: 1.5px solid {settings.lineOa.useCustomRegisterCard ? '#f472b6' : '#cbd5e1'}; border-radius: 12px; padding: 1rem; margin-bottom: 0.85rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                    <span style="font-size: 1.05rem;">✨</span>
+                                    <strong style="font-size: 0.88rem; color: #1e293b;">การ์ดชวนสมัครสมาชิก (เมื่อพิมพ์เบอร์ใหม่)</strong>
+                                </div>
+                                {#if settings.lineOa.useCustomRegisterCard}
+                                    <span style="font-size: 0.72rem; background: #db2777; color: #ffffff; font-weight: 800; padding: 0.15rem 0.55rem; border-radius: 9999px;">
+                                        ● กำลังใช้งานอยู่
+                                    </span>
+                                {:else}
+                                    <span style="font-size: 0.72rem; background: #f1f5f9; color: #64748b; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 9999px; border: 1px solid #e2e8f0;">
+                                        ○ การ์ดเริ่มต้น
+                                    </span>
+                                {/if}
+                            </div>
+                            <p style="margin: 0 0 0.65rem 0; font-size: 0.78rem; color: #64748b; line-height: 1.45;">
+                                ตั้งให้ระบบส่งการ์ดที่กำลังออกแบบอยู่นี้ เมื่อลูกค้าพิมพ์เบอร์โทรศัพท์ 10 หลักที่ยังไม่ได้สมัครสมาชิก โดยระบบจะดึงเบอร์ไปกรอกในหน้าสมัครให้อัตโนมัติ
+                            </p>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button
+                                    type="button"
+                                    onclick={setAsRegisterCard}
+                                    class="btn-matcha-primary"
+                                    style="flex: 1; padding: 0.5rem 0.75rem; font-size: 0.82rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; background: #be185d;"
+                                >
+                                    {settings.lineOa.useCustomRegisterCard ? '💾 อัปเดตการ์ดชวนสมัครสมาชิก' : '⭐ ตั้งเป็นการ์ดชวนสมัครสมาชิก'}
+                                </button>
+                                {#if settings.lineOa.useCustomRegisterCard}
+                                    <button
+                                        type="button"
+                                        onclick={unsetRegisterCard}
+                                        style="padding: 0.5rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; border-radius: 8px; cursor: pointer; white-space: nowrap;"
+                                        title="ยกเลิกการใช้การ์ดและกลับไปใช้การ์ดเริ่มต้นของระบบ"
                                     >
                                         ปิดใช้การ์ด
                                     </button>
