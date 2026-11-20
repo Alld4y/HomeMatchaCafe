@@ -118,18 +118,49 @@ export interface CustomerNotificationPayload {
     title: string;
     body: string;
     url?: string;
-    eventType: 'slip_approved' | 'delivering' | 'completed' | 'custom';
+    eventType: 'order_created' | 'slip_approved' | 'brewing' | 'ready_to_ship' | 'delivering' | 'completed' | 'cancelled' | 'custom';
+    itemsSummary?: string;
+    totalPrice?: number;
 }
 
 /**
- * ส่งการแจ้งเตือนไปยังลูกค้าตามการตั้งค่าในระบบ (Web Push + LINE OA สำรอง)
+ * ค้นหา LINE User ID ที่ผูกกับเบอร์โทรศัพท์ (จากตาราง members หรือ line_users)
+ */
+export async function getLineUserIdByPhone(phone: string): Promise<string | null> {
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    if (!cleanPhone) return null;
+    await ensurePgSchema();
+    try {
+        const memberRes = await pool.query(
+            `SELECT line_user_id FROM public.members WHERE phone = $1 AND line_user_id IS NOT NULL AND line_user_id <> '' LIMIT 1`,
+            [cleanPhone]
+        );
+        if (memberRes.rows.length > 0 && memberRes.rows[0].line_user_id) {
+            return memberRes.rows[0].line_user_id;
+        }
+
+        const lineUserRes = await pool.query(
+            `SELECT line_user_id FROM public.line_users WHERE phone = $1 AND line_user_id IS NOT NULL AND line_user_id <> '' LIMIT 1`,
+            [cleanPhone]
+        );
+        if (lineUserRes.rows.length > 0 && lineUserRes.rows[0].line_user_id) {
+            return lineUserRes.rows[0].line_user_id;
+        }
+    } catch (e) {
+        console.warn('⚠️ Error querying line_user_id:', e);
+    }
+    return null;
+}
+
+/**
+ * ส่งการแจ้งเตือนไปยังลูกค้าตามการตั้งค่าในระบบ (Web Push + LINE OA)
  */
 export async function sendCustomerNotification(payload: CustomerNotificationPayload): Promise<{
     webPushSent: number;
     lineOaSent: boolean;
     reason?: string;
 }> {
-    const { phone, title, body, url = '/loyalty', eventType } = payload;
+    const { phone, title, body, url = '/loyalty', eventType, orderCode, itemsSummary, totalPrice } = payload;
     if (!phone) {
         return { webPushSent: 0, lineOaSent: false, reason: 'ไม่มีเบอร์โทรลูกค้า' };
     }
@@ -137,28 +168,18 @@ export async function sendCustomerNotification(payload: CustomerNotificationPayl
     const cleanPhone = phone.replace(/[^0-9]/g, '');
     const settings = await getStoreSettings();
     const notifSettings = settings.notifications;
-
-    // 1. ตรวจสอบว่าระบบแจ้งเตือนเปิดอยู่หรือไม่
-    if (!notifSettings?.enabled) {
-        return { webPushSent: 0, lineOaSent: false, reason: 'ระบบแจ้งเตือนถูกปิดไว้ในการตั้งค่าร้าน' };
-    }
-
-    // 2. ตรวจสอบว่าเหตุการณ์นี้เปิดให้ส่งแจ้งเตือนหรือไม่
-    if (eventType === 'slip_approved' && notifSettings.notifyOnSlipApproved === false) {
-        return { webPushSent: 0, lineOaSent: false, reason: 'ปิดการแจ้งเตือนเมื่ออนุมัติสลิป' };
-    }
-    if (eventType === 'delivering' && notifSettings.notifyOnDelivering === false) {
-        return { webPushSent: 0, lineOaSent: false, reason: 'ปิดการแจ้งเตือนเมื่อเริ่มนำส่ง' };
-    }
-    if (eventType === 'completed' && notifSettings.notifyOnCompleted === false) {
-        return { webPushSent: 0, lineOaSent: false, reason: 'ปิดการแจ้งเตือนเมื่อจัดส่งสำเร็จ' };
-    }
+    const lineOaSettings = settings.lineOa;
 
     let webPushCount = 0;
     let lineOaSuccess = false;
 
-    // 3. ส่งผ่าน Web Push Notification (ถ้าเปิดใช้งาน)
-    if (notifSettings.enableWebPush !== false) {
+    // 1. ส่งผ่าน Web Push Notification (ถ้าเปิดใช้งาน)
+    const isWebPushAllowedForEvent =
+        eventType === 'slip_approved' ? notifSettings?.notifyOnSlipApproved !== false :
+        eventType === 'delivering' ? notifSettings?.notifyOnDelivering !== false :
+        eventType === 'completed' ? notifSettings?.notifyOnCompleted !== false : true;
+
+    if (notifSettings?.enabled && notifSettings?.enableWebPush !== false && isWebPushAllowedForEvent) {
         const subs = await getSubscriptionsByPhone(cleanPhone);
         if (subs.length > 0) {
             const pushData = JSON.stringify({
@@ -185,7 +206,6 @@ export async function sendCustomerNotification(payload: CustomerNotificationPayl
                         );
                         webPushCount++;
                     } catch (err: any) {
-                        // หาก endpoint 410 (Gone) หรือ 404 (Not Found) แสดงว่าลูกค้าถอนสิทธิ์ ให้ลบออก
                         if (err?.statusCode === 410 || err?.statusCode === 404) {
                             await removePushSubscription(sub.endpoint);
                         } else {
@@ -197,21 +217,39 @@ export async function sendCustomerNotification(payload: CustomerNotificationPayl
         }
     }
 
-    // 4. ส่งผ่าน LINE Official Account (สำรองไว้ในอนาคต)
-    if (notifSettings.enableLineOA && notifSettings.lineOaChannelAccessToken) {
+    // 2. ส่งผ่าน LINE Official Account
+    const isLineOaAllowed = lineOaSettings?.enabled && (
+        eventType === 'order_created' ? lineOaSettings.notifyOnOrderCreated !== false :
+        eventType === 'slip_approved' ? lineOaSettings.notifyOnSlipApproved !== false :
+        eventType === 'brewing' ? lineOaSettings.notifyOnBrewing !== false :
+        eventType === 'ready_to_ship' ? lineOaSettings.notifyOnReadyToShip !== false :
+        eventType === 'delivering' ? lineOaSettings.notifyOnDelivering !== false :
+        eventType === 'completed' ? lineOaSettings.notifyOnCompleted !== false :
+        eventType === 'cancelled' ? lineOaSettings.notifyOnCancelled !== false : true
+    );
+
+    const channelToken = lineOaSettings?.channelAccessToken || notifSettings?.lineOaChannelAccessToken;
+
+    if (isLineOaAllowed && channelToken) {
         try {
-            // ระบบสำรอง: ถ้าในอนาคตมีการเชื่อมต่อ LINE User ID กับเบอร์โทร
-            // สามารถยิง Push Message ไปยัง LINE ได้ทันที
-            // หากยังไม่มี LINE User ID หรือยิงไม่ผ่าน จะไม่ error ขัดขวางการทำงานหลัก
-            lineOaSuccess = await sendLineOaPushMessage(
-                notifSettings.lineOaChannelAccessToken,
-                cleanPhone,
-                title,
-                body,
-                url
-            );
+            const lineUserId = await getLineUserIdByPhone(cleanPhone);
+            if (lineUserId) {
+                lineOaSuccess = await sendLineStatusFlexMessage(
+                    channelToken,
+                    lineUserId,
+                    {
+                        title,
+                        body,
+                        eventType,
+                        orderCode,
+                        itemsSummary,
+                        totalPrice,
+                        url
+                    }
+                );
+            }
         } catch (lineErr) {
-            console.warn('⚠️ LINE OA notification fallback error:', lineErr);
+            console.warn('⚠️ LINE OA notification error:', lineErr);
         }
     }
 
@@ -219,33 +257,206 @@ export async function sendCustomerNotification(payload: CustomerNotificationPayl
 }
 
 /**
- * ฟังก์ชันส่งข้อความผ่าน LINE OA Messaging API (ระบบสำรองพร้อมใช้)
+ * ส่งข้อความสถานะออเดอร์ในรูปแบบ LINE Flex Message
  */
-async function sendLineOaPushMessage(
+export async function sendLineStatusFlexMessage(
     channelAccessToken: string,
-    phone: string,
-    title: string,
-    body: string,
-    url: string
-): Promise<boolean> {
-    if (!channelAccessToken) return false;
-
-    // ตรวจสอบในฐานข้อมูลว่ามี line_user_id ที่ผูกกับเบอร์โทรนี้หรือไม่
-    let lineUserId = '';
-    try {
-        const res = await pool.query(
-            `
-            SELECT pin FROM public.members WHERE phone = $1 LIMIT 1
-            `,
-            [phone]
-        );
-        // ในอนาคตเมื่อมี LINE Login หรือ Webhook บันทึก LINE User ID ไว้ในฟิลด์หรือตารางคู่
-    } catch {}
-
-    // ถ้าไม่มี lineUserId เฉพาะบุคคล จะไม่ยิงผิดพลาด
-    if (!lineUserId) {
-        return false;
+    toUserId: string,
+    params: {
+        title: string;
+        body: string;
+        eventType: CustomerNotificationPayload['eventType'];
+        orderCode?: string;
+        itemsSummary?: string;
+        totalPrice?: number;
+        url: string;
     }
+): Promise<boolean> {
+    if (!channelAccessToken || !toUserId) return false;
+
+    const { title, body, eventType, orderCode, itemsSummary, totalPrice, url } = params;
+
+    const themeMap: Record<string, { color: string; badge: string; icon: string }> = {
+        order_created: { color: '#166534', badge: 'รับออเดอร์แล้ว', icon: '📝' },
+        slip_approved: { color: '#15803d', badge: 'อนุมัติการชำระเงิน', icon: '💳' },
+        brewing: { color: '#0d9488', badge: 'กำลังชงเครื่องดื่ม', icon: '🍵' },
+        ready_to_ship: { color: '#059669', badge: 'ชงเสร็จแล้ว รอจัดส่ง', icon: '📦' },
+        delivering: { color: '#2563eb', badge: 'กำลังนำส่ง', icon: '🛵' },
+        completed: { color: '#166534', badge: 'จัดส่งสำเร็จแล้ว', icon: '🎉' },
+        cancelled: { color: '#dc2626', badge: 'ยกเลิกออเดอร์', icon: '❌' },
+        custom: { color: '#166534', badge: 'แจ้งเตือนจากทางร้าน', icon: '📢' }
+    };
+
+    const theme = themeMap[eventType] || themeMap.custom;
+    const trackingUrl = url.startsWith('http') ? url : `https://homematchacafe.store${url}`;
+
+    const contents: any = {
+        type: 'bubble',
+        header: {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: theme.color,
+            paddingAll: '16px',
+            contents: [
+                {
+                    type: 'text',
+                    text: 'HOME MATCHA CAFE',
+                    weight: 'bold',
+                    size: 'xs',
+                    color: '#dcfce7'
+                },
+                {
+                    type: 'text',
+                    text: `${theme.icon} ${title}`,
+                    weight: 'bold',
+                    size: 'lg',
+                    color: '#ffffff',
+                    margin: 'sm'
+                }
+            ]
+        },
+        body: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: '16px',
+            contents: [
+                {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                        {
+                            type: 'text',
+                            text: 'สถานะ:',
+                            size: 'sm',
+                            color: '#64748b',
+                            flex: 2
+                        },
+                        {
+                            type: 'text',
+                            text: theme.badge,
+                            size: 'sm',
+                            weight: 'bold',
+                            color: theme.color,
+                            flex: 4,
+                            align: 'end'
+                        }
+                    ]
+                }
+            ]
+        },
+        footer: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: '14px',
+            contents: [
+                {
+                    type: 'button',
+                    style: 'primary',
+                    color: theme.color,
+                    action: {
+                        type: 'uri',
+                        label: 'ดูสถานะ / ใบเสร็จ',
+                        uri: trackingUrl
+                    }
+                }
+            ]
+        }
+    };
+
+    if (orderCode) {
+        contents.body.contents.push({
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'sm',
+            contents: [
+                {
+                    type: 'text',
+                    text: 'รหัสออเดอร์:',
+                    size: 'sm',
+                    color: '#64748b',
+                    flex: 2
+                },
+                {
+                    type: 'text',
+                    text: `#${orderCode}`,
+                    size: 'sm',
+                    weight: 'bold',
+                    color: '#1e293b',
+                    flex: 4,
+                    align: 'end'
+                }
+            ]
+        });
+    }
+
+    if (itemsSummary) {
+        contents.body.contents.push({
+            type: 'box',
+            layout: 'vertical',
+            margin: 'md',
+            paddingAll: '10px',
+            backgroundColor: '#f8fafc',
+            cornerRadius: '8px',
+            contents: [
+                {
+                    type: 'text',
+                    text: itemsSummary,
+                    size: 'xs',
+                    color: '#475569',
+                    wrap: true
+                }
+            ]
+        });
+    }
+
+    if (totalPrice !== undefined && totalPrice > 0) {
+        contents.body.contents.push({
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'sm',
+            contents: [
+                {
+                    type: 'text',
+                    text: 'ยอดรวม:',
+                    size: 'sm',
+                    color: '#64748b',
+                    flex: 2
+                },
+                {
+                    type: 'text',
+                    text: `฿${totalPrice.toLocaleString()}`,
+                    size: 'sm',
+                    weight: 'bold',
+                    color: '#166534',
+                    flex: 4,
+                    align: 'end'
+                }
+            ]
+        });
+    }
+
+    contents.body.contents.push({
+        type: 'text',
+        text: body,
+        size: 'xs',
+        color: '#64748b',
+        wrap: true,
+        margin: 'md'
+    });
+
+    return sendLineRawFlexMessage(channelAccessToken, toUserId, `${title}: ${body}`, contents);
+}
+
+/**
+ * ส่ง Flex Message ดิบไปยัง LINE Messaging API
+ */
+export async function sendLineRawFlexMessage(
+    channelAccessToken: string,
+    toUserId: string,
+    altText: string,
+    flexContents: any
+): Promise<boolean> {
+    if (!channelAccessToken || !toUserId) return false;
 
     try {
         const res = await fetch('https://api.line.me/v2/bot/message/push', {
@@ -255,65 +466,221 @@ async function sendLineOaPushMessage(
                 Authorization: `Bearer ${channelAccessToken}`
             },
             body: JSON.stringify({
-                to: lineUserId,
+                to: toUserId,
                 messages: [
                     {
                         type: 'flex',
-                        altText: `${title}: ${body}`,
-                        contents: {
-                            type: 'bubble',
-                            hero: {
-                                type: 'image',
-                                url: 'https://homematchacafe.store/image/home-matcha-cafe-logo.png',
-                                size: 'full',
-                                aspectRatio: '20:13',
-                                aspectMode: 'cover'
-                            },
-                            body: {
-                                type: 'box',
-                                layout: 'vertical',
-                                contents: [
-                                    {
-                                        type: 'text',
-                                        text: title,
-                                        weight: 'bold',
-                                        size: 'md',
-                                        color: '#166534'
-                                    },
-                                    {
-                                        type: 'text',
-                                        text: body,
-                                        size: 'sm',
-                                        color: '#334155',
-                                        wrap: true,
-                                        margin: 'md'
-                                    }
-                                ]
-                            },
-                            footer: {
-                                type: 'box',
-                                layout: 'vertical',
-                                contents: [
-                                    {
-                                        type: 'button',
-                                        style: 'primary',
-                                        color: '#166534',
-                                        action: {
-                                            type: 'uri',
-                                            label: 'ดูสถานะออเดอร์',
-                                            uri: url.startsWith('http') ? url : `https://homematchacafe.store${url}`
-                                        }
-                                    }
-                                ]
-                            }
-                        }
+                        altText: altText.slice(0, 400),
+                        contents: flexContents
                     }
                 ]
             })
         });
-        return res.ok;
+
+        if (!res.ok) {
+            const errBody = await res.text();
+            console.error('❌ LINE API Push Error:', res.status, errBody);
+            return false;
+        }
+        return true;
     } catch (e) {
-        console.error('Error sending LINE OA message:', e);
+        console.error('❌ Error sending LINE OA Flex message:', e);
         return false;
+    }
+}
+
+/**
+ * แจ้งเตือนแอดมินทาง LINE เมื่อมีออเดอร์ใหม่ หรือมีการแนบสลิป
+ */
+export async function notifyAdminLine(params: {
+    eventType: 'new_order' | 'slip_uploaded';
+    orderCode: string;
+    customerName: string;
+    phone: string;
+    totalPrice: number;
+    itemsSummary?: string;
+    deliveryDate?: string;
+    deliveryRound?: string;
+}): Promise<boolean> {
+    const settings = await getStoreSettings();
+    const lineOa = settings.lineOa;
+
+    if (!lineOa?.enabled || !lineOa?.channelAccessToken || !lineOa?.adminLineUserId) {
+        return false;
+    }
+
+    if (params.eventType === 'new_order' && !lineOa.notifyAdminOnNewOrder) {
+        return false;
+    }
+    if (params.eventType === 'slip_uploaded' && !lineOa.notifyAdminOnSlipUploaded) {
+        return false;
+    }
+
+    const title = params.eventType === 'new_order' ? '🍵 มีออเดอร์ใหม่เข้ามา!' : '💳 ลูกค้าแนบสลิปใหม่!';
+    const altText = `${title} ออเดอร์ #${params.orderCode} (฿${params.totalPrice})`;
+
+    const bubble: any = {
+        type: 'bubble',
+        header: {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: params.eventType === 'new_order' ? '#166534' : '#0284c7',
+            paddingAll: '16px',
+            contents: [
+                {
+                    type: 'text',
+                    text: 'ADMIN NOTIFICATION',
+                    weight: 'bold',
+                    size: 'xs',
+                    color: '#dcfce7'
+                },
+                {
+                    type: 'text',
+                    text: title,
+                    weight: 'bold',
+                    size: 'md',
+                    color: '#ffffff',
+                    margin: 'sm'
+                }
+            ]
+        },
+        body: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: '16px',
+            contents: [
+                {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                        { type: 'text', text: 'รหัส:', size: 'sm', color: '#64748b', flex: 2 },
+                        { type: 'text', text: `#${params.orderCode}`, size: 'sm', weight: 'bold', color: '#1e293b', flex: 4, align: 'end' }
+                    ]
+                },
+                {
+                    type: 'box',
+                    layout: 'horizontal',
+                    margin: 'xs',
+                    contents: [
+                        { type: 'text', text: 'ลูกค้า:', size: 'sm', color: '#64748b', flex: 2 },
+                        { type: 'text', text: `${params.customerName} (${params.phone})`, size: 'sm', color: '#1e293b', flex: 4, align: 'end' }
+                    ]
+                },
+                {
+                    type: 'box',
+                    layout: 'horizontal',
+                    margin: 'xs',
+                    contents: [
+                        { type: 'text', text: 'ยอดชำระ:', size: 'sm', color: '#64748b', flex: 2 },
+                        { type: 'text', text: `฿${params.totalPrice.toLocaleString()}`, size: 'sm', weight: 'bold', color: '#166534', flex: 4, align: 'end' }
+                    ]
+                }
+            ]
+        },
+        footer: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: '14px',
+            contents: [
+                {
+                    type: 'button',
+                    style: 'primary',
+                    color: '#166534',
+                    action: {
+                        type: 'uri',
+                        label: 'เปิดจัดการออเดอร์ (Admin)',
+                        uri: 'https://homematchacafe.store/admin'
+                    }
+                }
+            ]
+        }
+    };
+
+    if (params.deliveryDate || params.deliveryRound) {
+        bubble.body.contents.push({
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'xs',
+            contents: [
+                { type: 'text', text: 'รอบส่ง:', size: 'sm', color: '#64748b', flex: 2 },
+                { type: 'text', text: `${params.deliveryDate || ''} ${params.deliveryRound || ''}`, size: 'xs', color: '#475569', flex: 4, align: 'end' }
+            ]
+        });
+    }
+
+    if (params.itemsSummary) {
+        bubble.body.contents.push({
+            type: 'box',
+            layout: 'vertical',
+            margin: 'md',
+            paddingAll: '10px',
+            backgroundColor: '#f1f5f9',
+            cornerRadius: '8px',
+            contents: [
+                { type: 'text', text: params.itemsSummary, size: 'xs', color: '#334155', wrap: true }
+            ]
+        });
+    }
+
+    return sendLineRawFlexMessage(lineOa.channelAccessToken, lineOa.adminLineUserId, altText, bubble);
+}
+
+/**
+ * ส่งข้อความทดสอบจากหน้าแอดมิน
+ */
+export async function sendLineTestMessage(targetUserId?: string, customMessage?: string): Promise<{ success: boolean; message: string }> {
+    const settings = await getStoreSettings();
+    const lineOa = settings.lineOa;
+
+    const token = lineOa.channelAccessToken;
+    if (!token) {
+        return { success: false, message: 'ยังไม่ได้ระบุ Channel Access Token ในการตั้งค่า LINE OA' };
+    }
+
+    const to = targetUserId || lineOa.adminLineUserId;
+    if (!to) {
+        return { success: false, message: 'ไม่มี Admin User ID หรือผู้รับสำหรับทดสอบ' };
+    }
+
+    const testBubble = {
+        type: 'bubble',
+        header: {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#166534',
+            paddingAll: '16px',
+            contents: [
+                { type: 'text', text: '🍵 HOME MATCHA CAFE', weight: 'bold', size: 'sm', color: '#dcfce7' },
+                { type: 'text', text: '🔔 ข้อความทดสอบระบบ LINE OA', weight: 'bold', size: 'md', color: '#ffffff', margin: 'xs' }
+            ]
+        },
+        body: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: '16px',
+            contents: [
+                {
+                    type: 'text',
+                    text: customMessage || 'การเชื่อมต่อระบบ LINE Official Account กับ Home Matcha Cafe ทำงานได้อย่างถูกต้องสมบูรณ์แล้วค่ะ! 🎉',
+                    size: 'sm',
+                    color: '#334155',
+                    wrap: true
+                },
+                {
+                    type: 'text',
+                    text: `ส่งเมื่อ: ${new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`,
+                    size: 'xs',
+                    color: '#94a3b8',
+                    margin: 'lg'
+                }
+            ]
+        }
+    };
+
+    const ok = await sendLineRawFlexMessage(token, to, 'ข้อความทดสอบระบบ LINE OA Home Matcha Cafe', testBubble);
+    if (ok) {
+        return { success: true, message: `ส่งข้อความทดสอบไปยัง ${to} สำเร็จ!` };
+    } else {
+        return { success: false, message: 'ส่งข้อความไม่สำเร็จ กรุณาตรวจสอบ Channel Access Token ว่าถูกต้องและยังไม่หมดอายุ' };
     }
 }

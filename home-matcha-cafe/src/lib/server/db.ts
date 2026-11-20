@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { pool, ensurePgSchema } from './pgPool';
 import { awardStampsForCompletedOrder } from './members';
-import { sendCustomerNotification } from './notifications';
+import { sendCustomerNotification, notifyAdminLine } from './notifications';
 
 export interface OrderItem {
     id: string;
@@ -310,7 +310,37 @@ export async function createOrder(data: {
     );
 
     const mapped = mapPgRowToOrder(res.rows[0]);
-    return await processCompletedOrderLoyalty(mapped, false);
+    const finalOrder = await processCompletedOrderLoyalty(mapped, false);
+
+    // แจ้งเตือนลูกค้าและแอดมินเมื่อมีออเดอร์ใหม่
+    const itemsSummary = Array.isArray(finalOrder.basket)
+        ? finalOrder.basket.map(i => `${i.thaiName || i.name || 'เครื่องดื่ม'} x${i.quantity}`).join(', ')
+        : undefined;
+
+    sendCustomerNotification({
+        phone: finalOrder.phone,
+        orderId: finalOrder.id,
+        orderCode: finalOrder.order_id,
+        title: '🍵 ได้รับคำสั่งซื้อของคุณแล้ว',
+        body: `ทางร้านได้รับออเดอร์ ${finalOrder.order_id} เรียบร้อยแล้วค่ะ กำลังเตรียมการสำหรับรอบจัดส่ง ${finalOrder.deliveryRound || ''}`,
+        url: `/success?phone=${encodeURIComponent(finalOrder.phone)}`,
+        eventType: 'order_created',
+        itemsSummary,
+        totalPrice: finalOrder.totalPrice
+    }).catch(e => console.warn('Customer order_created notif error:', e));
+
+    notifyAdminLine({
+        eventType: 'new_order',
+        orderCode: finalOrder.order_id,
+        customerName: finalOrder.name,
+        phone: finalOrder.phone,
+        totalPrice: finalOrder.totalPrice,
+        itemsSummary,
+        deliveryDate: finalOrder.deliveryDate,
+        deliveryRound: finalOrder.deliveryRound
+    }).catch(e => console.warn('Admin new_order notif error:', e));
+
+    return finalOrder;
 }
 
 async function processCompletedOrderLoyalty(order: Order, wasAlreadyAwarded: boolean): Promise<Order> {
@@ -341,7 +371,11 @@ async function processCompletedOrderLoyalty(order: Order, wasAlreadyAwarded: boo
 function triggerOrderNotification(order: Order, prevStatus: string) {
     if (!order.phone) return;
 
-    // 1. อนุมัติสลิป / รับยอด (กรณีที่เคยรอตรวจสลิป)
+    const itemsSummary = Array.isArray(order.basket)
+        ? order.basket.map(i => `${i.thaiName || i.name || 'เครื่องดื่ม'} x${i.quantity}`).join(', ')
+        : undefined;
+
+    // 1. อนุมัติสลิป / รับยอด
     if (order.status === 'paid' && (prevStatus === 'pending' || order.needsManualReview)) {
         sendCustomerNotification({
             phone: order.phone,
@@ -350,11 +384,43 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
             title: '🍵 ยืนยันรับยอดออเดอร์แล้ว',
             body: `แอดมินตรวจสอบสลิปและรับยอดออเดอร์ ${order.order_id} เรียบร้อยแล้วค่ะ กำลังเตรียมคิวชงให้นะคะ`,
             url: `/success?phone=${encodeURIComponent(order.phone)}`,
-            eventType: 'slip_approved'
+            eventType: 'slip_approved',
+            itemsSummary,
+            totalPrice: order.totalPrice
         }).catch((e) => console.warn('Notification error:', e));
     }
 
-    // 2. กำลังนำส่ง
+    // 2. กำลังชง
+    if (order.status === 'brewing' && prevStatus !== 'brewing') {
+        sendCustomerNotification({
+            phone: order.phone,
+            orderId: order.id,
+            orderCode: order.order_id,
+            title: '🍵 กำลังชงเครื่องดื่มของคุณ',
+            body: `บาริสต้ากำลังพิถีพิถันชงเครื่องดื่มสำหรับออเดอร์ ${order.order_id} ให้อย่างตั้งใจค่ะ`,
+            url: `/success?phone=${encodeURIComponent(order.phone)}`,
+            eventType: 'brewing',
+            itemsSummary,
+            totalPrice: order.totalPrice
+        }).catch((e) => console.warn('Notification error:', e));
+    }
+
+    // 3. ชงเสร็จแล้ว รอจัดส่ง
+    if (order.status === 'ready_to_ship' && prevStatus !== 'ready_to_ship') {
+        sendCustomerNotification({
+            phone: order.phone,
+            orderId: order.id,
+            orderCode: order.order_id,
+            title: '📦 เครื่องดื่มชงเสร็จแล้ว',
+            body: `ออเดอร์ ${order.order_id} ชงเสร็จเรียบร้อยและแพ็กพร้อมส่งตามรอบเวลา ${order.deliveryRound || ''} ค่ะ`,
+            url: `/success?phone=${encodeURIComponent(order.phone)}`,
+            eventType: 'ready_to_ship',
+            itemsSummary,
+            totalPrice: order.totalPrice
+        }).catch((e) => console.warn('Notification error:', e));
+    }
+
+    // 4. กำลังนำส่ง
     if (order.status === 'delivering' && prevStatus !== 'delivering') {
         sendCustomerNotification({
             phone: order.phone,
@@ -363,11 +429,13 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
             title: '🛵 เครื่องดื่มของคุณกำลังนำส่ง',
             body: `ออเดอร์ ${order.order_id} กำลังนำส่งไปที่ ${order.address} แล้วค่ะ เตรียมรับความสดชื่นได้เลย!`,
             url: `/success?phone=${encodeURIComponent(order.phone)}`,
-            eventType: 'delivering'
+            eventType: 'delivering',
+            itemsSummary,
+            totalPrice: order.totalPrice
         }).catch((e) => console.warn('Notification error:', e));
     }
 
-    // 3. จัดส่งสำเร็จแล้ว
+    // 5. จัดส่งสำเร็จแล้ว
     if (order.status === 'completed' && prevStatus !== 'completed') {
         sendCustomerNotification({
             phone: order.phone,
@@ -376,7 +444,24 @@ function triggerOrderNotification(order: Order, prevStatus: string) {
             title: '✅ จัดส่งสำเร็จเรียบร้อยแล้ว',
             body: `ออเดอร์ ${order.order_id} จัดส่งถึง ${order.address} เรียบร้อยแล้วค่ะ ขอบคุณที่อุดหนุน Home Matcha Cafe นะคะ 🍵`,
             url: `/success?phone=${encodeURIComponent(order.phone)}`,
-            eventType: 'completed'
+            eventType: 'completed',
+            itemsSummary,
+            totalPrice: order.totalPrice
+        }).catch((e) => console.warn('Notification error:', e));
+    }
+
+    // 6. ยกเลิกออเดอร์
+    if (order.status === 'cancelled' && prevStatus !== 'cancelled') {
+        sendCustomerNotification({
+            phone: order.phone,
+            orderId: order.id,
+            orderCode: order.order_id,
+            title: '❌ ออเดอร์ถูกยกเลิก',
+            body: `ออเดอร์ ${order.order_id} ถูกยกเลิก หากมีข้อสงสัยหรือต้องการความช่วยเหลือ สามารถสอบถามทางร้านได้เลยนะคะ`,
+            url: `/success?phone=${encodeURIComponent(order.phone)}`,
+            eventType: 'cancelled',
+            itemsSummary,
+            totalPrice: order.totalPrice
         }).catch((e) => console.warn('Notification error:', e));
     }
 }

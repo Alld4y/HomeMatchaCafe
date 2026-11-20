@@ -73,6 +73,37 @@
             lineOaChannelAccessToken?: string;
             lineOaChannelSecret?: string;
         };
+        lineOa: LineOaSettingsData;
+    }
+
+    interface LineOaKeywordReply {
+        id: string;
+        keyword: string;
+        matchType: 'exact' | 'contains';
+        replyType: 'text' | 'flex_menu' | 'flex_status' | 'flex_loyalty';
+        replyText?: string;
+        enabled: boolean;
+    }
+
+    interface LineOaSettingsData {
+        enabled: boolean;
+        channelSecret: string;
+        channelAccessToken: string;
+        botBasicId: string;
+        adminLineUserId: string;
+        autoReplyEnabled: boolean;
+        welcomeMessage: string;
+        defaultReplyMessage: string;
+        keywordReplies: LineOaKeywordReply[];
+        notifyOnOrderCreated: boolean;
+        notifyOnSlipApproved: boolean;
+        notifyOnBrewing: boolean;
+        notifyOnReadyToShip: boolean;
+        notifyOnDelivering: boolean;
+        notifyOnCompleted: boolean;
+        notifyOnCancelled: boolean;
+        notifyAdminOnNewOrder: boolean;
+        notifyAdminOnSlipUploaded: boolean;
     }
 
     // 🔐 ระบบล็อกรหัสผ่านหน้า Admin (ตรวจสอบกับ ADMIN_PASSWORD ใน .env)
@@ -81,8 +112,8 @@
     let adminAuthError = $state('');
     let isVerifyingAdmin = $state(false);
 
-    // แท็บหน้า Admin: 'orders' | 'delivery' | 'history' | 'settings' | 'members' | 'menus'
-    let activeTab = $state<'orders' | 'delivery' | 'history' | 'settings' | 'members' | 'menus'>('orders');
+    // แท็บหน้า Admin: 'orders' | 'delivery' | 'history' | 'line_oa' | 'settings' | 'members' | 'menus'
+    let activeTab = $state<'orders' | 'delivery' | 'history' | 'line_oa' | 'settings' | 'members' | 'menus'>('orders');
 
     // ข้อมูลคำสั่งซื้อ
     let orders = $state<AdminOrder[]>([]);
@@ -120,9 +151,35 @@
             notifyOnDelivering: true,
             notifyOnCompleted: true,
             enableWebPush: true,
-            enableLineOA: false,
+            enableLineOA: true,
             lineOaChannelAccessToken: '',
-            lineOaChannelSecret: ''
+            lineOaChannelSecret: 'ae1cf62ef3dbe63af73e93dd4b946bb1'
+        },
+        lineOa: {
+            enabled: true,
+            channelSecret: 'ae1cf62ef3dbe63af73e93dd4b946bb1',
+            channelAccessToken: '',
+            botBasicId: '@719wvlgi',
+            adminLineUserId: 'Uc04ed4f079c031e33621c131cec0ca27',
+            autoReplyEnabled: true,
+            welcomeMessage: 'ยินดีต้อนรับสู่ Home Matcha Cafe 🍵✨\nคุณสามารถพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อรับแจ้งเตือนสถานะออเดอร์ หรือพิมพ์ "เมนู" เพื่อดูรายการเครื่องดื่มได้เลยค่ะ',
+            defaultReplyMessage: 'ขออภัยค่ะ หากต้องการดูรายการเครื่องดื่ม พิมพ์ "เมนู" หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อระบบสมาชิกและรับแจ้งเตือนสถานะออเดอร์นะคะ 🍵',
+            keywordReplies: [
+                { id: 'kw-1', keyword: 'เมนู', matchType: 'exact', replyType: 'flex_menu', replyText: 'รายการเครื่องดื่ม Home Matcha Cafe', enabled: true },
+                { id: 'kw-2', keyword: 'สั่งซื้อ', matchType: 'contains', replyType: 'flex_menu', replyText: 'สั่งซื้อเครื่องดื่มได้ที่ https://homematchacafe.store', enabled: true },
+                { id: 'kw-3', keyword: 'สถานะ', matchType: 'contains', replyType: 'flex_status', replyText: 'ตรวจสอบสถานะออเดอร์ของคุณ', enabled: true },
+                { id: 'kw-4', keyword: 'แต้ม', matchType: 'contains', replyType: 'flex_loyalty', replyText: 'ตรวจสอบคะแนนสะสมและแลกแก้วฟรี', enabled: true },
+                { id: 'kw-5', keyword: 'เวลาส่ง', matchType: 'contains', replyType: 'text', replyText: '🍵 รอบจัดส่งของร้าน:\n- รอบเช้า: 07:00–08:00 น.\n- รอบเที่ยง: 12:30–13:00 น.\n(วันหยุดเสาร์-อาทิตย์ รอบรวม 09:00–13:00 น.)', enabled: true }
+            ],
+            notifyOnOrderCreated: true,
+            notifyOnSlipApproved: true,
+            notifyOnBrewing: true,
+            notifyOnReadyToShip: true,
+            notifyOnDelivering: true,
+            notifyOnCompleted: true,
+            notifyOnCancelled: true,
+            notifyAdminOnNewOrder: true,
+            notifyAdminOnSlipUploaded: true
         },
         deliveryRounds: [
             { id: 'morning', name: 'รอบเช้า', timeSlot: '07:00–08:00 น.', cutoffTime: '06:00', allowFermented: true, isAllDayOpen: false, enabled: true },
@@ -821,6 +878,10 @@
                         notifications: {
                             ...settings.notifications,
                             ...(data.settings.notifications || {})
+                        },
+                        lineOa: {
+                            ...settings.lineOa,
+                            ...(data.settings.lineOa || {})
                         }
                     };
                 }
@@ -1123,6 +1184,154 @@
         } finally {
             isSendingTestNotif = false;
         }
+    }
+
+    // ========================================================
+    // 💬 ระบบจัดการ LINE Official Account (LINE OA)
+    // ========================================================
+    let lineUsersList = $state<any[]>([]);
+    let isLoadingLineUsers = $state(false);
+    let lineTestMessageInput = $state('สวัสดีค่ะ! ทดสอบส่งข้อความจากระบบ Home Matcha Cafe 🍵✨ เชื่อมต่อสำเร็จสมบูรณ์แล้วค่ะ');
+    let isSendingLineTest = $state(false);
+    let webhookCopied = $state(false);
+    let isLineTokenVisible = $state(false);
+
+    // Modal เพิ่ม/แก้ไข Keyword
+    let editingKeywordModal = $state<{
+        isNew: boolean;
+        id: string;
+        keyword: string;
+        matchType: 'exact' | 'contains';
+        replyType: 'text' | 'flex_menu' | 'flex_status' | 'flex_loyalty';
+        replyText: string;
+        enabled: boolean;
+    } | null>(null);
+
+    async function loadLineUsers() {
+        isLoadingLineUsers = true;
+        try {
+            const res = await fetch('/api/line/users');
+            if (res.ok) {
+                const data = await res.json();
+                lineUsersList = data.users || [];
+            }
+        } catch (e) {
+            console.error('Error loading line users:', e);
+        } finally {
+            isLoadingLineUsers = false;
+        }
+    }
+
+    async function sendLineTestPushMessage() {
+        if (!settings.lineOa.channelAccessToken) {
+            swal.fire({
+                icon: 'warning',
+                title: 'ยังไม่ได้ระบุ Token',
+                text: 'กรุณากรอก Channel Access Token ก่อนทดสอบส่งนะคะ',
+                confirmButtonColor: '#166534'
+            });
+            return;
+        }
+        isSendingLineTest = true;
+        try {
+            const res = await fetch('/api/line/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    targetUserId: settings.lineOa.adminLineUserId,
+                    message: lineTestMessageInput
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                swal.fire({
+                    icon: 'success',
+                    title: 'ส่งข้อความสำเร็จ! 💬',
+                    text: data.message,
+                    confirmButtonColor: '#166534'
+                });
+            } else {
+                swal.fire({
+                    icon: 'error',
+                    title: 'ส่งข้อความไม่สำเร็จ',
+                    text: data.message || 'โปรดตรวจสอบ Channel Access Token อีกครั้งค่ะ',
+                    confirmButtonColor: '#dc2626'
+                });
+            }
+        } catch (e: any) {
+            swal.fire('ข้อผิดพลาด', e?.message || 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', 'error');
+        } finally {
+            isSendingLineTest = false;
+        }
+    }
+
+    function copyWebhookUrl() {
+        const url = 'https://homematchacafe.store/api/line/webhook';
+        navigator.clipboard.writeText(url);
+        webhookCopied = true;
+        setTimeout(() => { webhookCopied = false; }, 2500);
+        swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'คัดลอก Webhook URL สำเร็จ! 📋',
+            showConfirmButton: false,
+            timer: 2000
+        });
+    }
+
+    function openAddKeywordModal() {
+        editingKeywordModal = {
+            isNew: true,
+            id: `kw-${Date.now()}`,
+            keyword: '',
+            matchType: 'contains',
+            replyType: 'text',
+            replyText: '',
+            enabled: true
+        };
+    }
+
+    function openEditKeywordModal(k: LineOaKeywordReply) {
+        editingKeywordModal = {
+            isNew: false,
+            id: k.id,
+            keyword: k.keyword,
+            matchType: k.matchType,
+            replyType: k.replyType,
+            replyText: k.replyText || '',
+            enabled: k.enabled !== false
+        };
+    }
+
+    function saveKeywordModal() {
+        if (!editingKeywordModal) return;
+        if (!editingKeywordModal.keyword.trim()) {
+            swal.fire({ icon: 'warning', title: 'กรุณาระบุคำค้นหา (Keyword)', confirmButtonColor: '#166534' });
+            return;
+        }
+
+        const newKw: LineOaKeywordReply = {
+            id: editingKeywordModal.id,
+            keyword: editingKeywordModal.keyword.trim(),
+            matchType: editingKeywordModal.matchType,
+            replyType: editingKeywordModal.replyType,
+            replyText: editingKeywordModal.replyText.trim(),
+            enabled: editingKeywordModal.enabled
+        };
+
+        if (editingKeywordModal.isNew) {
+            settings.lineOa.keywordReplies = [...(settings.lineOa.keywordReplies || []), newKw];
+        } else {
+            settings.lineOa.keywordReplies = (settings.lineOa.keywordReplies || []).map(k => k.id === newKw.id ? newKw : k);
+        }
+        editingKeywordModal = null;
+        saveAllSettings();
+    }
+
+    function deleteKeyword(id: string) {
+        settings.lineOa.keywordReplies = (settings.lineOa.keywordReplies || []).filter(k => k.id !== id);
+        saveAllSettings();
     }
 
     function getStatusName(status: string) {
@@ -1871,6 +2080,132 @@
     </div>
 {/if}
 
+<!-- Modal เพิ่ม/แก้ไขคีย์เวิร์ดตอบกลับ LINE OA -->
+{#if editingKeywordModal}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div 
+        style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 1rem;"
+        onclick={() => (editingKeywordModal = null)}
+    >
+        <div 
+            style="background: #ffffff; border-radius: 20px; max-width: 500px; width: 100%; padding: 1.5rem; text-align: left; box-shadow: 0 20px 50px rgba(0,0,0,0.25); max-height: 90vh; overflow-y: auto;"
+            onclick={(e) => e.stopPropagation()}
+        >
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0; font-size: 1.15rem; color: #166534; font-weight: 800;">
+                    {editingKeywordModal.isNew ? '➕ เพิ่มคีย์เวิร์ดตอบกลับใหม่' : '✏️ แก้ไขคีย์เวิร์ดตอบกลับ'}
+                </h3>
+                <button 
+                    type="button" 
+                    onclick={() => (editingKeywordModal = null)}
+                    style="border: none; background: #f1f5f9; border-radius: 50%; width: 32px; height: 32px; font-weight: bold; cursor: pointer; color: #64748b;"
+                >
+                    ✕
+                </button>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+                <div>
+                    <label for="kwKeyword" style="display: block; font-size: 0.82rem; font-weight: 700; color: #334155; margin-bottom: 0.3rem;">
+                        คำค้นหา / คีย์เวิร์ดที่ลูกค้าพิมพ์:
+                    </label>
+                    <input
+                        id="kwKeyword"
+                        type="text"
+                        bind:value={editingKeywordModal.keyword}
+                        placeholder="เช่น เมนู, เวลาส่ง, เบอร์โทร, สั่งซื้อ"
+                        style="width: 100%; padding: 0.55rem 0.75rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.88rem;"
+                    />
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                    <div>
+                        <label for="kwMatchType" style="display: block; font-size: 0.82rem; font-weight: 700; color: #334155; margin-bottom: 0.3rem;">
+                            เงื่อนไขการจับคู่:
+                        </label>
+                        <select
+                            id="kwMatchType"
+                            bind:value={editingKeywordModal.matchType}
+                            style="width: 100%; padding: 0.55rem 0.75rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem;"
+                        >
+                            <option value="contains">มีคำนี้อยู่ในข้อความ (แนะนำ)</option>
+                            <option value="exact">ตรงกันทุกตัวอักษรเป๊ะๆ</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="kwReplyType" style="display: block; font-size: 0.82rem; font-weight: 700; color: #334155; margin-bottom: 0.3rem;">
+                            ประเภทการตอบกลับ:
+                        </label>
+                        <select
+                            id="kwReplyType"
+                            bind:value={editingKeywordModal.replyType}
+                            style="width: 100%; padding: 0.55rem 0.75rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem;"
+                        >
+                            <option value="text">ข้อความตัวอักษร</option>
+                            <option value="flex_menu">การ์ด Flex เมนูมัทฉะ</option>
+                            <option value="flex_status">การ์ด Flex ติดตามสถานะ</option>
+                            <option value="flex_loyalty">การ์ด Flex บัตรสะสมแต้ม</option>
+                        </select>
+                    </div>
+                </div>
+
+                {#if editingKeywordModal.replyType === 'text'}
+                    <div>
+                        <label for="kwReplyText" style="display: block; font-size: 0.82rem; font-weight: 700; color: #334155; margin-bottom: 0.3rem;">
+                            ข้อความตอบกลับ:
+                        </label>
+                        <textarea
+                            id="kwReplyText"
+                            bind:value={editingKeywordModal.replyText}
+                            rows={4}
+                            placeholder="พิมพ์ข้อความที่ต้องการให้บอทตอบกลับลูกค้าอัตโนมัติ..."
+                            style="width: 100%; padding: 0.55rem 0.75rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; line-height: 1.5;"
+                        ></textarea>
+                    </div>
+                {:else}
+                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.75rem; font-size: 0.82rem; color: #166534;">
+                        ✨ บอทจะตอบกลับด้วยการ์ด <strong>Flex Message</strong> ดีไซน์พิเศษของ Home Matcha Cafe พร้อมปุ่มกดเข้าสู่เว็บไซต์โดยอัตโนมัติ
+                    </div>
+                {/if}
+
+                <div>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={editingKeywordModal.enabled}
+                            style="width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <span style="font-size: 0.88rem; font-weight: 700; color: #1e293b;">
+                            เปิดใช้งานคีย์เวิร์ดนี้ทันที
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; margin-top: 1.25rem;">
+                <button
+                    type="button"
+                    onclick={saveKeywordModal}
+                    class="btn-matcha-primary"
+                    style="flex: 1; padding: 0.7rem; font-weight: 800;"
+                >
+                    💾 บันทึกคีย์เวิร์ด
+                </button>
+                <button
+                    type="button"
+                    onclick={() => (editingKeywordModal = null)}
+                    class="btn-matcha-outline"
+                    style="padding: 0.7rem 1.2rem;"
+                >
+                    ยกเลิก
+                </button>
+            </div>
+        </div>
+    </div>
+{/if}
+
 <!-- Modal แก้ไขข้อมูลสมาชิก แต้ม และวันหมดอายุบัตร -->
 {#if editingMemberModal}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -2289,6 +2624,14 @@
             class="admin-main-tab-btn {activeTab === 'settings' ? 'active' : ''}"
         >
             <span>📅 ปฏิทิน & รอบส่ง</span>
+        </button>
+
+        <button 
+            type="button"
+            onclick={() => { activeTab = 'line_oa'; loadLineUsers(); }}
+            class="admin-main-tab-btn {activeTab === 'line_oa' ? 'active' : ''}"
+        >
+            <span>💬 LINE OA</span>
         </button>
 
         <button 
@@ -3928,37 +4271,23 @@
                                 </div>
                             </div>
 
-                            <!-- LINE OA (สำรอง) -->
-                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.85rem 1rem;">
-                                <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer;">
-                                    <input
-                                        type="checkbox"
-                                        bind:checked={settings.notifications.enableLineOA}
-                                        style="width: 18px; height: 18px; accent-color: #06c755;"
-                                    />
-                                    <div>
-                                        <strong style="font-size: 0.9rem; color: #0f172a;">
-                                            💬 LINE OA Messaging API (ระบบสำรองเผื่อสร้าง LINE OA ในอนาคต)
-                                        </strong>
-                                        <div style="font-size: 0.8rem; color: #64748b;">
-                                            ระบบเตรียมโค้ดและ Flex Message สำรองไว้เรียบร้อย เมื่อเปิดใช้งานให้กรอก Token ด้านล่าง
-                                        </div>
+                            <!-- ลิงก์ไปยังแท็บ LINE OA -->
+                            <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 10px; padding: 0.9rem 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                                <div>
+                                    <strong style="font-size: 0.92rem; color: #166534; display: flex; align-items: center; gap: 0.4rem;">
+                                        💬 ระบบ LINE Official Account (LINE OA)
+                                    </strong>
+                                    <div style="font-size: 0.8rem; color: #15803d; margin-top: 0.2rem;">
+                                        การตั้งค่า Channel Secret, Token, ข้อความตอบกลับอัตโนมัติ และการแจ้งเตือน ได้ย้ายไปที่แท็บเฉพาะแล้วค่ะ
                                     </div>
-                                </label>
-                                {#if settings.notifications.enableLineOA}
-                                    <div style="margin-top: 0.75rem; margin-left: 1.7rem;">
-                                        <label for="lineOaChannelAccessToken" style="display: block; font-size: 0.82rem; font-weight: 700; color: #334155; margin-bottom: 0.3rem;">
-                                            LINE Channel Access Token (Long-lived):
-                                        </label>
-                                        <input
-                                            id="lineOaChannelAccessToken"
-                                            type="password"
-                                            bind:value={settings.notifications.lineOaChannelAccessToken}
-                                            placeholder="ใส่ Channel Access Token จาก LINE Developers Console"
-                                            style="width: 100%; padding: 0.5rem 0.75rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem;"
-                                        />
-                                    </div>
-                                {/if}
+                                </div>
+                                <button
+                                    type="button"
+                                    onclick={() => { activeTab = 'line_oa'; loadLineUsers(); }}
+                                    style="padding: 0.45rem 0.9rem; background: #166534; color: #ffffff; border: none; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;"
+                                >
+                                    👉 ไปที่เมนู LINE OA
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -4006,6 +4335,603 @@
                     disabled={isSavingSettings}
                 >
                     💾 {isSavingSettings ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่าร้านและปฏิทินทั้งหมด'}
+                </button>
+            </div>
+        </div>
+    {/if}
+
+    <!-- ============================================== -->
+    <!-- 💬 TAB: ระบบจัดการ LINE Official Account (LINE OA) -->
+    <!-- ============================================== -->
+    {#if activeTab === 'line_oa'}
+        <div style="display: flex; flex-direction: column; gap: 1.5rem; text-align: left;">
+            <!-- Header Card & Master Toggle -->
+            <div class="info-card" style="padding: 1.5rem; border: 2px solid #86efac; background: linear-gradient(to bottom right, #f0fdf4, #ffffff);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+                            <span style="background: #06c755; color: #fff; padding: 0.2rem 0.65rem; border-radius: 999px; font-size: 0.82rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.35rem;">
+                                💬 LINE Messaging API
+                            </span>
+                            <span style="font-size: 0.8rem; background: {settings.lineOa.enabled ? '#dcfce7' : '#fee2e2'}; color: {settings.lineOa.enabled ? '#166534' : '#991b1b'}; padding: 0.15rem 0.6rem; border-radius: 999px; font-weight: 700;">
+                                {settings.lineOa.enabled ? '● เปิดใช้งานระบบ' : '○ ปิดการทำงาน'}
+                            </span>
+                        </div>
+                        <h2 style="margin: 0 0 0.35rem 0; font-size: 1.35rem; font-weight: 800; color: #166534;">
+                            ตั้งค่า &amp; จัดการระบบ LINE Official Account
+                        </h2>
+                        <p style="margin: 0; font-size: 0.88rem; color: #475569;">
+                            เชื่อมต่อ LINE Messaging API, ตั้งค่าข้อความตอบกลับอัตโนมัติ (Auto-Replies), จัดการคีย์เวิร์ด และการแจ้งเตือนสถานะออเดอร์
+                        </p>
+                    </div>
+
+                    <label style="display: inline-flex; align-items: center; gap: 0.6rem; cursor: pointer; background: #ffffff; padding: 0.6rem 1rem; border-radius: 999px; border: 1.5px solid #86efac; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.enabled}
+                            style="width: 20px; height: 20px; accent-color: #06c755;"
+                        />
+                        <span style="font-size: 0.92rem; font-weight: 800; color: {settings.lineOa.enabled ? '#166534' : '#64748b'};">
+                            {settings.lineOa.enabled ? 'เปิดระบบ LINE OA' : 'ปิดระบบ LINE OA'}
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- กล่องที่ 1: กุญแจ API & การเชื่อมต่อ Webhook -->
+            <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 1px solid #cbd5e1;">
+                <h3 style="margin: 0 0 0.25rem 0; font-size: 1.15rem; color: #14532d; font-weight: 800;">
+                    🔑 1. ข้อมูลการเชื่อมต่อ LINE Developers Console
+                </h3>
+                <p style="margin: 0 0 1.25rem 0; font-size: 0.85rem; color: #64748b;">
+                    ระบุ Channel Secret, Channel Access Token และนำ Webhook URL ไปใส่ใน LINE Developers Console
+                </p>
+
+                <!-- Webhook URL Display Box -->
+                <div style="background: #f8fafc; border: 1.5px dashed #0284c7; border-radius: 12px; padding: 1.1rem; margin-bottom: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <span style="font-weight: 800; font-size: 0.88rem; color: #0369a1; display: inline-flex; align-items: center; gap: 0.35rem;">
+                            🌐 Webhook URL สำหรับใส่ใน LINE Console:
+                        </span>
+                        <span style="font-size: 0.75rem; background: #e0f2fe; color: #0369a1; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 6px;">
+                            POST /api/line/webhook
+                        </span>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <input
+                            type="text"
+                            readonly
+                            value="https://homematchacafe.store/api/line/webhook"
+                            style="flex: 1; min-width: 260px; padding: 0.6rem 0.85rem; background: #ffffff; border: 1.5px solid #94a3b8; border-radius: 8px; font-family: monospace; font-size: 0.92rem; color: #0f172a; font-weight: 600;"
+                        />
+                        <button
+                            type="button"
+                            onclick={copyWebhookUrl}
+                            style="padding: 0.6rem 1.25rem; background: {webhookCopied ? '#16a34a' : '#0284c7'}; color: #ffffff; border: none; border-radius: 8px; font-weight: 800; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: background 0.2s ease;"
+                        >
+                            {webhookCopied ? '✓ คัดลอกแล้ว!' : '📋 คัดลอก Webhook URL'}
+                        </button>
+                    </div>
+
+                    <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0; font-size: 0.8rem; color: #475569; line-height: 1.6;">
+                        <strong style="color: #0369a1;">📌 วิธีการตั้งค่าใน LINE Developers Console:</strong><br/>
+                        1. ไปที่ <a href="https://developers.line.biz" target="_blank" rel="noopener noreferrer" style="color: #0284c7; font-weight: 700; text-decoration: underline;">LINE Developers Console</a> &gt; เข้าเมนู Channel มัทฉะของคุณ<br/>
+                        2. ไปที่แท็บ <strong>Messaging API</strong> &gt; เลื่อนหาหัวข้อ <strong>Webhook settings</strong><br/>
+                        3. กด <strong>Edit</strong> แล้ววาง Webhook URL ด้านบน &gt; กด <strong>Verify</strong> (ต้องขึ้น Verified)<br/>
+                        4. เปิดสวิตช์ <strong>Use webhook</strong> ให้เป็นสีเขียว
+                    </div>
+                </div>
+
+                <!-- API Credentials Grid -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+                    <!-- Channel Secret -->
+                    <div>
+                        <label for="lineChannelSecret" style="display: block; font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-bottom: 0.35rem;">
+                            Channel Secret:
+                        </label>
+                        <input
+                            id="lineChannelSecret"
+                            type="text"
+                            bind:value={settings.lineOa.channelSecret}
+                            placeholder="เช่น ae1cf62ef3dbe63af73e93dd4b946bb1"
+                            style="width: 100%; padding: 0.6rem 0.8rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.88rem; font-family: monospace;"
+                        />
+                        <span style="font-size: 0.75rem; color: #64748b;">จากแท็บ Basic settings ใช้สำหรับยืนยันความปลอดภัยของ Webhook</span>
+                    </div>
+
+                    <!-- Bot Basic ID -->
+                    <div>
+                        <label for="lineBotBasicId" style="display: block; font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-bottom: 0.35rem;">
+                            Bot Basic ID:
+                        </label>
+                        <input
+                            id="lineBotBasicId"
+                            type="text"
+                            bind:value={settings.lineOa.botBasicId}
+                            placeholder="เช่น @719wvlgi"
+                            style="width: 100%; padding: 0.6rem 0.8rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.88rem; font-weight: 600;"
+                        />
+                        <span style="font-size: 0.75rem; color: #64748b;">ไอดี LINE OA สำหรับให้ลูกค้าแอดเพื่อน</span>
+                    </div>
+
+                    <!-- Admin User ID -->
+                    <div>
+                        <label for="lineAdminUserId" style="display: block; font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-bottom: 0.35rem;">
+                            Admin User ID (สำหรับรับแจ้งเตือน):
+                        </label>
+                        <input
+                            id="lineAdminUserId"
+                            type="text"
+                            bind:value={settings.lineOa.adminLineUserId}
+                            placeholder="เช่น Uc04ed4f079c031e33621c131cec0ca27"
+                            style="width: 100%; padding: 0.6rem 0.8rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.88rem; font-family: monospace;"
+                        />
+                        <span style="font-size: 0.75rem; color: #64748b;">ดูได้จาก "Your user ID" ที่ด้านล่างของแท็บ Basic settings</span>
+                    </div>
+
+                    <!-- Channel Access Token (Long-lived) -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                            <label for="lineChannelToken" style="font-size: 0.85rem; font-weight: 700; color: #1e293b;">
+                                Channel Access Token (Long-lived):
+                            </label>
+                            <button
+                                type="button"
+                                onclick={() => (isLineTokenVisible = !isLineTokenVisible)}
+                                style="background: none; border: none; color: #0284c7; font-size: 0.75rem; font-weight: 700; cursor: pointer; text-decoration: underline;"
+                            >
+                                {isLineTokenVisible ? 'ซ่อน Token' : 'แสดง Token'}
+                            </button>
+                        </div>
+                        <input
+                            id="lineChannelToken"
+                            type={isLineTokenVisible ? 'text' : 'password'}
+                            bind:value={settings.lineOa.channelAccessToken}
+                            placeholder="วาง Channel Access Token ยาวๆ จากแท็บ Messaging API"
+                            style="width: 100%; padding: 0.6rem 0.8rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.88rem; font-family: monospace;"
+                        />
+                        <span style="font-size: 0.75rem; color: #64748b;">กดปุ่ม Issue ในแท็บ Messaging API &gt; Channel access token</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- กล่องที่ 2: ตั้งค่าการแจ้งเตือนสถานะคำสั่งซื้อให้ลูกค้า -->
+            <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 1px solid #cbd5e1;">
+                <h3 style="margin: 0 0 0.25rem 0; font-size: 1.15rem; color: #14532d; font-weight: 800;">
+                    🔔 2. ตั้งค่าการแจ้งเตือนสถานะคำสั่งซื้อให้ลูกค้า
+                </h3>
+                <p style="margin: 0 0 1.25rem 0; font-size: 0.85rem; color: #64748b;">
+                    เลือกว่าต้องการให้ระบบส่งแจ้งเตือน Flex Message ทาง LINE ไปยังลูกค้าในขั้นตอนใดบ้าง
+                </p>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0.85rem;">
+                    <!-- 1. ได้รับคำสั่งซื้อใหม่ -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnOrderCreated}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #1e293b;">🍵 ได้รับคำสั่งซื้อใหม่ (Order Created)</strong>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
+                                ส่งสรุปรายการเครื่องดื่มและยอดรวมเมื่อลูกค้ากดยืนยันสั่งซื้อ
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- 2. อนุมัติสลิป / รับยอด -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnSlipApproved}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #1e293b;">💳 ตรวจสอบสลิป &amp; ยืนยันรับยอดแล้ว</strong>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
+                                แจ้งเตือนเมื่อแอดมินกดตรวจสลิปผ่าน หรือระบบตรวจสอบสลิปสำเร็จ
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- 3. กำลังชง -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnBrewing}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #1e293b;">🍃 บาริสต้าเริ่มชงเครื่องดื่ม</strong>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
+                                แจ้งเตือนเมื่อบาริสต้าเปลี่ยนสถานะเป็น "กำลังชง"
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- 4. ชงเสร็จแล้ว รอจัดส่ง -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnReadyToShip}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #1e293b;">📦 ชงเสร็จแล้ว แพ็กพร้อมส่ง</strong>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
+                                แจ้งเตือนเมื่อเครื่องดื่มพร้อมจัดส่งตามรอบเวลา
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- 5. กำลังนำส่ง -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnDelivering}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #1e293b;">🛵 ไรเดอร์กำลังนำส่งถึงที่</strong>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
+                                แจ้งเตือนให้ลูกค้าเตรียมตัวรับเครื่องดื่ม
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- 6. จัดส่งสำเร็จ -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnCompleted}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #1e293b;">🎉 จัดส่งสำเร็จ &amp; บันทึกแต้มสะสม</strong>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
+                                แจ้งเตือนส่งมอบสำเร็จ พร้อมแสดงแต้มสะสมที่ได้รับ
+                            </div>
+                        </div>
+                    </label>
+
+                    <!-- 7. ยกเลิกออเดอร์ -->
+                    <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid #fee2e2; border-radius: 10px; background: #fff5f5; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.notifyOnCancelled}
+                            style="margin-top: 0.2rem; width: 18px; height: 18px; accent-color: #dc2626;"
+                        />
+                        <div>
+                            <strong style="font-size: 0.9rem; color: #991b1b;">❌ ออเดอร์ถูกยกเลิก (Order Cancelled)</strong>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
+                                แจ้งเตือนลูกค้าเมื่อออเดอร์ถูกยกเลิก
+                            </div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- กล่องที่ 3: แจ้งเตือนแอดมิน & ทดสอบส่งข้อความ -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+                <!-- แจ้งเตือนแอดมิน -->
+                <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 1px solid #cbd5e1;">
+                    <h3 style="margin: 0 0 0.25rem 0; font-size: 1.1rem; color: #14532d; font-weight: 800;">
+                        🚨 3. แจ้งเตือนแอดมินทาง LINE
+                    </h3>
+                    <p style="margin: 0 0 1rem 0; font-size: 0.82rem; color: #64748b;">
+                        ส่งแจ้งเตือนตรงเข้า LINE ส่วนตัวของแอดมิน ({settings.lineOa.adminLineUserId || 'ยังไม่ได้ระบุ'})
+                    </p>
+
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; padding: 0.7rem; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0;">
+                            <input
+                                type="checkbox"
+                                bind:checked={settings.lineOa.notifyAdminOnNewOrder}
+                                style="width: 18px; height: 18px; accent-color: #166534;"
+                            />
+                            <div>
+                                <strong style="font-size: 0.88rem; color: #1e293b;">🔔 แจ้งเตือนเมื่อมีออเดอร์ใหม่</strong>
+                                <div style="font-size: 0.78rem; color: #64748b;">ส่งรายละเอียดคำสั่งซื้อ ยอดชำระ และรอบส่ง</div>
+                            </div>
+                        </label>
+
+                        <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; padding: 0.7rem; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0;">
+                            <input
+                                type="checkbox"
+                                bind:checked={settings.lineOa.notifyAdminOnSlipUploaded}
+                                style="width: 18px; height: 18px; accent-color: #166534;"
+                            />
+                            <div>
+                                <strong style="font-size: 0.88rem; color: #1e293b;">💳 แจ้งเตือนเมื่อมีสลิปแนบใหม่</strong>
+                                <div style="font-size: 0.78rem; color: #64748b;">แจ้งเตือนแอดมินให้รีบตรวจสลิปและรับยอดเงิน</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- ทดสอบส่งข้อความ Push Test -->
+                <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 1.5px dashed #86efac;">
+                    <h3 style="margin: 0 0 0.25rem 0; font-size: 1.1rem; color: #14532d; font-weight: 800;">
+                        🧪 4. ทดสอบส่งข้อความ LINE Push
+                    </h3>
+                    <p style="margin: 0 0 0.85rem 0; font-size: 0.82rem; color: #64748b;">
+                        ทดสอบยิงข้อความ Flex Message ไปยัง LINE แอดมินทันที เพื่อยืนยันว่า Access Token ถูกต้อง
+                    </p>
+
+                    <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+                        <textarea
+                            bind:value={lineTestMessageInput}
+                            rows={3}
+                            placeholder="พิมพ์ข้อความทดสอบ..."
+                            style="width: 100%; padding: 0.6rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; line-height: 1.4;"
+                        ></textarea>
+
+                        <button
+                            type="button"
+                            onclick={sendLineTestPushMessage}
+                            disabled={isSendingLineTest}
+                            style="padding: 0.65rem 1.25rem; background: #166534; color: #ffffff; border: none; border-radius: 8px; font-weight: 800; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;"
+                        >
+                            {#if isSendingLineTest}
+                                <span>⏳ กำลังยิงข้อความ...</span>
+                            {:else}
+                                <span>🚀 ทดสอบส่งเข้า LINE แอดมิน</span>
+                            {/if}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- กล่องที่ 4: การจัดการข้อความอัตโนมัติ (Auto-Replies & Keywords) -->
+            <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 1px solid #cbd5e1;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+                    <div>
+                        <h3 style="margin: 0 0 0.25rem 0; font-size: 1.15rem; color: #14532d; font-weight: 800;">
+                            🤖 5. จัดการข้อความอัตโนมัติ (Auto-Replies &amp; คีย์เวิร์ด)
+                        </h3>
+                        <p style="margin: 0; font-size: 0.85rem; color: #64748b;">
+                            กำหนดคำตอบที่บอทจะตอบกลับลูกค้าอัตโนมัติเมื่อพิมพ์คีย์เวิร์ดต่างๆ เข้ามา
+                        </p>
+                    </div>
+
+                    <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.lineOa.autoReplyEnabled}
+                            style="width: 18px; height: 18px; accent-color: #166534;"
+                        />
+                        <span style="font-size: 0.9rem; font-weight: 700; color: #1e293b;">
+                            เปิดระบบตอบกลับอัตโนมัติ
+                        </span>
+                    </label>
+                </div>
+
+                <!-- ข้อความต้อนรับ & Fallback -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div>
+                        <label for="lineWelcomeMsg" style="display: block; font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-bottom: 0.35rem;">
+                            ข้อความต้อนรับเมื่อแอดเพื่อนใหม่ (Welcome Message):
+                        </label>
+                        <textarea
+                            id="lineWelcomeMsg"
+                            bind:value={settings.lineOa.welcomeMessage}
+                            rows={4}
+                            placeholder="ข้อความทักทายเมื่อลูกค้าเพิ่ม LINE OA เป็นเพื่อนครั้งแรก..."
+                            style="width: 100%; padding: 0.6rem 0.75rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; line-height: 1.5;"
+                        ></textarea>
+                    </div>
+
+                    <div>
+                        <label for="lineDefaultMsg" style="display: block; font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-bottom: 0.35rem;">
+                            ข้อความตอบกลับเริ่มต้นเมื่อไม่ตรงกับคีย์เวิร์ด (Fallback Reply):
+                        </label>
+                        <textarea
+                            id="lineDefaultMsg"
+                            bind:value={settings.lineOa.defaultReplyMessage}
+                            rows={4}
+                            placeholder="ข้อความที่จะตอบเมื่อลูกค้าพิมพ์คำที่ไม่ตรงกับคีย์เวิร์ดใดๆ..."
+                            style="width: 100%; padding: 0.6rem 0.75rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; line-height: 1.5;"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <!-- ตารางคีย์เวิร์ดตอบกลับ -->
+                <div style="border-top: 1px solid #e2e8f0; padding-top: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
+                        <div>
+                            <h4 style="margin: 0; font-size: 1rem; color: #1e293b; font-weight: 800;">
+                                📋 รายการคีย์เวิร์ดตอบกลับ ({settings.lineOa.keywordReplies?.length || 0} รายการ)
+                            </h4>
+                            <span style="font-size: 0.8rem; color: #64748b;">
+                                หากลูกค้าพิมพ์เบอร์โทรศัพท์ 10 หลัก ระบบจะทำการผูกเบอร์เข้ากับบัญชีสมาชิกโดยอัตโนมัติ
+                            </span>
+                        </div>
+
+                        <button
+                            type="button"
+                            onclick={openAddKeywordModal}
+                            class="btn-matcha-primary"
+                            style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem;"
+                        >
+                            ➕ เพิ่มคีย์เวิร์ดใหม่
+                        </button>
+                    </div>
+
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+                            <thead>
+                                <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1; text-align: left;">
+                                    <th style="padding: 0.75rem 1rem; color: #334155;">คีย์เวิร์ด (คำที่พิมพ์)</th>
+                                    <th style="padding: 0.75rem 1rem; color: #334155;">เงื่อนไข</th>
+                                    <th style="padding: 0.75rem 1rem; color: #334155;">รูปแบบการตอบกลับ</th>
+                                    <th style="padding: 0.75rem 1rem; color: #334155;">ตัวอย่างข้อความ</th>
+                                    <th style="padding: 0.75rem 1rem; text-align: center; color: #334155;">สถานะ</th>
+                                    <th style="padding: 0.75rem 1rem; text-align: right; color: #334155;">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each settings.lineOa.keywordReplies || [] as kw (kw.id)}
+                                    <tr style="border-bottom: 1px solid #e2e8f0; background: {kw.enabled ? '#ffffff' : '#f8fafc'};">
+                                        <td style="padding: 0.75rem 1rem; font-weight: 700; color: #166534;">
+                                            "{kw.keyword}"
+                                        </td>
+                                        <td style="padding: 0.75rem 1rem; color: #64748b; font-size: 0.82rem;">
+                                            {kw.matchType === 'exact' ? 'ตรงกันทุกคำ (Exact)' : 'มีคำนี้อยู่ (Contains)'}
+                                        </td>
+                                        <td style="padding: 0.75rem 1rem;">
+                                            {#if kw.replyType === 'flex_menu'}
+                                                <span style="background: #dcfce7; color: #166534; padding: 0.15rem 0.5rem; border-radius: 6px; font-size: 0.78rem; font-weight: 700;">
+                                                    🍵 การ์ดเมนู Flex
+                                                </span>
+                                            {:else if kw.replyType === 'flex_status'}
+                                                <span style="background: #e0f2fe; color: #0369a1; padding: 0.15rem 0.5rem; border-radius: 6px; font-size: 0.78rem; font-weight: 700;">
+                                                    🔍 การ์ดสถานะ Flex
+                                                </span>
+                                            {:else if kw.replyType === 'flex_loyalty'}
+                                                <span style="background: #fef3c7; color: #b45309; padding: 0.15rem 0.5rem; border-radius: 6px; font-size: 0.78rem; font-weight: 700;">
+                                                    ⭐ การ์ดแต้ม Flex
+                                                </span>
+                                            {:else}
+                                                <span style="background: #f1f5f9; color: #475569; padding: 0.15rem 0.5rem; border-radius: 6px; font-size: 0.78rem;">
+                                                    💬 ข้อความ
+                                                </span>
+                                            {/if}
+                                        </td>
+                                        <td style="padding: 0.75rem 1rem; color: #475569; font-size: 0.82rem; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                            {kw.replyText || '-'}
+                                        </td>
+                                        <td style="padding: 0.75rem 1rem; text-align: center;">
+                                            <input
+                                                type="checkbox"
+                                                bind:checked={kw.enabled}
+                                                onchange={saveAllSettings}
+                                                style="width: 18px; height: 18px; accent-color: #166534;"
+                                            />
+                                        </td>
+                                        <td style="padding: 0.75rem 1rem; text-align: right; white-space: nowrap;">
+                                            <button
+                                                type="button"
+                                                onclick={() => openEditKeywordModal(kw)}
+                                                style="padding: 0.3rem 0.6rem; background: #e0f2fe; color: #0284c7; border: none; border-radius: 6px; font-weight: 700; font-size: 0.78rem; cursor: pointer; margin-right: 0.35rem;"
+                                            >
+                                                ✏️ แก้ไข
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onclick={() => deleteKeyword(kw.id)}
+                                                style="padding: 0.3rem 0.6rem; background: #fee2e2; color: #dc2626; border: none; border-radius: 6px; font-weight: 700; font-size: 0.78rem; cursor: pointer;"
+                                            >
+                                                🗑️ ลบ
+                                            </button>
+                                        </td>
+                                    </tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- กล่องที่ 5: บัญชี LINE ที่เชื่อมต่อแล้ว (Connected LINE Users) -->
+            <div class="info-card" style="padding: 1.5rem; background: #ffffff; border: 1px solid #cbd5e1;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
+                    <div>
+                        <h3 style="margin: 0 0 0.25rem 0; font-size: 1.15rem; color: #14532d; font-weight: 800;">
+                            👥 6. บัญชี LINE ที่เชื่อมต่อแล้ว ({lineUsersList.length} บัญชี)
+                        </h3>
+                        <p style="margin: 0; font-size: 0.85rem; color: #64748b;">
+                            ลูกค้าที่ได้กดเพิ่มเพื่อนกับ LINE OA หรือพิมพ์เบอร์โทรศัพท์เพื่อผูกรับการแจ้งเตือน
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onclick={loadLineUsers}
+                        disabled={isLoadingLineUsers}
+                        class="btn-matcha-outline"
+                        style="padding: 0.45rem 0.9rem; font-size: 0.82rem;"
+                    >
+                        🔄 {isLoadingLineUsers ? 'กำลังโหลด...' : 'รีเฟรชรายชื่อ'}
+                    </button>
+                </div>
+
+                {#if lineUsersList.length === 0}
+                    <div style="text-align: center; padding: 2rem; color: #94a3b8; font-size: 0.88rem; background: #f8fafc; border-radius: 10px;">
+                        ยังไม่มีผู้ใช้ LINE เชื่อมต่อเข้ามาค่ะ เมื่อมีลูกค้าแอด LINE OA รายชื่อจะปรากฏที่นี่อัตโนมัติ 🍵
+                    </div>
+                {:else}
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                            <thead>
+                                <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1; text-align: left;">
+                                    <th style="padding: 0.65rem 0.85rem; color: #334155;">ผู้ใช้ LINE</th>
+                                    <th style="padding: 0.65rem 0.85rem; color: #334155;">LINE User ID</th>
+                                    <th style="padding: 0.65rem 0.85rem; color: #334155;">เบอร์โทรศัพท์</th>
+                                    <th style="padding: 0.65rem 0.85rem; color: #334155;">สมาชิกในระบบ</th>
+                                    <th style="padding: 0.65rem 0.85rem; color: #334155;">แต้มสะสม</th>
+                                    <th style="padding: 0.65rem 0.85rem; text-align: right; color: #334155;">เชื่อมต่อเมื่อ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each lineUsersList as u (u.line_user_id)}
+                                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                                        <td style="padding: 0.65rem 0.85rem;">
+                                            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                                {#if u.picture_url}
+                                                    <img
+                                                        src={u.picture_url}
+                                                        alt={u.display_name}
+                                                        style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;"
+                                                    />
+                                                {:else}
+                                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: #06c755; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.75rem;">
+                                                        LINE
+                                                    </div>
+                                                {/if}
+                                                <strong style="color: #1e293b;">{u.display_name || 'ไม่ระบุชื่อ'}</strong>
+                                            </div>
+                                        </td>
+                                        <td style="padding: 0.65rem 0.85rem; font-family: monospace; font-size: 0.78rem; color: #64748b;">
+                                            {u.line_user_id.slice(0, 10)}...{u.line_user_id.slice(-6)}
+                                        </td>
+                                        <td style="padding: 0.65rem 0.85rem; font-weight: 700; color: #166534;">
+                                            {u.phone || '-'}
+                                        </td>
+                                        <td style="padding: 0.65rem 0.85rem; color: #334155;">
+                                            {u.member_name || (u.phone ? 'ไม่ได้สมัครสมาชิก' : 'ยังไม่ผูกเบอร์')}
+                                        </td>
+                                        <td style="padding: 0.65rem 0.85rem;">
+                                            {#if u.member_stamps !== null && u.member_stamps !== undefined}
+                                                <span style="background: #fef3c7; color: #b45309; padding: 0.15rem 0.5rem; border-radius: 999px; font-weight: 800; font-size: 0.78rem;">
+                                                    ⭐ {u.member_stamps} ดวง
+                                                </span>
+                                            {:else}
+                                                <span style="color: #94a3b8;">-</span>
+                                            {/if}
+                                        </td>
+                                        <td style="padding: 0.65rem 0.85rem; text-align: right; color: #64748b; font-size: 0.78rem;">
+                                            {formatTime(u.updated_at || u.created_at)}
+                                        </td>
+                                    </tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                {/if}
+            </div>
+
+            <!-- ปุ่มบันทึกการตั้งค่า LINE OA ทั้งหมด (Sticky Bottom) -->
+            <div style="position: sticky; bottom: 1.5rem; z-index: 1000; width: 100%; display: flex; justify-content: flex-end;">
+                <button 
+                    type="button" 
+                    onclick={saveAllSettings} 
+                    class="btn-matcha-primary" 
+                    style="padding: 1rem 2.5rem; font-size: 1.15rem; font-weight: 800; border-radius: 999px; box-shadow: 0 10px 30px rgba(52, 84, 39, 0.4);"
+                    disabled={isSavingSettings}
+                >
+                    💾 {isSavingSettings ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่า LINE OA ทั้งหมด'}
                 </button>
             </div>
         </div>

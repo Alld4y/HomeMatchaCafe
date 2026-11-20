@@ -170,8 +170,24 @@ export async function ensurePgSchema(): Promise<void> {
                 CREATE INDEX IF NOT EXISTS idx_push_subs_phone ON public.push_subscriptions(phone);
             `);
 
+            // 7. สร้างตาราง public.line_users และเพิ่มฟิลด์ line_user_id สำหรับระบบ LINE OA
+            await pool.query(`
+                ALTER TABLE public.members ADD COLUMN IF NOT EXISTS line_user_id TEXT;
+                ALTER TABLE public."order" ADD COLUMN IF NOT EXISTS line_user_id TEXT;
+
+                CREATE TABLE IF NOT EXISTS public.line_users (
+                    line_user_id TEXT PRIMARY KEY,
+                    display_name TEXT,
+                    picture_url TEXT,
+                    phone TEXT,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                );
+                CREATE INDEX IF NOT EXISTS idx_line_users_phone ON public.line_users(phone);
+            `);
+
             schemaInitialized = true;
-            console.log('✅ PostgreSQL connected & all tables verified (order, store_settings, members, menu_categories, menu_items, push_subscriptions)');
+            console.log('✅ PostgreSQL connected & all tables verified (order, store_settings, members, menu_categories, menu_items, push_subscriptions, line_users)');
         } catch (err) {
             schemaInitPromise = null;
             console.error('❌ Error initializing PostgreSQL schema:', err);

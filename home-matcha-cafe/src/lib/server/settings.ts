@@ -29,6 +29,42 @@ export interface NotificationSettings {
     lineOaChannelSecret?: string;
 }
 
+export interface LineOaKeywordReply {
+    id: string;
+    keyword: string;
+    matchType: 'exact' | 'contains';
+    replyType: 'text' | 'flex_menu' | 'flex_status' | 'flex_loyalty';
+    replyText?: string;
+    enabled: boolean;
+}
+
+export interface LineOaSettings {
+    enabled: boolean;
+    channelSecret: string;
+    channelAccessToken: string;
+    botBasicId: string;
+    adminLineUserId: string;
+
+    // Auto replies
+    autoReplyEnabled: boolean;
+    welcomeMessage: string;
+    defaultReplyMessage: string;
+    keywordReplies: LineOaKeywordReply[];
+
+    // Customer Notification Events
+    notifyOnOrderCreated: boolean;
+    notifyOnSlipApproved: boolean;
+    notifyOnBrewing: boolean;
+    notifyOnReadyToShip: boolean;
+    notifyOnDelivering: boolean;
+    notifyOnCompleted: boolean;
+    notifyOnCancelled: boolean;
+
+    // Admin Notification Events
+    notifyAdminOnNewOrder: boolean;
+    notifyAdminOnSlipUploaded: boolean;
+}
+
 export interface StoreSettings {
     isMasterOpen: boolean;
     closedAlertMessage: string;
@@ -45,6 +81,7 @@ export interface StoreSettings {
     loyaltyExpireDays: number;
     loyaltyRedeemableItemIds: string[];
     notifications?: NotificationSettings;
+    lineOa: LineOaSettings;
 }
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
@@ -85,9 +122,70 @@ const DEFAULT_SETTINGS: StoreSettings = {
         notifyOnDelivering: true,
         notifyOnCompleted: true,
         enableWebPush: true,
-        enableLineOA: false,
+        enableLineOA: true,
         lineOaChannelAccessToken: '',
-        lineOaChannelSecret: ''
+        lineOaChannelSecret: 'ae1cf62ef3dbe63af73e93dd4b946bb1'
+    },
+    lineOa: {
+        enabled: true,
+        channelSecret: 'ae1cf62ef3dbe63af73e93dd4b946bb1',
+        channelAccessToken: '',
+        botBasicId: '@719wvlgi',
+        adminLineUserId: 'Uc04ed4f079c031e33621c131cec0ca27',
+        autoReplyEnabled: true,
+        welcomeMessage: 'ยินดีต้อนรับสู่ Home Matcha Cafe 🍵✨\nคุณสามารถพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อรับแจ้งเตือนสถานะออเดอร์ หรือพิมพ์ "เมนู" เพื่อดูรายการเครื่องดื่มได้เลยค่ะ',
+        defaultReplyMessage: 'ขออภัยค่ะ หากต้องการดูรายการเครื่องดื่ม พิมพ์ "เมนู" หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อระบบสมาชิกและรับแจ้งเตือนสถานะออเดอร์นะคะ 🍵',
+        keywordReplies: [
+            {
+                id: 'kw-1',
+                keyword: 'เมนู',
+                matchType: 'exact',
+                replyType: 'flex_menu',
+                replyText: 'รายการเครื่องดื่ม Home Matcha Cafe',
+                enabled: true
+            },
+            {
+                id: 'kw-2',
+                keyword: 'สั่งซื้อ',
+                matchType: 'contains',
+                replyType: 'flex_menu',
+                replyText: 'สั่งซื้อเครื่องดื่มได้ที่ https://homematchacafe.store',
+                enabled: true
+            },
+            {
+                id: 'kw-3',
+                keyword: 'สถานะ',
+                matchType: 'contains',
+                replyType: 'flex_status',
+                replyText: 'ตรวจสอบสถานะออเดอร์ของคุณ',
+                enabled: true
+            },
+            {
+                id: 'kw-4',
+                keyword: 'แต้ม',
+                matchType: 'contains',
+                replyType: 'flex_loyalty',
+                replyText: 'ตรวจสอบคะแนนสะสมและแลกแก้วฟรี',
+                enabled: true
+            },
+            {
+                id: 'kw-5',
+                keyword: 'เวลาส่ง',
+                matchType: 'contains',
+                replyType: 'text',
+                replyText: '🍵 รอบจัดส่งของร้าน Home Matcha Cafe:\n- รอบเช้า: 07:00–08:00 น.\n- รอบเที่ยง: 12:30–13:00 น.\n(วันหยุดเสาร์-อาทิตย์ รอบรวม 09:00–13:00 น.)',
+                enabled: true
+            }
+        ],
+        notifyOnOrderCreated: true,
+        notifyOnSlipApproved: true,
+        notifyOnBrewing: true,
+        notifyOnReadyToShip: true,
+        notifyOnDelivering: true,
+        notifyOnCompleted: true,
+        notifyOnCancelled: true,
+        notifyAdminOnNewOrder: true,
+        notifyAdminOnSlipUploaded: true
     },
     deliveryRounds: [
         {
@@ -167,6 +265,24 @@ function normalizeSettings(parsed: any): StoreSettings {
         return { ...r, allowFermented: true };
     });
 
+    const defaultLineOa = DEFAULT_SETTINGS.lineOa;
+    const parsedLineOa = parsed?.lineOa || {};
+
+    const lineOaSecret = String(parsedLineOa.channelSecret || parsed?.notifications?.lineOaChannelSecret || defaultLineOa.channelSecret).trim();
+    const lineOaToken = String(parsedLineOa.channelAccessToken || parsed?.notifications?.lineOaChannelAccessToken || '').trim();
+    const lineOaEnabled = parsedLineOa.enabled !== undefined ? Boolean(parsedLineOa.enabled) : (parsed?.notifications?.enableLineOA !== undefined ? Boolean(parsed.notifications.enableLineOA) : true);
+
+    const keywordReplies: LineOaKeywordReply[] = Array.isArray(parsedLineOa.keywordReplies) && parsedLineOa.keywordReplies.length > 0
+        ? parsedLineOa.keywordReplies.map((k: any, idx: number) => ({
+            id: String(k.id || `kw-${idx + 1}`),
+            keyword: String(k.keyword || '').trim(),
+            matchType: k.matchType === 'exact' ? 'exact' : 'contains',
+            replyType: ['text', 'flex_menu', 'flex_status', 'flex_loyalty'].includes(k.replyType) ? k.replyType : 'text',
+            replyText: String(k.replyText || ''),
+            enabled: k.enabled !== false
+        })).filter((k: LineOaKeywordReply) => k.keyword.length > 0)
+        : defaultLineOa.keywordReplies;
+
     return {
         ...DEFAULT_SETTINGS,
         ...(parsed || {}),
@@ -183,9 +299,29 @@ function normalizeSettings(parsed: any): StoreSettings {
             notifyOnDelivering: parsed?.notifications?.notifyOnDelivering !== false,
             notifyOnCompleted: parsed?.notifications?.notifyOnCompleted !== false,
             enableWebPush: parsed?.notifications?.enableWebPush !== false,
-            enableLineOA: Boolean(parsed?.notifications?.enableLineOA),
-            lineOaChannelAccessToken: String(parsed?.notifications?.lineOaChannelAccessToken || '').trim(),
-            lineOaChannelSecret: String(parsed?.notifications?.lineOaChannelSecret || '').trim()
+            enableLineOA: lineOaEnabled,
+            lineOaChannelAccessToken: lineOaToken,
+            lineOaChannelSecret: lineOaSecret
+        },
+        lineOa: {
+            enabled: lineOaEnabled,
+            channelSecret: lineOaSecret,
+            channelAccessToken: lineOaToken,
+            botBasicId: String(parsedLineOa.botBasicId || defaultLineOa.botBasicId).trim(),
+            adminLineUserId: String(parsedLineOa.adminLineUserId || defaultLineOa.adminLineUserId).trim(),
+            autoReplyEnabled: parsedLineOa.autoReplyEnabled !== false,
+            welcomeMessage: typeof parsedLineOa.welcomeMessage === 'string' ? parsedLineOa.welcomeMessage : defaultLineOa.welcomeMessage,
+            defaultReplyMessage: typeof parsedLineOa.defaultReplyMessage === 'string' ? parsedLineOa.defaultReplyMessage : defaultLineOa.defaultReplyMessage,
+            keywordReplies,
+            notifyOnOrderCreated: parsedLineOa.notifyOnOrderCreated !== false,
+            notifyOnSlipApproved: parsedLineOa.notifyOnSlipApproved !== false,
+            notifyOnBrewing: parsedLineOa.notifyOnBrewing !== false,
+            notifyOnReadyToShip: parsedLineOa.notifyOnReadyToShip !== false,
+            notifyOnDelivering: parsedLineOa.notifyOnDelivering !== false,
+            notifyOnCompleted: parsedLineOa.notifyOnCompleted !== false,
+            notifyOnCancelled: parsedLineOa.notifyOnCancelled !== false,
+            notifyAdminOnNewOrder: parsedLineOa.notifyAdminOnNewOrder !== false,
+            notifyAdminOnSlipUploaded: parsedLineOa.notifyAdminOnSlipUploaded !== false
         },
         deliveryRounds: rounds,
         calendar: parsed?.calendar || {}
