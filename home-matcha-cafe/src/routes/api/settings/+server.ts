@@ -1,13 +1,15 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getStoreSettings, updateStoreSettings, getNext7DaysSchedule } from '$lib/server/settings';
+import { getStoreSettings, updateStoreSettings, getNext7DaysSchedule, parseAdminPhones } from '$lib/server/settings';
 
 export const GET: RequestHandler = async () => {
     try {
         const schedule = await getNext7DaysSchedule();
+        const adminPhones = parseAdminPhones(schedule.settings?.lineOa?.adminPhone);
         return json({
             success: true,
             settings: schedule.settings,
+            adminPhones,
             days: schedule.days,
             storeStatus: schedule.storeStatus,
             storeStatusBadgeText: schedule.storeStatusBadgeText,

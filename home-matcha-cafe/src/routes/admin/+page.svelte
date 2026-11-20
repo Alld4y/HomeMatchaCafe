@@ -5190,7 +5190,38 @@
                 </div>
             </div>
 
-            <!-- 3. ตั้งค่าระยะเวลาการสั่งล่วงหน้า (Max Advance Booking) & ปิดร้านอัตโนมัติ -->
+            <!-- 3. เบอร์โทรศัพท์แอดมินที่ได้รับสิทธิ์ (Admin Phone Numbers) -->
+            <div class="form-card" style="padding: 1.5rem; text-align: left; background: #ffffff; border: 1.5px solid var(--border-matcha); border-radius: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem;">
+                    <div>
+                        <h3 style="margin: 0 0 0.25rem 0; font-size: 1.25rem; color: var(--matcha-deep);">
+                            👑 เบอร์โทรศัพท์แอดมินที่ได้รับสิทธิ์ (Admin Phone Numbers)
+                        </h3>
+                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted); line-height: 1.45;">
+                            กำหนดเบอร์สมาชิกที่จะมองเห็นแถบ Admin ในหน้าเว็บ และมีปุ่มเข้าหน้าจัดการร้านในหน้า Profile (คั่นด้วยจุลภาค <code>,</code>)
+                        </p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 0.75rem;">
+                    <label for="adminAccessPhones" style="font-size: 0.85rem; font-weight: 700; color: #1e293b; display: block; margin-bottom: 0.35rem;">
+                        เบอร์โทรศัพท์แอดมิน (สามารถลงทะเบียนเพิ่มได้หลายเบอร์):
+                    </label>
+                    <input
+                        id="adminAccessPhones"
+                        type="text"
+                        class="form-input"
+                        bind:value={settings.lineOa.adminPhone}
+                        placeholder="เช่น 0641163533, 0966514809"
+                        style="font-weight: 700; font-size: 0.95rem; letter-spacing: 0.3px;"
+                    />
+                    <p style="margin: 0.35rem 0 0 0; font-size: 0.78rem; color: #64748b;">
+                        💡 เบอร์ที่ระบุที่นี่จะได้รับสิทธิ์มองเห็นแถบ Admin ในหน้าเว็บ, มีปุ่ม Admin ในโปรไฟล์ และใช้รับแจ้งเตือนออเดอร์ใน LINE ด้วยค่ะ
+                    </p>
+                </div>
+            </div>
+
+            <!-- 4. ตั้งค่าระยะเวลาการสั่งล่วงหน้า (Max Advance Booking) & ปิดร้านอัตโนมัติ -->
             <div class="form-card" style="padding: 1.5rem; text-align: left; background: #ffffff; border: 1.5px solid var(--border-matcha); border-radius: 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem;">
                     <div>

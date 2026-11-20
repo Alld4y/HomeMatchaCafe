@@ -156,7 +156,7 @@ const DEFAULT_SETTINGS: StoreSettings = {
         channelAccessToken: '',
         botBasicId: '@719wvlgi',
         adminLineUserId: 'Uc04ed4f079c031e33621c131cec0ca27',
-        adminPhone: '',
+        adminPhone: '0641163533, 0966514809',
         autoReplyEnabled: true,
         welcomeMessage: 'ยินดีต้อนรับสู่ Home Matcha Cafe 🍵✨\nคุณสามารถพิมพ์ "เมนู" เพื่อดูรายการเครื่องดื่ม, "สถานะ" เพื่อติดตามออเดอร์, "แต้ม" เพื่อเช็คคะแนนสะสม หรือพิมพ์เบอร์โทรศัพท์ 10 หลัก เพื่อเชื่อมต่อรับแจ้งเตือนได้เลยค่ะ',
         useCustomWelcomeCard: false,
@@ -262,6 +262,24 @@ export function formatDateKey(d: Date): string {
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
+}
+
+export function parseAdminPhones(adminPhoneStr?: string): string[] {
+    const raw = (adminPhoneStr && adminPhoneStr.trim()) ? adminPhoneStr : '0641163533, 0966514809';
+    const phones = raw
+        .split(/[,;\s\n]+/)
+        .map(p => p.replace(/[^0-9]/g, ''))
+        .filter(p => p.length >= 9);
+    if (!phones.includes('0641163533')) phones.push('0641163533');
+    if (!phones.includes('0966514809')) phones.push('0966514809');
+    return phones;
+}
+
+export function isPhoneAdmin(phone?: string, adminPhoneStr?: string): boolean {
+    if (!phone) return false;
+    const clean = phone.replace(/[^0-9]/g, '');
+    const adminPhones = parseAdminPhones(adminPhoneStr);
+    return adminPhones.includes(clean);
 }
 
 function buildInitialSettings(): StoreSettings {

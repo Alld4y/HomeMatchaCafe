@@ -52,6 +52,18 @@
         expireDays: 60
     });
 
+    // 👑 สิทธิ์แอดมิน (แสดงแถบแอดมินและปุ่ม Admin Dashboard เฉพาะเบอร์แอดมินที่ลงทะเบียน)
+    const DEFAULT_ADMIN_PHONES = ['0641163533', '0966514809'];
+    let adminPhonesList = $state<string[]>(DEFAULT_ADMIN_PHONES);
+    let serverIsAdmin = $state<boolean | null>(null);
+
+    let isCurrentMemberAdmin = $derived.by(() => {
+        if (!currentMember || !currentMember.phone) return false;
+        if (serverIsAdmin !== null) return serverIsAdmin;
+        const clean = currentMember.phone.replace(/[^0-9]/g, '');
+        return adminPhonesList.some(p => p.replace(/[^0-9]/g, '') === clean);
+    });
+
     // Modal สมัครสมาชิก / ล็อกอิน / PIN Numpad / เมนูสมาชิก
     let showMemberAuthModal = $state(false);
     let authModalCloseCallback: (() => void) | null = null;
@@ -257,6 +269,9 @@
                 if (res.ok) {
                     const data = await res.json();
                     if (data.loyaltySettings) loyaltySettings = data.loyaltySettings;
+                    if (Array.isArray(data.adminPhones)) {
+                        adminPhonesList = Array.from(new Set([...DEFAULT_ADMIN_PHONES, ...data.adminPhones]));
+                    }
                 }
             }
         } catch (e) {
@@ -273,6 +288,12 @@
                 const data = await res.json();
                 if (data.loyaltySettings) {
                     loyaltySettings = data.loyaltySettings;
+                }
+                if (Array.isArray(data.adminPhones)) {
+                    adminPhonesList = Array.from(new Set([...DEFAULT_ADMIN_PHONES, ...data.adminPhones]));
+                }
+                if (typeof data.isAdmin === 'boolean') {
+                    serverIsAdmin = data.isAdmin;
                 }
                 if (data.member) {
                     // ป้องกันกระพริบ: เช็กก่อนว่ามีข้อมูลเปลี่ยนจริงหรือไม่ ถ้าเหมือนเดิมไม่ต้อง re-assign currentMember
@@ -476,6 +497,7 @@
 
     function handleMemberLogout() {
         currentMember = null;
+        serverIsAdmin = false;
         localStorage.removeItem('hmc_member');
         showMemberQuickModal = false;
         swal.fire({
@@ -768,14 +790,16 @@
                 <a href="/loyalty" class="nav-link {page.url.pathname === '/loyalty' ? 'active' : ''}">บัตรสะสมแต้ม</a>
             {/if}
             <a href="/success" class="nav-link {page.url.pathname === '/success' ? 'active' : ''}">ประวัติคำสั่งซื้อ</a>
-            <a href="/admin" class="nav-link {page.url.pathname === '/admin' ? 'active' : ''}" style="display: inline-flex; align-items: center; gap: 0.35rem;">
-                <span>Admin</span>
-                {#if adminPendingReviewCount > 0}
-                    <span style="background: #d97706; color: #ffffff; font-size: 0.7rem; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 999px; line-height: 1.2;">
-                        🔔 {adminPendingReviewCount}
-                    </span>
-                {/if}
-            </a>
+            {#if isCurrentMemberAdmin}
+                <a href="/admin" class="nav-link {page.url.pathname === '/admin' ? 'active' : ''}" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <span>Admin</span>
+                    {#if adminPendingReviewCount > 0}
+                        <span style="background: #d97706; color: #ffffff; font-size: 0.7rem; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 999px; line-height: 1.2;">
+                            🔔 {adminPendingReviewCount}
+                        </span>
+                    {/if}
+                </a>
+            {/if}
             {#if !isStandalone && !isLineBrowser}
                 <button type="button" class="nav-install-chip" onclick={handleInstallPwa} title="ติดตั้งแอปพลิเคชัน">
                     📲 ติดตั้งแอป
@@ -986,7 +1010,11 @@
                             <div class="profile-header-info">
                                 <div class="profile-header-name">
                                     คุณ {currentMember.fullName}
-                                    <span class="profile-badge-pill">สมาชิก</span>
+                                    {#if isCurrentMemberAdmin}
+                                        <span class="profile-badge-pill" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a;">👑 แอดมิน</span>
+                                    {:else}
+                                        <span class="profile-badge-pill">สมาชิก</span>
+                                    {/if}
                                 </div>
                                 <div class="profile-header-phone">
                                     📱 {currentMember.phone}
@@ -1023,6 +1051,25 @@
 
                         <!-- Actions Stack -->
                         <div class="profile-actions-stack">
+                            {#if isCurrentMemberAdmin}
+                                <button
+                                    type="button"
+                                    class="btn-admin-access"
+                                    style="width: 100%; padding: 0.75rem 1rem; font-size: 0.92rem; font-weight: 700; border-radius: 12px; background: linear-gradient(135deg, #1e293b, #0f172a); color: #ffffff; border: 1px solid #334155; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25); transition: all 0.15s ease;"
+                                    onclick={() => {
+                                        showMemberQuickModal = false;
+                                        goto('/admin');
+                                    }}
+                                >
+                                    <span>🛠️ เข้าสู่ระบบแอดมิน (Admin Dashboard)</span>
+                                    {#if adminPendingReviewCount > 0}
+                                        <span style="background: #d97706; color: #ffffff; font-size: 0.72rem; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 999px; line-height: 1.2;">
+                                            🔔 {adminPendingReviewCount}
+                                        </span>
+                                    {/if}
+                                </button>
+                            {/if}
+
                             <button
                                 type="button"
                                 class="btn-matcha-primary"
@@ -1087,7 +1134,11 @@
                             <div class="profile-header-info">
                                 <div class="profile-header-name">
                                     คุณ {currentMember.fullName}
-                                    <span class="profile-badge-pill">สมาชิก</span>
+                                    {#if isCurrentMemberAdmin}
+                                        <span class="profile-badge-pill" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a;">👑 แอดมิน</span>
+                                    {:else}
+                                        <span class="profile-badge-pill">สมาชิก</span>
+                                    {/if}
                                 </div>
                                 <div class="profile-header-phone">
                                     📱 {currentMember.phone}

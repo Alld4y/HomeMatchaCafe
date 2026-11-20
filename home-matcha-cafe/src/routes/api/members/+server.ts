@@ -10,7 +10,7 @@ import {
     deleteMemberByAdmin,
     updateMemberProfile
 } from '$lib/server/members';
-import { getStoreSettings } from '$lib/server/settings';
+import { getStoreSettings, parseAdminPhones, isPhoneAdmin } from '$lib/server/settings';
 import { getLineUserIdByPhone, sendCustomerNotification } from '$lib/server/notifications';
 import { pool } from '$lib/server/pgPool';
 
@@ -18,13 +18,18 @@ export const GET: RequestHandler = async ({ url }) => {
     try {
         const phone = url.searchParams.get('phone');
         const settings = await getStoreSettings();
+        const adminPhoneStr = settings.lineOa?.adminPhone || '0641163533, 0966514809';
+        const adminPhones = parseAdminPhones(adminPhoneStr);
 
         if (phone) {
             const member = await getMemberByPhone(phone);
+            const isAdmin = isPhoneAdmin(phone, adminPhoneStr);
             return json({
                 success: true,
                 exists: Boolean(member),
                 member,
+                isAdmin,
+                adminPhones,
                 loyaltySettings: {
                     enabled: settings.loyaltyEnabled !== false,
                     stampsRequired: Number(settings.loyaltyStampsRequired) || 10,
