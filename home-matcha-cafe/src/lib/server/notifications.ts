@@ -808,11 +808,14 @@ export async function notifyAdminLine(params: {
     eventType: 'new_order' | 'slip_uploaded';
     orderCode: string;
     customerName: string;
+    memberName?: string;
     phone: string;
     totalPrice: number;
     itemsSummary?: string;
     deliveryDate?: string;
     deliveryRound?: string;
+    reviewReason?: string;
+    slipImageUrl?: string;
 }): Promise<boolean> {
     const settings = await getStoreSettings();
     const lineOa = settings.lineOa;
@@ -833,8 +836,12 @@ export async function notifyAdminLine(params: {
         return false;
     }
 
-    const title = params.eventType === 'new_order' ? '🍵 มีออเดอร์ใหม่เข้ามา!' : '💳 ลูกค้าแนบสลิปใหม่!';
+    const title = params.eventType === 'new_order' ? '🍵 มีออเดอร์ใหม่เข้ามา!' : '💳 ลูกค้าส่งสลิป (รอแอดมินตรวจ)!';
     const altText = `${title} ออเดอร์ #${params.orderCode} (฿${params.totalPrice})`;
+
+    const customerDisplayText = (params.memberName && params.memberName.trim() !== params.customerName.trim())
+        ? `${params.customerName} (สมาชิก: ${params.memberName})`
+        : params.customerName;
 
     const bubble: any = {
         type: 'bubble',
@@ -880,7 +887,7 @@ export async function notifyAdminLine(params: {
                     margin: 'xs',
                     contents: [
                         { type: 'text', text: 'ลูกค้า:', size: 'sm', color: '#64748b', flex: 2 },
-                        { type: 'text', text: `${params.customerName} (${params.phone})`, size: 'sm', color: '#1e293b', flex: 4, align: 'end' }
+                        { type: 'text', text: `${customerDisplayText} (${params.phone})`, size: 'sm', color: '#1e293b', flex: 4, align: 'end', wrap: true }
                     ]
                 },
                 {
@@ -902,16 +909,30 @@ export async function notifyAdminLine(params: {
                 {
                     type: 'button',
                     style: 'primary',
-                    color: '#166534',
+                    color: params.eventType === 'slip_uploaded' ? '#0284c7' : '#166534',
                     action: {
                         type: 'uri',
-                        label: 'เปิดจัดการออเดอร์ (Admin)',
+                        label: params.eventType === 'slip_uploaded' ? '🔍 ตรวจสอบสลิปใน Admin' : 'เปิดจัดการออเดอร์ (Admin)',
                         uri: 'https://homematchacafe.store/admin'
                     }
                 }
             ]
         }
     };
+
+    if (params.reviewReason) {
+        bubble.body.contents.push({
+            type: 'box',
+            layout: 'vertical',
+            margin: 'sm',
+            paddingAll: '8px',
+            backgroundColor: '#fef2f2',
+            cornerRadius: '6px',
+            contents: [
+                { type: 'text', text: `⚠️ ตรวจสลิป: ${params.reviewReason}`, size: 'xs', color: '#b91c1c', wrap: true, weight: 'bold' }
+            ]
+        });
+    }
 
     if (params.deliveryDate || params.deliveryRound) {
         bubble.body.contents.push({

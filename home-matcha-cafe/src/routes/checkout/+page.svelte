@@ -791,6 +791,7 @@
             formData.append('slipImage', selectedFile);
         }
         formData.append('recipientName', userData.name || '');
+        formData.append('memberName', memberCtx?.member?.fullName || userData.memberName || '');
         formData.append('phone', userData.phone || '');
         formData.append('address', userData.address || '');
         formData.append('sellerMessage', userData.message || '');

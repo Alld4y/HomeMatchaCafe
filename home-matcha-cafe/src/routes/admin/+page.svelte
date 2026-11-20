@@ -6,6 +6,7 @@
         id: string;
         order_id: string;
         name: string;
+        memberName?: string;
         phone: string;
         address: string;
         message?: string;
@@ -1165,7 +1166,7 @@
                 <div style="text-align: left; font-size: 0.92rem; line-height: 1.55; color: #334155;">
                     <p style="margin: 0 0 0.5rem 0;">ส่งมอบเครื่องดื่มให้:</p>
                     <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px; padding: 0.75rem 0.9rem; margin-bottom: 0.65rem;">
-                        <strong style="color: #14532d; font-size: 1.05rem;">คุณ ${order.name}</strong><br/>
+                        <strong style="color: #14532d; font-size: 1.05rem;">คุณ ${order.name}${order.memberName && order.memberName.trim() !== order.name.trim() ? ` (${order.memberName})` : ''}</strong><br/>
                         <span style="color: #166534; font-weight: 700;">📍 ${order.address}</span>
                     </div>
                     <div style="background: #f8fafc; border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.82rem; color: #64748b;">
@@ -4021,7 +4022,7 @@
                             <div>
                                 <p style="margin: 0; font-size: 0.75rem; color: var(--text-muted);">ผู้สั่งซื้อ & สถานที่จัดส่ง</p>
                                 <p style="margin: 0; font-weight: 700; color: var(--matcha-deep); font-size: 0.95rem;">
-                                    {order.name} (<a href="tel:{order.phone}" style="color: var(--matcha-primary); text-decoration: none;">{order.phone}</a>)
+                                    {order.name}{#if order.memberName && order.memberName.trim() !== order.name.trim()} <span style="color: #166534; font-size: 0.82em; font-weight: 700;">({order.memberName})</span>{/if} (<a href="tel:{order.phone}" style="color: var(--matcha-primary); text-decoration: none;">{order.phone}</a>)
                                 </p>
                                 <p style="margin: 0.35rem 0 0 0; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">
                                     📍 {order.address}
@@ -4229,6 +4230,9 @@
                                     </span>
                                     <strong style="font-size: 1.05rem; color: #14532d;">
                                         คุณ {order.name}
+                                        {#if order.memberName && order.memberName.trim() !== order.name.trim()}
+                                            <span style="font-size: 0.82rem; color: #166534; font-weight: 700;">({order.memberName})</span>
+                                        {/if}
                                     </strong>
                                 </div>
                                 <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.2rem;">
@@ -4335,7 +4339,12 @@
                                             <span style="font-size: 0.75rem; background: #cbd5e1; color: #334155; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 4px;">
                                                 #{order.order_id || order.id.slice(-6)}
                                             </span>
-                                            <strong style="color: #334155; font-size: 0.95rem;">คุณ {order.name}</strong>
+                                            <strong style="color: #334155; font-size: 0.95rem;">
+                                                คุณ {order.name}
+                                                {#if order.memberName && order.memberName.trim() !== order.name.trim()}
+                                                    <span style="font-size: 0.82rem; color: #166534; font-weight: 700;">({order.memberName})</span>
+                                                {/if}
+                                            </strong>
                                         </div>
                                         <span style="color: #16a34a; font-size: 0.75rem; font-weight: 700; background: #dcfce7; padding: 0.15rem 0.45rem; border-radius: 999px;">
                                             ✓ ส่งสำเร็จแล้ว
@@ -4554,7 +4563,9 @@
 
                             <!-- ข้อมูลลูกค้า & วันจัดส่ง -->
                             <div style="margin: 0.85rem 0; font-size: 0.9rem; display: flex; flex-direction: column; gap: 0.35rem;">
-                                <div><strong>ลูกค้า:</strong> {order.name} (โทร: <a href="tel:{order.phone}" style="color: var(--matcha-deep); font-weight: 700;">{order.phone}</a>)</div>
+                                <div>
+                                    <strong>ลูกค้า:</strong> {order.name}{#if order.memberName && order.memberName.trim() !== order.name.trim()} <span style="color: #166534; font-weight: 700;">({order.memberName})</span>{/if} (โทร: <a href="tel:{order.phone}" style="color: var(--matcha-deep); font-weight: 700;">{order.phone}</a>)
+                                </div>
                                 <div><strong>สถานที่จัดส่ง:</strong> {order.address}</div>
                                 <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: #475569;">
                                     <span>📅 วันที่ส่ง: <strong>{order.deliveryDate || order.createdAt.slice(0, 10)}</strong></span>

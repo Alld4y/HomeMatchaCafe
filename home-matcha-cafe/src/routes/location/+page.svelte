@@ -383,8 +383,10 @@
             ? `${chosenRound.name} (${chosenRound.timeSlot}) · นัดส่ง ${preferredDeliveryTime.trim()}`
             : `${chosenRound.name} (${chosenRound.timeSlot})`;
 
+        const memberInfo = memberCtx?.member || null;
         const customerData = {
             name: trimmedName,
+            memberName: memberInfo?.fullName || '',
             phone: trimmedPhone,
             address: trimmedAddress,
             message: sellerMessage.trim(),

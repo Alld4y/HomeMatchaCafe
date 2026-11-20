@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { pool, ensurePgSchema } from './pgPool';
 import { awardStampsForCompletedOrder } from './members';
-import { sendCustomerNotification } from './notifications';
+import { sendCustomerNotification, notifyAdminLine } from './notifications';
 
 export interface OrderItem {
     id: string;
@@ -23,6 +23,7 @@ export interface Order {
     id: string;
     order_id: string;
     name: string;
+    memberName?: string;
     phone: string;
     address: string;
     message?: string;
@@ -143,6 +144,7 @@ function mapPgRowToOrder(row: any): Order {
         id: String(row.order_id),
         order_id: displayId,
         name: row.name || '',
+        memberName: row.member_name || undefined,
         phone: row.phone || '',
         address: row.address || '',
         message: row.message || '',
@@ -170,9 +172,16 @@ function mapPgRowToOrder(row: any): Order {
 export async function getAllOrders(): Promise<Order[]> {
     await ensurePgSchema();
     const res = await pool.query(`
-        SELECT *
-        FROM public."order"
-        ORDER BY order_id DESC
+        SELECT o.*,
+               COALESCE(NULLIF(o.member_name, ''), m.full_name) AS member_name
+        FROM public."order" o
+        LEFT JOIN LATERAL (
+            SELECT (first_name || ' ' || last_name) AS full_name
+            FROM public.members m
+            WHERE m.phone = o.phone
+            LIMIT 1
+        ) m ON true
+        ORDER BY o.order_id DESC
     `);
     return res.rows.map(mapPgRowToOrder);
 }
@@ -184,10 +193,17 @@ export async function getOrdersByPhone(phone: string): Promise<Order[]> {
 
     const res = await pool.query(
         `
-        SELECT *
-        FROM public."order"
-        WHERE regexp_replace(phone, '[^0-9]', '', 'g') LIKE $1
-        ORDER BY order_id DESC
+        SELECT o.*,
+               COALESCE(NULLIF(o.member_name, ''), m.full_name) AS member_name
+        FROM public."order" o
+        LEFT JOIN LATERAL (
+            SELECT (first_name || ' ' || last_name) AS full_name
+            FROM public.members m
+            WHERE m.phone = o.phone
+            LIMIT 1
+        ) m ON true
+        WHERE regexp_replace(o.phone, '[^0-9]', '', 'g') LIKE $1
+        ORDER BY o.order_id DESC
         `,
         [`%${cleaned}%`]
     );
@@ -198,9 +214,16 @@ export async function getOrderById(id: string): Promise<Order | undefined> {
     await ensurePgSchema();
     const res = await pool.query(
         `
-        SELECT *
-        FROM public."order"
-        WHERE order_id::text = $1 OR order_code = $1
+        SELECT o.*,
+               COALESCE(NULLIF(o.member_name, ''), m.full_name) AS member_name
+        FROM public."order" o
+        LEFT JOIN LATERAL (
+            SELECT (first_name || ' ' || last_name) AS full_name
+            FROM public.members m
+            WHERE m.phone = o.phone
+            LIMIT 1
+        ) m ON true
+        WHERE o.order_id::text = $1 OR o.order_code = $1
         LIMIT 1
         `,
         [String(id)]
@@ -226,6 +249,7 @@ export async function isSlipRefUsed(ref: string): Promise<boolean> {
 
 export async function createOrder(data: {
     name: string;
+    memberName?: string;
     phone: string;
     address: string;
     message?: string;
@@ -250,11 +274,25 @@ export async function createOrder(data: {
     const status: Order['status'] =
         data.status || (data.totalPrice === 0 && data.redeemedFreeCups ? 'paid' : 'pending');
 
+    let memberName = data.memberName?.trim() || '';
+    if (!memberName && data.phone) {
+        try {
+            const memRes = await pool.query(
+                `SELECT (first_name || ' ' || last_name) AS full_name FROM public.members WHERE phone = $1 LIMIT 1`,
+                [data.phone.replace(/[^0-9]/g, '')]
+            );
+            if (memRes.rows.length > 0) {
+                memberName = (memRes.rows[0].full_name || '').trim();
+            }
+        } catch {}
+    }
+
     const res = await pool.query(
         `
         INSERT INTO public."order" (
             order_code,
             name,
+            member_name,
             phone,
             address,
             message,
@@ -278,9 +316,9 @@ export async function createOrder(data: {
             updated_at
         )
         VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9,
-            $10, $11, $12, $13, $14, $15, $16, $17, $18,
-            $19, $20, FALSE,
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+            $11, $12, $13, $14, $15, $16, $17, $18, $19,
+            $20, $21, FALSE,
             NOW(), NOW()
         )
         RETURNING *
@@ -288,6 +326,7 @@ export async function createOrder(data: {
         [
             orderCode,
             data.name,
+            memberName || null,
             data.phone,
             data.address,
             data.message || '',
@@ -310,10 +349,33 @@ export async function createOrder(data: {
     );
 
     const mapped = mapPgRowToOrder(res.rows[0]);
+    if (!mapped.memberName && memberName) {
+        mapped.memberName = memberName;
+    }
     const finalOrder = await processCompletedOrderLoyalty(mapped, false);
 
-    // หมายเหตุ: ตามข้อกำหนด ไม่ส่งแจ้งเตือน order_created หาลูกค้า และไม่ส่ง new_order หาแอดมินตอนสร้างออเดอร์
-    // ให้รอแอดมินตรวจสอบสลิปและกดยืนยันในระบบก่อน จากนั้นระบบจะส่งเฉพาะการแจ้งเตือนตรวจสอบสลิปแล้ว (slip_approved)
+    // แจ้งเตือนแอดมินทาง LINE เมื่อมีออเดอร์ใหม่เข้ามา หรือเมื่อลูกค้าส่งสลิปเพื่อขอให้แอดมินตรวจสอบ
+    const itemsSummary = Array.isArray(finalOrder.basket)
+        ? finalOrder.basket.map(i => `${i.thaiName || i.name || 'เครื่องดื่ม'} x${i.quantity}`).join(', ')
+        : undefined;
+
+    const isSlipReviewRequired = Boolean(finalOrder.needsManualReview || finalOrder.slipImage);
+    const adminEventType = isSlipReviewRequired ? 'slip_uploaded' : 'new_order';
+
+    notifyAdminLine({
+        eventType: adminEventType,
+        orderCode: finalOrder.order_id,
+        customerName: finalOrder.name,
+        memberName: finalOrder.memberName || memberName,
+        phone: finalOrder.phone,
+        totalPrice: finalOrder.totalPrice,
+        itemsSummary,
+        deliveryDate: finalOrder.deliveryDate,
+        deliveryRound: finalOrder.deliveryRound,
+        reviewReason: finalOrder.reviewReason,
+        slipImageUrl: finalOrder.slipImage
+    }).catch(e => console.warn('Admin notification error in createOrder:', e));
+
     return finalOrder;
 }
 

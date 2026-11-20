@@ -19,6 +19,7 @@ export const POST: RequestHandler = async ({ request }) => {
     try {
         const contentType = request.headers.get('content-type') || '';
         let recipientName = '';
+        let memberName = '';
         let phone = '';
         let address = '';
         let sellerMessage = '';
@@ -41,6 +42,7 @@ export const POST: RequestHandler = async ({ request }) => {
         if (contentType.includes('multipart/form-data')) {
             const formData = await request.formData();
             recipientName = (formData.get('recipientName') as string) || '';
+            memberName = (formData.get('memberName') as string) || '';
             phone = (formData.get('phone') as string) || '';
             address = (formData.get('address') as string) || '';
             sellerMessage = (formData.get('sellerMessage') as string) || '';
@@ -117,6 +119,7 @@ export const POST: RequestHandler = async ({ request }) => {
         } else {
             const body = await request.json();
             recipientName = body.name || body.recipientName || '';
+            memberName = body.memberName || '';
             phone = body.phone || '';
             address = body.address || '';
             sellerMessage = body.message || body.sellerMessage || '';
@@ -170,6 +173,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
         const newOrder = await createOrder({
             name: recipientName,
+            memberName: memberName || undefined,
             phone: phone,
             address: address,
             message: sellerMessage,

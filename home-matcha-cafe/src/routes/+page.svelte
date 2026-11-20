@@ -197,7 +197,7 @@
         </div> -->
 
         <!-- ชื่อร้านและคำโปรย -->
-        <h1 class="hero-title">Home Matcha Cafe</h1>
+        <h1 class="hero-title" style="color: var(--matcha-dark);">Home Matcha Cafe</h1>
         <p class="hero-sub font-kanit">
             สัมผัสรสชาติมัทฉะแท้เกรดพิธีการ ชงสดใหม่แก้วต่อแก้ว 
             พร้อมจัดส่งภายในโรงพยาบาลทองผาภูมิ บ้านพัก และแฟลต

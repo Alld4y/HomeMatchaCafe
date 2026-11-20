@@ -79,6 +79,7 @@ export async function ensurePgSchema(): Promise<void> {
             await pool.query(`
                 ALTER TABLE public."order"
                     ADD COLUMN IF NOT EXISTS order_code TEXT,
+                    ADD COLUMN IF NOT EXISTS member_name TEXT,
                     ADD COLUMN IF NOT EXISTS total_price NUMERIC(10, 2) DEFAULT 0,
                     ADD COLUMN IF NOT EXISTS slip_amount NUMERIC(10, 2),
                     ADD COLUMN IF NOT EXISTS slip_time_text TEXT,
