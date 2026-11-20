@@ -1291,7 +1291,8 @@
                     targetUserId: settings.lineOa.adminLineUserId,
                     targetPhone: settings.lineOa.adminPhone,
                     message: lineTestMessageInput,
-                    statusType: statusType || undefined
+                    statusType: statusType || undefined,
+                    testVars
                 })
             });
             const data = await res.json();
@@ -1391,7 +1392,9 @@
         id: string;
         type: 'banner' | 'tag' | 'title' | 'body' | 'highlight' | 'button';
         imageUrl?: string;
-        aspectRatio?: '20:13' | '16:9' | '1:1';
+        aspectRatio?: '20:13' | '16:9' | '4:3' | '1:1' | '3:2' | '3:4' | '9:16' | string;
+        aspectMode?: 'cover' | 'fit';
+        imageSize?: 'full' | '5xl' | '4xl' | '3xl' | 'xxl' | 'xl' | 'lg' | string;
         tagText?: string;
         tagColor?: string;
         tagBg?: string;
@@ -1513,10 +1516,27 @@
     let designerBodyBlocks = $derived(designerCardBlocks.filter(b => b.type !== 'banner' && b.type !== 'button'));
     let designerFooterBlocks = $derived(designerCardBlocks.filter(b => b.type === 'button' && b.buttonLabel));
 
+    let testVars = $state({
+        orderCode: 'HM-8899',
+        itemsSummary: '🍵 Cold-Fermented Oat Milk Matcha Latte x1\n🍵 Clear Matcha Cold Whisk x1',
+        totalPrice: '฿165',
+        customerName: 'คุณลูกค้า',
+        phone: '0812345678',
+        points: '10'
+    });
+    let showTestVars = $state(false);
+
     function addDesignerBlock(type: DesignerCardBlock['type']) {
         const id = `blk-${Date.now()}`;
         if (type === 'banner') {
-            designerCardBlocks = [...designerCardBlocks, { id, type, imageUrl: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80', aspectRatio: '20:13' }];
+            designerCardBlocks = [...designerCardBlocks, { 
+                id, 
+                type, 
+                imageUrl: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80', 
+                aspectRatio: '1:1',
+                aspectMode: 'cover',
+                imageSize: 'full'
+            }];
         } else if (type === 'tag') {
             designerCardBlocks = [...designerCardBlocks, { id, type, tagText: '🔥 โปรโมชั่นพิเศษ', tagBg: '#fef3c7', tagColor: '#b45309' }];
         } else if (type === 'title') {
@@ -1547,17 +1567,17 @@
     function replacePreviewVars(text?: string): string {
         if (!text) return '';
         return text
-            .replace(/\{orderCode\}/g, 'HM-8899')
-            .replace(/\{totalPrice\}/g, '฿165')
-            .replace(/\{customerName\}/g, 'คุณลูกค้า')
-            .replace(/\{name\}/g, 'คุณลูกค้า')
-            .replace(/\{phone\}/g, '081-234-5678')
-            .replace(/\{points\}/g, '10')
-            .replace(/\{itemsSummary\}/g, 'Cold-Fermented Oat Milk Matcha Latte x1')
+            .replace(/\{orderCode\}/g, testVars.orderCode || 'HM-8899')
+            .replace(/\{totalPrice\}/g, testVars.totalPrice || '฿165')
+            .replace(/\{customerName\}/g, testVars.customerName || 'คุณลูกค้า')
+            .replace(/\{name\}/g, testVars.customerName || 'คุณลูกค้า')
+            .replace(/\{phone\}/g, testVars.phone || '0812345678')
+            .replace(/\{points\}/g, testVars.points || '10')
+            .replace(/\{itemsSummary\}/g, testVars.itemsSummary || 'Cold-Fermented Oat Milk Matcha Latte x1')
             .replace(/\{url\}/g, 'https://homematchacafe.store/order')
             .replace(/\{trackingUrl\}/g, 'https://homematchacafe.store/order')
             .replace(/\{loyaltyUrl\}/g, 'https://homematchacafe.store/loyalty')
-            .replace(/\{registerUrl\}/g, 'https://homematchacafe.store/loyalty?action=register')
+            .replace(/\{registerUrl\}/g, `https://homematchacafe.store/loyalty?action=register&phone=${testVars.phone || '0812345678'}`)
             .replace(/\{menuUrl\}/g, 'https://homematchacafe.store/menu');
     }
 
@@ -1678,9 +1698,10 @@
         const hero = banner && banner.imageUrl ? {
             type: 'image',
             url: banner.imageUrl,
-            size: 'full',
+            size: banner.imageSize || 'full',
             aspectRatio: banner.aspectRatio || '20:13',
-            aspectMode: 'cover'
+            aspectMode: banner.aspectMode || 'cover',
+            backgroundColor: '#f8fafc'
         } : undefined;
 
         const bodyContents: any[] = [];
@@ -1823,7 +1844,8 @@
                 body: JSON.stringify({
                     target: designerTarget,
                     flexBubble,
-                    altText: designerAltText
+                    altText: designerAltText,
+                    testVars
                 })
             });
 
@@ -6137,23 +6159,75 @@
                                     <!-- ฟิลด์แก้ไขของบล็อกแต่ละประเภท -->
                                     {#if block.type === 'banner'}
                                         <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                            <div>
+                                                <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #475569; margin-bottom: 0.2rem;">
+                                                    🔗 URL รูปภาพแบนเนอร์ / มาสคอต:
+                                                </label>
                                                 <input
                                                     type="text"
                                                     class="form-input"
                                                     bind:value={block.imageUrl}
                                                     placeholder="URL รูปภาพแบนเนอร์ (https://...)"
-                                                    style="font-size: 0.82rem; padding: 0.35rem 0.65rem;"
+                                                    style="font-size: 0.82rem; padding: 0.35rem 0.65rem; width: 100%;"
                                                 />
-                                                <select
-                                                    class="form-input"
-                                                    bind:value={block.aspectRatio}
-                                                    style="width: 120px; font-size: 0.8rem; padding: 0.35rem 0.5rem;"
-                                                >
-                                                    <option value="20:13">20:13 (กว้าง)</option>
-                                                    <option value="16:9">16:9 (แนวนอน)</option>
-                                                    <option value="1:1">1:1 (จัตุรัส)</option>
-                                                </select>
+                                            </div>
+
+                                            <!-- แถวตั้งค่าขนาด, สัดส่วน และโหมดจัดรูป -->
+                                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.45rem; background: #f8fafc; padding: 0.5rem; border-radius: 8px; border: 1px solid #e2e8f0;">
+                                                <!-- 1. สัดส่วนภาพ (Aspect Ratio) -->
+                                                <div>
+                                                    <label style="display: block; font-size: 0.72rem; font-weight: 700; color: #334155; margin-bottom: 0.2rem;">
+                                                        📐 สัดส่วนภาพ:
+                                                    </label>
+                                                    <select
+                                                        class="form-input"
+                                                        bind:value={block.aspectRatio}
+                                                        style="width: 100%; font-size: 0.78rem; padding: 0.3rem 0.4rem; background: #ffffff;"
+                                                    >
+                                                        <option value="1:1">1:1 (จัตุรัส - แมว/สินค้า)</option>
+                                                        <option value="20:13">20:13 (มาตรฐาน LINE)</option>
+                                                        <option value="16:9">16:9 (แนวนอนจอไวด์)</option>
+                                                        <option value="4:3">4:3 (แนวนอนคลาสสิก)</option>
+                                                        <option value="3:2">3:2 (แนวนอน 3:2)</option>
+                                                        <option value="3:4">3:4 (แนวตั้ง 3:4)</option>
+                                                        <option value="9:16">9:16 (แนวตั้งยาว)</option>
+                                                    </select>
+                                                </div>
+
+                                                <!-- 2. ขนาดภาพ (Size) -->
+                                                <div>
+                                                    <label style="display: block; font-size: 0.72rem; font-weight: 700; color: #334155; margin-bottom: 0.2rem;">
+                                                        📏 ขนาดภาพ (Size):
+                                                    </label>
+                                                    <select
+                                                        class="form-input"
+                                                        bind:value={block.imageSize}
+                                                        style="width: 100%; font-size: 0.78rem; padding: 0.3rem 0.4rem; background: #ffffff;"
+                                                    >
+                                                        <option value="full">เต็มขอบการ์ด (100% Full)</option>
+                                                        <option value="5xl">ใหญ่พิเศษ (5xl ~280px)</option>
+                                                        <option value="4xl">ใหญ่ (4xl ~240px)</option>
+                                                        <option value="3xl">ขนาดกลาง (3xl ~200px)</option>
+                                                        <option value="xxl">ขนาดพอดี (xxl ~160px)</option>
+                                                        <option value="xl">ขนาดเล็ก (xl ~120px)</option>
+                                                        <option value="lg">กะทัดรัด (lg ~80px)</option>
+                                                    </select>
+                                                </div>
+
+                                                <!-- 3. โหมดการแสดงผล (Aspect Mode) -->
+                                                <div>
+                                                    <label style="display: block; font-size: 0.72rem; font-weight: 700; color: #334155; margin-bottom: 0.2rem;">
+                                                        🔍 โหมดการแสดง (Fit):
+                                                    </label>
+                                                    <select
+                                                        class="form-input"
+                                                        bind:value={block.aspectMode}
+                                                        style="width: 100%; font-size: 0.78rem; padding: 0.3rem 0.4rem; background: #ffffff;"
+                                                    >
+                                                        <option value="cover">Cover (เต็มกรอบ ครอปขอบ)</option>
+                                                        <option value="fit">Fit (เห็นครบทั้งรูป ไม่ตัดขอบ)</option>
+                                                    </select>
+                                                </div>
                                             </div>
 
                                             <!-- 🐱 คลังเลือกมาสคอตน้องแมว (7 อารมณ์) -->
@@ -6243,6 +6317,8 @@
                                             <div style="display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.3rem;">
                                                 <span style="font-size: 0.68rem; color: #64748b;">กดเลือกตัวแปร:</span>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'titleText', '{orderCode}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 4px; cursor: pointer;">+{'{orderCode}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'titleText', '{itemsSummary}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #e0f2fe; border: 1px solid #bae6fd; color: #0369a1; border-radius: 4px; cursor: pointer;">+{'{itemsSummary}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'titleText', '{totalPrice}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fefce8; border: 1px solid #fde047; color: #854d0e; border-radius: 4px; cursor: pointer;">+{'{totalPrice}'}</button>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'titleText', '{name}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 4px; cursor: pointer;">+{'{name}'}</button>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'titleText', '{phone}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fdf2f8; border: 1px solid #fbcfe8; color: #9d174d; border-radius: 4px; cursor: pointer;">+{'{phone}'}</button>
                                             </div>
@@ -6278,9 +6354,10 @@
                                             />
                                             <div style="display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.3rem;">
                                                 <span style="font-size: 0.68rem; color: #64748b;">กดเลือกตัวแปร:</span>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'highlightText', '{orderCode}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 4px; cursor: pointer;">+{'{orderCode}'}</button>
+                                                <button type="button" onclick={() => insertVariableToBlock(block, 'highlightText', '{itemsSummary}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #e0f2fe; border: 1px solid #bae6fd; color: #0369a1; border-radius: 4px; cursor: pointer;">+{'{itemsSummary}'}</button>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'highlightText', '{totalPrice}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fefce8; border: 1px solid #fde047; color: #854d0e; border-radius: 4px; cursor: pointer;">+{'{totalPrice}'}</button>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'highlightText', '{points}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fff7ed; border: 1px solid #fed7aa; color: #c2410c; border-radius: 4px; cursor: pointer;">+{'{points}'}</button>
-                                                <button type="button" onclick={() => insertVariableToBlock(block, 'highlightText', '{orderCode}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 4px; cursor: pointer;">+{'{orderCode}'}</button>
                                             </div>
                                         </div>
                                     {:else if block.type === 'button'}
@@ -6416,19 +6493,25 @@
                             <!-- ตัวการ์ด Flex Message สีขาว (จำลอง Flex Bubble ขนาด Mega ตามสเปก LINE 1:1) -->
                             <div style="background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.18);">
                                 
-                                <!-- 1. HERO BANNER (ขอบชนขอบ ด้านบนสุดของการ์ด) -->
+                                <!-- 1. HERO BANNER (ขอบชนขอบ หรือจัดกึ่งกลางตามขนาดที่เลือก) -->
                                 {#if designerHeroBlock}
-                                    <div style="width: 100%; aspect-ratio: {designerHeroBlock.aspectRatio === '1:1' ? '1/1' : designerHeroBlock.aspectRatio === '16:9' ? '16/9' : '20/13'}; overflow: hidden; background: #e2e8f0; position: relative;">
-                                        <img
-                                            src={designerHeroBlock.imageUrl}
-                                            alt="Hero Mascot"
-                                            style="width: 100%; height: 100%; object-fit: cover; display: block;"
-                                            onerror={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80'; }}
-                                        />
-                                        <!-- จำลอง Badge วันนี้ ของแอป LINE บนหัวภาพ -->
-                                        <div style="position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: #96a978; color: #ffffff; font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.55rem; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">
-                                            วันนี้
+                                    {@const imgSize = designerHeroBlock.imageSize || 'full'}
+                                    {@const maxWidth = imgSize === 'full' ? '100%' : imgSize === '5xl' ? '280px' : imgSize === '4xl' ? '240px' : imgSize === '3xl' ? '200px' : imgSize === 'xxl' ? '160px' : imgSize === 'xl' ? '120px' : imgSize === 'lg' ? '80px' : '100%'}
+                                    <div style="width: 100%; background: #f8fafc; display: flex; justify-content: center; align-items: center; position: relative; padding: {imgSize === 'full' ? '0' : '0.85rem 0'};">
+                                        <div style="width: {maxWidth}; max-width: 100%; aspect-ratio: {designerHeroBlock.aspectRatio === '1:1' ? '1/1' : designerHeroBlock.aspectRatio === '16:9' ? '16/9' : designerHeroBlock.aspectRatio === '4:3' ? '4/3' : designerHeroBlock.aspectRatio === '3:2' ? '3/2' : designerHeroBlock.aspectRatio === '3:4' ? '3/4' : designerHeroBlock.aspectRatio === '9:16' ? '9/16' : '20/13'}; overflow: hidden; border-radius: {imgSize === 'full' ? '0' : '8px'};">
+                                            <img
+                                                src={designerHeroBlock.imageUrl}
+                                                alt="Hero Mascot"
+                                                style="width: 100%; height: 100%; object-fit: {designerHeroBlock.aspectMode || 'cover'}; display: block;"
+                                                onerror={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80'; }}
+                                            />
                                         </div>
+                                        {#if imgSize === 'full'}
+                                            <!-- จำลอง Badge วันนี้ ของแอป LINE บนหัวภาพ -->
+                                            <div style="position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: #96a978; color: #ffffff; font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.55rem; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">
+                                                วันนี้
+                                            </div>
+                                        {/if}
                                     </div>
                                 {/if}
 
@@ -6703,6 +6786,85 @@
                                             </button>
                                         {/if}
                                     {/each}
+                                </div>
+                            {/if}
+                        </div>
+
+                        <!-- กล่องกำหนดตัวแปรทดสอบ (Test Variables) -->
+                        <div style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 0.85rem 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick={() => (showTestVars = !showTestVars)}>
+                                <strong style="font-size: 0.85rem; color: #1e293b; display: flex; align-items: center; gap: 0.35rem;">
+                                    🧪 ตั้งค่าตัวแปรจำลองสำหรับทดสอบ (Test Variables)
+                                </strong>
+                                <span style="font-size: 0.72rem; color: #0284c7; font-weight: 700;">
+                                    {showTestVars ? '▲ ย่อเก็บ' : '▼ กำหนดค่าทดสอบ'}
+                                </span>
+                            </div>
+
+                            {#if showTestVars}
+                                <div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px dashed #cbd5e1; padding-top: 0.75rem;">
+                                    <div style="font-size: 0.72rem; color: #64748b;">
+                                        กำหนดค่าที่จะนำไปแทนที่ในข้อความตัวอย่าง ({'{orderCode}'}, {'{itemsSummary}'}, ฯลฯ) ทั้งบนหน้าจอ Live Preview และตอนกดส่งทดสอบเข้า LINE:
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                        <div>
+                                            <label style="font-size: 0.72rem; font-weight: 700; color: #475569; display: block; margin-bottom: 0.15rem;">
+                                                {'{orderCode}'} รหัสออเดอร์:
+                                            </label>
+                                            <input type="text" class="form-input" bind:value={testVars.orderCode} placeholder="เช่น HM-8899" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" />
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 0.72rem; font-weight: 700; color: #475569; display: block; margin-bottom: 0.15rem;">
+                                                {'{totalPrice}'} ยอดเงิน:
+                                            </label>
+                                            <input type="text" class="form-input" bind:value={testVars.totalPrice} placeholder="เช่น ฿165" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label style="font-size: 0.72rem; font-weight: 700; color: #475569; display: block; margin-bottom: 0.15rem;">
+                                            {'{itemsSummary}'} รายการสินค้า (Item Summary):
+                                        </label>
+                                        <textarea
+                                            class="form-input"
+                                            bind:value={testVars.itemsSummary}
+                                            rows="2"
+                                            placeholder="เช่น 🍵 Cold-Fermented Oat Milk Matcha Latte x1&#10;🍵 Clear Matcha Cold Whisk x1"
+                                            style="font-size: 0.8rem; padding: 0.3rem 0.5rem; width: 100%; resize: vertical; line-height: 1.4;"
+                                        ></textarea>
+                                    </div>
+
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                        <div>
+                                            <label style="font-size: 0.72rem; font-weight: 700; color: #475569; display: block; margin-bottom: 0.15rem;">
+                                                {'{customerName}'} ชื่อลูกค้า:
+                                            </label>
+                                            <input type="text" class="form-input" bind:value={testVars.customerName} placeholder="เช่น คุณลูกค้า" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" />
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 0.72rem; font-weight: 700; color: #475569; display: block; margin-bottom: 0.15rem;">
+                                                {'{phone}'} เบอร์โทร:
+                                            </label>
+                                            <input type="text" class="form-input" bind:value={testVars.phone} placeholder="เช่น 0812345678" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;" />
+                                        </div>
+                                    </div>
+
+                                    <div style="text-align: right;">
+                                        <button
+                                            type="button"
+                                            onclick={() => {
+                                                testVars.orderCode = 'HM-8899';
+                                                testVars.itemsSummary = '🍵 Cold-Fermented Oat Milk Matcha Latte x1\n🍵 Clear Matcha Cold Whisk x1';
+                                                testVars.totalPrice = '฿165';
+                                                testVars.customerName = 'คุณลูกค้า';
+                                                testVars.phone = '0812345678';
+                                                testVars.points = '10';
+                                            }}
+                                            style="background: none; border: none; font-size: 0.7rem; color: #64748b; cursor: pointer; text-decoration: underline;"
+                                        >
+                                            ↺ รีเซ็ตค่าตัวแปรทดสอบ
+                                        </button>
+                                    </div>
                                 </div>
                             {/if}
                         </div>

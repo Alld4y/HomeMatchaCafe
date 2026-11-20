@@ -522,7 +522,7 @@ export async function sendLineStatusFlexMessage(
 /**
  * ส่ง Flex Message ดิบไปยัง LINE Messaging API
  */
-export function sanitizeFlexBubble(bubble: any, fallbackPhone?: string): any {
+export function sanitizeFlexBubble(bubble: any, fallbackPhone?: string, testVars?: Record<string, string>): any {
     if (!bubble || typeof bubble !== 'object') return bubble;
     try {
         let str = JSON.stringify(bubble);
@@ -530,12 +530,20 @@ export function sanitizeFlexBubble(bubble: any, fallbackPhone?: string): any {
         str = str.replace(/"layout"\s*:\s*"inline"/g, '"layout":"horizontal"');
 
         // 2. แทนค่า placeholders ที่อาจยังค้างอยู่ในการ์ด (เช่น ตอนทดสอบส่ง) ป้องกัน LINE ตีกลับ Error "invalid uri scheme"
-        const phone = fallbackPhone || '0812345678';
+        const phone = testVars?.phone || fallbackPhone || '0812345678';
+        const orderCode = testVars?.orderCode || 'HM-TEST88';
+        const itemsSummary = testVars?.itemsSummary || 'Cold-Fermented Oat Milk Matcha Latte x1, Clear Matcha Cold Whisk x1';
+        const totalPrice = testVars?.totalPrice || '165';
+        const name = testVars?.customerName || testVars?.name || 'ลูกค้าคนพิเศษ';
+        const points = testVars?.points || '10';
+
         str = str.replace(/\{phone\}/g, phone);
-        str = str.replace(/\{orderCode\}/g, 'HM-TEST88');
-        str = str.replace(/\{totalPrice\}/g, '165');
-        str = str.replace(/\{name\}/g, 'ลูกค้าคนพิเศษ');
-        str = str.replace(/\{points\}/g, '10');
+        str = str.replace(/\{orderCode\}/g, orderCode);
+        str = str.replace(/\{itemsSummary\}/g, itemsSummary);
+        str = str.replace(/\{totalPrice\}/g, totalPrice);
+        str = str.replace(/\{name\}/g, name);
+        str = str.replace(/\{customerName\}/g, name);
+        str = str.replace(/\{points\}/g, points);
         str = str.replace(/\{url\}/g, 'https://homematchacafe.store/order');
         str = str.replace(/\{trackingUrl\}/g, 'https://homematchacafe.store/order');
         str = str.replace(/\{loyaltyUrl\}/g, 'https://homematchacafe.store/loyalty');
@@ -552,12 +560,13 @@ export async function sendLineRawFlexMessage(
     channelAccessToken: string,
     toUserId: string,
     altText: string,
-    flexContents: any
+    flexContents: any,
+    testVars?: Record<string, string>
 ): Promise<boolean> {
     if (!channelAccessToken || !toUserId) return false;
 
     try {
-        const safeContents = sanitizeFlexBubble(flexContents);
+        const safeContents = sanitizeFlexBubble(flexContents, undefined, testVars);
         const res = await fetch('https://api.line.me/v2/bot/message/push', {
             method: 'POST',
             headers: {
@@ -816,6 +825,7 @@ export async function sendLineTestMessage(
         targetPhone?: string;
         customMessage?: string;
         statusType?: 'brewing' | 'ready_to_ship' | 'delivering' | 'completed' | 'cancelled' | 'order_created' | 'slip_approved';
+        testVars?: Record<string, string>;
     },
     legacyCustomMessage?: string
 ): Promise<{ success: boolean; message: string }> {
@@ -831,12 +841,14 @@ export async function sendLineTestMessage(
     let targetPhone: string | undefined;
     let customMessage: string | undefined;
     let statusType: string | undefined;
+    let testVars: Record<string, string> | undefined;
 
     if (typeof param1 === 'object' && param1 !== null) {
         targetUserId = param1.targetUserId;
         targetPhone = param1.targetPhone;
         customMessage = param1.customMessage;
         statusType = param1.statusType;
+        testVars = param1.testVars;
     } else {
         targetUserId = param1;
         customMessage = legacyCustomMessage;
@@ -927,15 +939,19 @@ export async function sendLineTestMessage(
             body: 'นี่คือข้อความทดสอบการแจ้งเตือนสถานะคำสั่งซื้อทาง LINE OA'
         };
 
+        const testItems = testVars?.itemsSummary || 'Cold-Fermented Oat Milk Matcha Latte x1, Clear Matcha Cold Whisk x1';
+        const testCode = testVars?.orderCode || 'HM-TEST88';
+        const testPrice = testVars?.totalPrice ? Number(testVars.totalPrice.replace(/[^0-9.]/g, '')) || 165 : 165;
+
         let successCount = 0;
         for (const to of recipients) {
             const ok = await sendLineStatusFlexMessage(token, to, {
                 title: meta.title,
                 body: meta.body,
                 eventType: statusType as any,
-                orderCode: 'HM-TEST88',
-                itemsSummary: 'Cold-Fermented Oat Milk Matcha Latte x1, Clear Matcha Cold Whisk x1',
-                totalPrice: 165,
+                orderCode: testCode,
+                itemsSummary: testItems,
+                totalPrice: testPrice,
                 url: '/order/test',
                 phone: targetPhone || lineOa.adminPhone || '0987654321'
             });

@@ -8,6 +8,7 @@ export const POST: RequestHandler = async ({ request }) => {
         const target = body.target || 'admin'; // 'admin' | 'broadcast' | userId
         const flexBubble = body.flexBubble;
         const altText = body.altText || 'ข้อความจากการ์ดโปรโมชั่น Home Matcha Cafe';
+        const testVars = body.testVars;
 
         if (!flexBubble) {
             return json({ success: false, message: 'ไม่มีข้อมูล Flex Bubble Card' }, { status: 400 });
@@ -34,7 +35,7 @@ export const POST: RequestHandler = async ({ request }) => {
             }
             let successCount = 0;
             for (const uid of adminUserIds) {
-                const ok = await sendLineRawFlexMessage(token, uid, altText, flexBubble);
+                const ok = await sendLineRawFlexMessage(token, uid, altText, flexBubble, testVars);
                 if (ok) successCount++;
             }
             return json({
@@ -50,7 +51,7 @@ export const POST: RequestHandler = async ({ request }) => {
             return json({ success: false, message: 'ไม่พบ User ID ผู้รับ' }, { status: 400 });
         }
 
-        const ok = await sendLineRawFlexMessage(token, to, altText, flexBubble);
+        const ok = await sendLineRawFlexMessage(token, to, altText, flexBubble, testVars);
         return json({
             success: ok,
             message: ok ? `ส่งการ์ดไปยัง LINE สำเร็จแล้วค่ะ! (${to})` : 'ส่งไม่สำเร็จ กรุณาตรวจสอบว่าบัญชี LINE ผู้รับได้กดแอดเพื่อนกับ LINE OA หรือยังนะคะ'

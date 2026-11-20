@@ -8,12 +8,14 @@ export const POST: RequestHandler = async ({ request }) => {
         const targetPhone = body.targetPhone ? String(body.targetPhone).trim() : undefined;
         const message = body.message ? String(body.message).trim() : undefined;
         const statusType = body.statusType ? String(body.statusType).trim() : undefined;
+        const testVars = body.testVars;
 
         const res = await sendLineTestMessage({
             targetUserId,
             targetPhone,
             customMessage: message,
-            statusType: statusType as any
+            statusType: statusType as any,
+            testVars
         });
         return json(res, { status: res.success ? 200 : 400 });
     } catch (e: any) {
