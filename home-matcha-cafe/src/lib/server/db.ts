@@ -272,7 +272,11 @@ export async function createOrder(data: {
     await ensurePgSchema();
     const orderCode = generateOrderId();
     const status: Order['status'] =
-        data.status || (data.totalPrice === 0 && data.redeemedFreeCups ? 'paid' : 'pending');
+        data.status || (
+            (data.totalPrice === 0 && data.redeemedFreeCups) || !data.needsManualReview
+                ? 'paid'
+                : 'pending'
+        );
 
     let memberName = data.memberName?.trim() || '';
     if (!memberName && data.phone) {

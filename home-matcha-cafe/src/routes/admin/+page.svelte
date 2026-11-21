@@ -631,6 +631,102 @@
         }
     }
 
+    // ==============================================
+    // 🔍 Modal ตรวจสอบคำขออนุมัติสลิปโอนเงิน (Manual Slip Review Modal)
+    // ==============================================
+    let isSlipReviewModalOpen = $state(false);
+    let reviewCurrentOrder = $state<AdminOrder | null>(null);
+    let isProcessingSlipReview = $state(false);
+
+    function openSlipReviewModal(order: AdminOrder) {
+        reviewCurrentOrder = order;
+        isSlipReviewModalOpen = true;
+    }
+
+    function closeSlipReviewModal() {
+        isSlipReviewModalOpen = false;
+        reviewCurrentOrder = null;
+    }
+
+    function navigateSlipReview(direction: 'prev' | 'next') {
+        if (!reviewCurrentOrder || manualReviewOrders.length === 0) return;
+        const currentIdx = manualReviewOrders.findIndex(
+            (o) => o.id === reviewCurrentOrder?.id || o.order_id === reviewCurrentOrder?.order_id
+        );
+        if (currentIdx === -1) {
+            reviewCurrentOrder = manualReviewOrders[0];
+            return;
+        }
+        if (direction === 'prev') {
+            const prevIdx = (currentIdx - 1 + manualReviewOrders.length) % manualReviewOrders.length;
+            reviewCurrentOrder = manualReviewOrders[prevIdx];
+        } else {
+            const nextIdx = (currentIdx + 1) % manualReviewOrders.length;
+            reviewCurrentOrder = manualReviewOrders[nextIdx];
+        }
+    }
+
+    async function handleApproveSlipFromModal() {
+        if (!reviewCurrentOrder || isProcessingSlipReview) return;
+        isProcessingSlipReview = true;
+        const targetId = reviewCurrentOrder.id;
+        const currentIdx = manualReviewOrders.findIndex(
+            (o) => o.id === targetId || o.order_id === targetId
+        );
+
+        await updateStatus(targetId, 'paid');
+        isProcessingSlipReview = false;
+
+        const remaining = manualReviewOrders.filter(
+            (o) => o.id !== targetId && o.order_id !== targetId
+        );
+        if (remaining.length > 0) {
+            const nextIdx = currentIdx < remaining.length ? currentIdx : 0;
+            reviewCurrentOrder = remaining[nextIdx];
+        } else {
+            isSlipReviewModalOpen = false;
+            reviewCurrentOrder = null;
+        }
+    }
+
+    async function handleRejectSlipFromModal() {
+        if (!reviewCurrentOrder || isProcessingSlipReview) return;
+        const targetId = reviewCurrentOrder.id;
+        const targetCode = reviewCurrentOrder.order_id || targetId;
+
+        const result = await swal.fire({
+            title: 'ปฏิเสธสลิปนี้?',
+            text: `ต้องการปฏิเสธสลิปของออเดอร์ ${targetCode} และยกเลิกคำสั่งซื้อใช่หรือไม่?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#94a3b8',
+            confirmButtonText: 'ใช่, ปฏิเสธสลิป',
+            cancelButtonText: 'ยกเลิก'
+        });
+
+        if (result.isConfirmed) {
+            isProcessingSlipReview = true;
+            const currentIdx = manualReviewOrders.findIndex(
+                (o) => o.id === targetId || o.order_id === targetId
+            );
+
+            await updateStatus(targetId, 'cancelled');
+            isProcessingSlipReview = false;
+
+            const remaining = manualReviewOrders.filter(
+                (o) => o.id !== targetId && o.order_id !== targetId
+            );
+            if (remaining.length > 0) {
+                const nextIdx = currentIdx < remaining.length ? currentIdx : 0;
+                reviewCurrentOrder = remaining[nextIdx];
+            } else {
+                isSlipReviewModalOpen = false;
+                reviewCurrentOrder = null;
+            }
+        }
+    }
+
     // รายการเมนูสำหรับเลือกเมนูบ่ม (อัปเดตตามรายการเมนูจริงอัตโนมัติ)
     let availableDrinks = $derived(
         menuItems.length > 0
@@ -3871,10 +3967,10 @@
                         </div>
                     </div>
                     <button
-                        onclick={() => (selectedFilter = 'pending')}
-                        style="background: #d97706; color: #fff; border: none; border-radius: 999px; padding: 0.45rem 1.1rem; font-weight: 700; font-size: 0.825rem; cursor: pointer;"
+                        onclick={() => (manualReviewOrders.length > 0 ? openSlipReviewModal(manualReviewOrders[0]) : (selectedFilter = 'pending'))}
+                        style="background: #d97706; color: #fff; border: none; border-radius: 999px; padding: 0.55rem 1.25rem; font-weight: 800; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.35);"
                     >
-                        🔍 ดูรายการรอตรวจสลิป ({manualReviewOrders.length})
+                        🔍 ตรวจคำขออนุมัติ ({manualReviewOrders.length})
                     </button>
                 </div>
             </div>
@@ -4415,11 +4511,19 @@
                             <!-- ปุ่ม Action เดี่ยวสำหรับเปลี่ยนสถานะ -->
                             <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;">
                                 {#if order.status === 'pending'}
-                                    <button onclick={() => updateStatus(order.id, 'paid')} class="btn-matcha-primary" style="padding: 0.45rem 0.95rem; font-size: 0.82rem;">
-                                        ✓ อนุมัติสลิป (รับยอด)
+                                    <button 
+                                        type="button"
+                                        onclick={() => openSlipReviewModal(order)} 
+                                        class="btn-matcha-primary" 
+                                        style="padding: 0.45rem 0.95rem; font-size: 0.82rem; background: #d97706; display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 700; border-radius: 8px;"
+                                    >
+                                        🔍 ตรวจคำขอ & สลิป
+                                    </button>
+                                    <button onclick={() => updateStatus(order.id, 'paid')} class="btn-matcha-primary" style="padding: 0.45rem 0.85rem; font-size: 0.8rem; background: #166534;">
+                                        ✓ อนุมัติด่วน
                                     </button>
                                     <button onclick={() => updateStatus(order.id, 'cancelled')} class="btn-danger" style="padding: 0.45rem 0.85rem; font-size: 0.8rem;">
-                                        ✕ ปฏิเสธสลิป
+                                        ✕ ปฏิเสธ
                                     </button>
                                 {/if}
                                 {#if order.status === 'paid'}
@@ -5082,6 +5186,16 @@
                                                         <option value="completed">ส่งสำเร็จ</option>
                                                         <option value="cancelled">ยกเลิก</option>
                                                     </select>
+                                                    {#if order.status === 'pending'}
+                                                        <button
+                                                            type="button"
+                                                            onclick={() => openSlipReviewModal(order)}
+                                                            style="padding: 0.35rem 0.75rem; font-size: 0.78rem; background: #d97706; color: #ffffff; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;"
+                                                            title="เปิดหน้าต่างตรวจคำขออนุมัติสลิป"
+                                                        >
+                                                            🔍 ตรวจสลิป
+                                                        </button>
+                                                    {/if}
                                                     <button
                                                         type="button"
                                                         onclick={() => openEditOrderModal(order)}
@@ -9317,6 +9431,242 @@
                         style="flex: 1; padding: 0.85rem; border-radius: 12px; font-weight: 700;"
                     >
                         ✕ ยกเลิก
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- ============================================== -->
+    <!-- 🔍 Modal ตรวจสอบคำขออนุมัติสลิป (Slip Review Modal) -->
+    <!-- ============================================== -->
+    {#if isSlipReviewModalOpen && reviewCurrentOrder}
+        {@const reviewOrder = reviewCurrentOrder}
+        {@const currentIdx = manualReviewOrders.findIndex(
+            (o) => o.id === reviewOrder.id || o.order_id === reviewOrder.order_id
+        )}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+            style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 999999; padding: 1rem; overflow-y: auto;"
+            onclick={closeSlipReviewModal}
+        >
+            <div
+                style="background: #ffffff; border-radius: 24px; max-width: 720px; width: 100%; padding: 1.5rem 1.75rem; text-align: left; box-shadow: 0 25px 60px rgba(0,0,0,0.35); max-height: 92vh; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 1.25rem;"
+                onclick={(e) => e.stopPropagation()}
+            >
+                <!-- Modal Top Header -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 0.85rem; gap: 0.75rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                            <span style="font-size: 1.3rem; font-weight: 800; color: #92400e; display: inline-flex; align-items: center; gap: 0.4rem;">
+                                🔍 ตรวจสอบคำขออนุมัติสลิป
+                            </span>
+                            <span style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-size: 0.8rem; font-weight: 800; padding: 0.15rem 0.6rem; border-radius: 999px;">
+                                #{reviewOrder.order_id || reviewOrder.id}
+                            </span>
+                        </div>
+                        <p style="margin: 0.25rem 0 0 0; font-size: 0.82rem; color: #64748b;">
+                            ลูกค้า: <strong>{reviewOrder.name}</strong>{#if reviewOrder.memberName && reviewOrder.memberName.trim() !== reviewOrder.name.trim()} <span style="color: #166534; font-weight: 700;">({reviewOrder.memberName})</span>{/if} · โทร: <a href="tel:{reviewOrder.phone}" style="color: #166534; font-weight: 700;">{reviewOrder.phone}</a>
+                        </p>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                        {#if manualReviewOrders.length > 1}
+                            <div style="display: flex; align-items: center; gap: 0.25rem; background: #f1f5f9; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.78rem; font-weight: 700; color: #475569;">
+                                <button
+                                    type="button"
+                                    onclick={() => navigateSlipReview('prev')}
+                                    style="border: none; background: transparent; cursor: pointer; padding: 0 0.25rem; font-size: 0.85rem; font-weight: 800; color: #1e293b;"
+                                    title="คำขอก่อนหน้า"
+                                >
+                                    ◀
+                                </button>
+                                <span>{currentIdx >= 0 ? currentIdx + 1 : 1}/{manualReviewOrders.length}</span>
+                                <button
+                                    type="button"
+                                    onclick={() => navigateSlipReview('next')}
+                                    style="border: none; background: transparent; cursor: pointer; padding: 0 0.25rem; font-size: 0.85rem; font-weight: 800; color: #1e293b;"
+                                    title="คำขอถัดไป"
+                                >
+                                    ▶
+                                </button>
+                            </div>
+                        {/if}
+                        <button
+                            type="button"
+                            onclick={closeSlipReviewModal}
+                            style="background: #f1f5f9; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 1.1rem; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+                            title="ปิดหน้าต่าง"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                </div>
+
+                <!-- เหตุผลที่ลูกค้าขอให้อนุมัติ (Reason Alert Banner) -->
+                <div style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border: 1.5px solid #f59e0b; border-radius: 14px; padding: 0.85rem 1.15rem; display: flex; align-items: flex-start; gap: 0.65rem;">
+                    <span style="font-size: 1.3rem; line-height: 1;">🔔</span>
+                    <div style="flex: 1;">
+                        <span style="font-weight: 800; font-size: 0.85rem; color: #92400e; display: block;">
+                            เหตุผลที่ลูกค้าขอให้แอดมินช่วยตรวจสอบ:
+                        </span>
+                        <p style="margin: 0.15rem 0 0 0; font-size: 0.82rem; color: #b45309; line-height: 1.45;">
+                            {reviewOrder.reviewReason || 'ลูกค้าแจ้งโอนเงินแล้วแต่ยืนยันสลิปไม่ผ่าน (ขอให้แอดมินช่วยตรวจยอดและอนุมัติ)'}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- กล่อง 2 คอลัมน์: ซ้าย = รูปภาพสลิป, ขวา = รายละเอียดเพื่อเทียบยอด -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; align-items: start;">
+                    <!-- ฝั่งซ้าย: รูปภาพสลิป -->
+                    <div style="display: flex; flex-direction: column; gap: 0.65rem; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 1rem; text-align: center;">
+                        <span style="font-size: 0.82rem; font-weight: 800; color: #334155; text-align: left;">
+                            🧾 รูปภาพสลิปโอนเงินที่แนบมา:
+                        </span>
+
+                        {#if reviewOrder.slipImage}
+                            <div style="width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid #cbd5e1; background: #ffffff; max-height: 380px; display: flex; align-items: center; justify-content: center;">
+                                <img
+                                    src={reviewOrder.slipImage}
+                                    alt="สลิปโอนเงินออเดอร์ #{reviewOrder.order_id}"
+                                    style="width: 100%; max-height: 380px; object-fit: contain; display: block;"
+                                />
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                                <a
+                                    href={reviewOrder.slipImage}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    class="btn-matcha-outline"
+                                    style="padding: 0.35rem 0.85rem; font-size: 0.78rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;"
+                                >
+                                    🔍 ดูรูปภาพขนาดเต็มในแท็บใหม่
+                                </a>
+                            </div>
+                        {:else}
+                            <div style="padding: 2.5rem 1rem; color: #94a3b8; font-size: 0.9rem;">
+                                ⚠️ ออเดอร์นี้ไม่มีไฟล์สลิปแนบมา
+                            </div>
+                        {/if}
+                    </div>
+
+                    <!-- ฝั่งขวา: รายละเอียดคำสั่งซื้อ & ข้อมูลที่อ่านได้จากสลิป -->
+                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                        <!-- บล็อกยอดเงินที่ต้องตรงกัน -->
+                        <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 16px; padding: 1rem;">
+                            <span style="font-size: 0.78rem; font-weight: 700; color: #166534; text-transform: uppercase;">
+                                💰 ยอดเงินในระบบที่ต้องชำระ
+                            </span>
+                            <div style="font-size: 1.85rem; font-weight: 900; color: #14532d; font-family: 'Outfit', sans-serif; line-height: 1.2; margin-top: 0.2rem;">
+                                {reviewOrder.totalPrice} ฿
+                            </div>
+
+                            {#if reviewOrder.slipAmount || reviewOrder.slipRef || reviewOrder.slipTimeText}
+                                <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed #86efac; font-size: 0.8rem; color: #166534; display: flex; flex-direction: column; gap: 0.25rem;">
+                                    {#if reviewOrder.slipAmount}
+                                        <div><strong>ยอดที่ระบบอ่านได้:</strong> {reviewOrder.slipAmount} ฿ {#if reviewOrder.slipAmount === reviewOrder.totalPrice}<span style="color: #15803d; font-weight: 800;">(ตรงกัน ✓)</span>{:else}<span style="color: #b91c1c; font-weight: 800;">(ไม่ตรงกับยอดที่สั่ง ⚠️)</span>{/if}</div>
+                                    {/if}
+                                    {#if reviewOrder.slipRef}
+                                        <div><strong>เลขอ้างอิงสลิป:</strong> <code>{reviewOrder.slipRef}</code></div>
+                                    {/if}
+                                    {#if reviewOrder.slipTimeText}
+                                        <div><strong>เวลาโอนในสลิป:</strong> {reviewOrder.slipTimeText}</div>
+                                    {/if}
+                                </div>
+                            {/if}
+                        </div>
+
+                        <!-- ข้อมูลจัดส่ง & วันรอบ -->
+                        <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 1rem; font-size: 0.82rem; display: flex; flex-direction: column; gap: 0.45rem;">
+                            <div>
+                                <span style="color: #64748b;">📅 วันที่ส่ง:</span> 
+                                <strong style="color: #1e293b;">{formatThaiDateDisplay(reviewOrder.deliveryDate || reviewOrder.createdAt.slice(0, 10))}</strong>
+                                <span style="margin-left: 0.5rem; color: #64748b;">⏰ รอบส่ง:</span>
+                                <strong style="color: #1e293b;">{reviewOrder.deliveryRound || 'รอบปกติ'}</strong>
+                            </div>
+                            <div>
+                                <span style="color: #64748b;">📍 สถานที่ส่ง:</span> 
+                                <strong style="color: #1e293b;">{reviewOrder.address}</strong>
+                            </div>
+                            {#if reviewOrder.message}
+                                <div>
+                                    <span style="color: #64748b;">💬 โน้ตลูกค้า:</span> 
+                                    <span style="color: #0f172a; font-style: italic;">"{reviewOrder.message}"</span>
+                                </div>
+                            {/if}
+                        </div>
+
+                        <!-- รายการสินค้าในตะกร้า -->
+                        <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 0.85rem 1rem;">
+                            <span style="font-size: 0.78rem; font-weight: 800; color: #475569; display: block; margin-bottom: 0.4rem;">
+                                🍵 รายการเครื่องดื่ม ({reviewOrder.basket?.length || 0} รายการ):
+                            </span>
+                            <div style="max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.35rem;">
+                                {#each reviewOrder.basket || [] as item}
+                                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; border-bottom: 1px dashed #e2e8f0; padding-bottom: 0.25rem;">
+                                        <div>
+                                            <span style="font-weight: 700; color: #1e293b;">{item.name || item.thaiName}</span>
+                                            <span style="color: #64748b; font-size: 0.74rem;">
+                                                (หวาน {item.sweetness ?? 50}%{#if item.addonName}, +{item.addonName}{/if})
+                                            </span>
+                                        </div>
+                                        <div style="font-weight: 700; color: #166534; white-space: nowrap;">
+                                            x{item.quantity || 1} ({item.price * (item.quantity || 1)}฿)
+                                        </div>
+                                    </div>
+                                {/each}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Action Buttons -->
+                <div style="display: flex; gap: 0.65rem; border-top: 1.5px solid #e2e8f0; padding-top: 1.15rem; flex-wrap: wrap;">
+                    <button
+                        type="button"
+                        onclick={handleApproveSlipFromModal}
+                        disabled={isProcessingSlipReview}
+                        class="btn-matcha-primary"
+                        style="flex: 2; min-width: 180px; padding: 0.85rem; font-size: 0.98rem; font-weight: 800; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; background: #166534; box-shadow: 0 4px 14px rgba(22, 101, 52, 0.3);"
+                    >
+                        {#if isProcessingSlipReview}
+                            ⏳ กำลังอนุมัติ...
+                        {:else}
+                            ✓ อนุมัติสลิป & รับยอดเข้าคิวชง
+                        {/if}
+                    </button>
+
+                    <button
+                        type="button"
+                        onclick={handleRejectSlipFromModal}
+                        disabled={isProcessingSlipReview}
+                        class="btn-danger"
+                        style="flex: 1; min-width: 130px; padding: 0.85rem; font-size: 0.92rem; font-weight: 700; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;"
+                    >
+                        ✕ ปฏิเสธสลิป
+                    </button>
+
+                    <button
+                        type="button"
+                        onclick={() => {
+                            const ord = reviewOrder;
+                            closeSlipReviewModal();
+                            openEditOrderModal(ord);
+                        }}
+                        style="padding: 0.85rem 1rem; border-radius: 12px; font-weight: 700; font-size: 0.88rem; background: #f8fafc; border: 1.5px solid #cbd5e1; color: #334155; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;"
+                        title="เปิดแก้ไขรายละเอียดออเดอร์"
+                    >
+                        ✏️ แก้ไขออเดอร์
+                    </button>
+
+                    <button
+                        type="button"
+                        onclick={closeSlipReviewModal}
+                        class="btn-matcha-outline"
+                        style="padding: 0.85rem 1rem; border-radius: 12px; font-weight: 700; font-size: 0.88rem;"
+                    >
+                        ปิด
                     </button>
                 </div>
             </div>
