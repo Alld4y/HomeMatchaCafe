@@ -824,35 +824,60 @@
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     }
 
-    function compareOrdersWithDateAndDeliveryTime(a: AdminOrder, b: AdminOrder): number {
+    // ฟังก์ชันจัดเรียงสำหรับ "กระดานคิวชงและคำสั่งซื้อ (เฉพาะคิวปัจจุบัน)":
+    // เรียงจากบนลงล่างตามเวลา: ส่งก่อนอยู่ล่าง ส่งหลังอยู่บน
+    // 1. วันที่จัดส่ง: วันที่ส่งทีหลังอยู่บน, วันที่ส่งก่อนอยู่ล่าง
+    // 2. เวลานัดส่ง: ส่งทีหลังอยู่บน (เช่น 13:00 น. -> 11:00 น. -> 10:00 น. -> 09:30 น.)
+    // 3. มีเวลานัดส่ง (ส่งหลัง) อยู่บน, ไม่มีเวลานัดส่ง (ส่งก่อน/ทันที) อยู่ล่าง
+    // 4. ถ้าเวลาเท่ากันหรือไม่มีเวลาทั้งคู่ ให้เรียงตามเวลาที่สั่งซื้อ (สั่งทีหลังอยู่บน, สั่งก่อน/ส่งก่อนอยู่ล่าง)
+    function compareOrdersForLiveQueue(a: AdminOrder, b: AdminOrder): number {
         const dateA = a.deliveryDate || a.createdAt.slice(0, 10);
         const dateB = b.deliveryDate || b.createdAt.slice(0, 10);
         if (dateA !== dateB) {
-            return dateA.localeCompare(dateB);
+            return dateB.localeCompare(dateA); // วันที่ส่งทีหลังอยู่บน (ส่งก่อนอยู่ล่าง)
         }
-        return compareOrdersByDeliveryTime(a, b);
+
+        const timeA = extractOrderAppointmentMinutes(a);
+        const timeB = extractOrderAppointmentMinutes(b);
+
+        const hasA = timeA !== null;
+        const hasB = timeB !== null;
+
+        // มีเวลานัดส่ง (ส่งหลัง) อยู่บน, ไม่มีเวลานัดส่ง (ส่งก่อน/ตามคิวปกติ) อยู่ล่าง
+        if (hasA && !hasB) return -1;
+        if (!hasA && hasB) return 1;
+
+        // ถ้ามีเวลานัดส่งทั้งคู่: ส่งหลังอยู่บน (เวลามากกว่า), ส่งก่อนอยู่ล่าง (เวลาน้อยกว่า)
+        if (hasA && hasB && timeA !== timeB) {
+            return timeB! - timeA!;
+        }
+
+        // ถ้าเวลาตรงกัน หรือไม่มีเวลาทั้งคู่: สั่งทีหลังอยู่บน, สั่งก่อน (ส่งก่อน) อยู่ล่าง
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     }
 
     function extractOrderDeliveryMinutes(order: AdminOrder): number {
         return extractOrderAppointmentMinutes(order) ?? 9999;
     }
 
-    // เรียงลำดับคำสั่งซื้อตามวันจัดส่ง, คิวที่ไม่มีเวลานัดส่งขึ้นก่อน, ตามด้วยเวลานัดส่ง (เร็วไปช้า), และเวลาสั่งซื้อ (FIFO)
+    // เรียงลำดับคำสั่งซื้อของคิวงานสด: ส่งก่อนอยู่ล่าง ส่งหลังอยู่บน
     let sortedOrders = $derived(
-        [...orders].sort(compareOrdersWithDateAndDeliveryTime)
+        [...orders].sort(compareOrdersForLiveQueue)
     );
 
     // 🍵 คิวงานปัจจุบัน ณ ตอนนั้น (Live Working Queue):
     // - ตัดออเดอร์ที่ยกเลิก (cancelled) ออก 100% ไม่นำมาแสดงในคิวสดเลย
     // - แสดงเฉพาะออเดอร์ที่ยังต้องทำจริง (pending, paid, brewing, ready_to_ship, delivering)
     // - และออเดอร์ที่ส่งเสร็จแล้วเฉพาะของ "วันนี้" (completed of today)
+    // - เรียงจากบนลงล่างตามเวลา: ส่งก่อนอยู่ล่าง ส่งหลังอยู่บน
     let liveOrders = $derived.by(() => {
-        return sortedOrders.filter((o) => {
+        const list = orders.filter((o) => {
             if (o.status === 'cancelled') return false;
             if (o.status !== 'completed') return true;
             const orderDate = o.deliveryDate || o.createdAt.slice(0, 10);
             return orderDate === todayDateStr;
         });
+        return list.slice().sort(compareOrdersForLiveQueue);
     });
 
     // คำนวณสรุปยอดของคิวงานสด
