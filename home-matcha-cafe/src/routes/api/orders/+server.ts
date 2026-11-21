@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createOrder, getAllOrders, getOrdersByPhone, saveSlipFile, type OrderItem } from '$lib/server/db';
+import { createOrder, getAllOrders, getOrdersByPhone, saveSlipFile, updateOrder, getOrderById, type OrderItem } from '$lib/server/db';
 import { validateSlip } from '$lib/server/slipValidator';
 import { getPromptPayConfig } from '$lib/server/promptpay';
 import { redeemFreeCupPoints } from '$lib/server/members';
@@ -19,6 +19,8 @@ export const GET: RequestHandler = async ({ url }) => {
 export const POST: RequestHandler = async ({ request }) => {
     try {
         const contentType = request.headers.get('content-type') || '';
+        let orderId = '';
+        let isPendingAction = false;
         let recipientName = '';
         let memberName = '';
         let phone = '';
@@ -42,6 +44,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
         if (contentType.includes('multipart/form-data')) {
             const formData = await request.formData();
+            orderId = (formData.get('orderId') as string) || '';
             recipientName = (formData.get('recipientName') as string) || '';
             memberName = (formData.get('memberName') as string) || '';
             phone = (formData.get('phone') as string) || '';
@@ -96,6 +99,17 @@ export const POST: RequestHandler = async ({ request }) => {
                 const isDuplicateError = slipValidation.message?.includes('เคยถูกใช้งานในระบบแล้ว');
 
                 if (!slipValidation.isValid && (!isManualReviewRequest || isDuplicateError)) {
+                    // หากมี orderId อยู่แล้ว แนบรูปสลิปที่ตรวจไม่ผ่านไว้ในออเดอร์ด้วย เพื่อให้แอดมินตรวจสอบได้ทันทีเมื่อลูกค้าติดต่อมา
+                    if (orderId && slipFile) {
+                        try {
+                            const savedUrl = await saveSlipFile(slipFile, phone.slice(-4) || 'order');
+                            await updateOrder(orderId, {
+                                slipImage: savedUrl,
+                                reviewReason: `สลิปไม่ผ่าน: ${slipValidation.message}`
+                            });
+                        } catch {}
+                    }
+
                     return json({
                         success: false,
                         message: slipValidation.message,
@@ -119,6 +133,8 @@ export const POST: RequestHandler = async ({ request }) => {
             }
         } else {
             const body = await request.json();
+            orderId = body.orderId || '';
+            isPendingAction = body.action === 'create_pending';
             recipientName = body.name || body.recipientName || '';
             memberName = body.memberName || '';
             phone = body.phone || '';
@@ -162,20 +178,20 @@ export const POST: RequestHandler = async ({ request }) => {
             totalPrice = validBasket.reduce((sum, it) => sum + (it.price * it.quantity), 0);
         }
 
-        // ตรวจสอบความถูกต้องของวันและรอบจัดส่ง รวมถึงเวลาเตรียมชงล่วงหน้าสำหรับรอบรวม
+        // ตรวจสอบความถูกต้องของวันและรอบจัดส่ง
         if (deliveryDate && deliveryRoundId) {
             const hasFermented = validBasket.some(item => 
                 (item.name || '').includes('บ่ม') || (item.thaiName || '').includes('บ่ม') || item.id === 'cold-fermented-matcha-oat-latte'
             );
-            const slotValidation = await validateDeliverySlot(deliveryDate, deliveryRoundId, hasFermented, deliveryRound);
+            const slotValidation = await validateDeliverySlot(deliveryDate, deliveryRoundId, hasFermented);
             if (!slotValidation.isValid) {
                 return json({ success: false, message: slotValidation.message || 'รอบเวลาจัดส่งที่เลือกไม่พร้อมให้บริการ' }, { status: 400 });
             }
         }
 
-        // หากลูกค้าเลือกใช้สิทธิ์แลกฟรี 1 แก้ว ให้หักแต้มทันทีที่สั่งซื้อสำเร็จ
+        // หากลูกค้าเลือกใช้สิทธิ์แลกฟรี 1 แก้ว และไม่ได้เป็นแค่ pending action ให้หักแต้ม
         let redeemedFreeCups = 0;
-        if (useFreeCupReward && phone) {
+        if (useFreeCupReward && phone && !isPendingAction) {
             const redeemRes = await redeemFreeCupPoints(phone);
             if (!redeemRes.success) {
                 return json({ success: false, message: redeemRes.message || 'ไม่สามารถใช้สิทธิ์แลกแก้วฟรีได้' }, { status: 400 });
@@ -183,6 +199,57 @@ export const POST: RequestHandler = async ({ request }) => {
             redeemedFreeCups = 1;
         }
 
+        // คำนวณสถานะออเดอร์
+        const finalStatus = customStatus || (
+            isPendingAction
+                ? 'pending'
+                : ((totalPrice === 0 && redeemedFreeCups > 0)
+                    ? 'paid'
+                    : (requiresManualReview ? 'pending' : 'paid'))
+        );
+
+        // ตรวจสอบว่ามี orderId เดิมที่บันทึกไว้ในขั้นตอนสร้างออเดอร์รอชำระเงินหรือไม่
+        if (orderId) {
+            const existingOrder = await getOrderById(orderId);
+            if (existingOrder) {
+                const updatedOrder = await updateOrder(orderId, {
+                    name: recipientName,
+                    phone: phone,
+                    address: address,
+                    message: sellerMessage,
+                    basket: validBasket,
+                    totalPrice: totalPrice,
+                    deliveryDate: deliveryDate || undefined,
+                    deliveryRound: deliveryRound || undefined,
+                    deliveryRoundId: deliveryRoundId || undefined,
+                    status: finalStatus,
+                    needsManualReview: requiresManualReview,
+                    reviewReason: reviewReason || undefined,
+                    ...(slipImageUrl ? {
+                        slipImage: slipImageUrl,
+                        slipRef: detectedSlipRef,
+                        slipAmount: detectedSlipAmount,
+                        slipTimeText: detectedSlipTimeText,
+                        qrGeneratedAt: qrGeneratedAt || undefined
+                    } : {})
+                });
+
+                return json({
+                    success: true,
+                    requiresManualReview,
+                    message: isPendingAction
+                        ? 'บันทึกออเดอร์รอชำระเงินเข้าสู่กระดานคิวเรียบร้อยแล้ว'
+                        : (requiresManualReview
+                            ? 'ส่งคำขอให้แอดมินตรวจสอบสลิปด้วยตนเองเรียบร้อยแล้ว'
+                            : 'บันทึกคำสั่งซื้อสำเร็จและสลิปผ่านการตรวจสอบแล้ว'),
+                    order: updatedOrder,
+                    order_id: updatedOrder?.order_id || orderId,
+                    slipRef: detectedSlipRef
+                });
+            }
+        }
+
+        // หากไม่มี orderId หรือไม่พบออเดอร์เดิม ให้สร้างออเดอร์ใหม่
         const newOrder = await createOrder({
             name: recipientName,
             memberName: memberName || undefined,
@@ -203,19 +270,17 @@ export const POST: RequestHandler = async ({ request }) => {
             deliveryRoundId: deliveryRoundId || undefined,
             redeemedFreeCups,
             discountAmount,
-            status: customStatus || (
-                (totalPrice === 0 && redeemedFreeCups > 0)
-                    ? 'paid'
-                    : (requiresManualReview ? 'pending' : 'paid')
-            )
+            status: finalStatus
         });
 
         return json({
             success: true,
             requiresManualReview,
-            message: requiresManualReview
-                ? 'ส่งคำขอให้แอดมินตรวจสอบสลิปด้วยตนเองเรียบร้อยแล้ว'
-                : 'บันทึกคำสั่งซื้อสำเร็จและสลิปผ่านการตรวจสอบแล้ว',
+            message: isPendingAction
+                ? 'บันทึกออเดอร์รอชำระเงินเข้าสู่กระดานคิวเรียบร้อยแล้ว'
+                : (requiresManualReview
+                    ? 'ส่งคำขอให้แอดมินตรวจสอบสลิปด้วยตนเองเรียบร้อยแล้ว'
+                    : 'บันทึกคำสั่งซื้อสำเร็จและสลิปผ่านการตรวจสอบแล้ว'),
             order: newOrder,
             order_id: newOrder.order_id,
             slipRef: detectedSlipRef

@@ -569,6 +569,11 @@ export interface UpdateOrderInput {
     basket?: OrderItem[];
     needsManualReview?: boolean;
     reviewReason?: string;
+    slipImage?: string;
+    slipRef?: string;
+    slipAmount?: number;
+    slipTimeText?: string;
+    qrGeneratedAt?: string;
 }
 
 export async function updateOrder(id: string, updates: UpdateOrderInput): Promise<Order | null> {
@@ -665,6 +670,31 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
     if (updates.reviewReason !== undefined) {
         fields.push(`review_reason = $${paramIdx++}`);
         values.push(updates.reviewReason);
+    }
+
+    if (updates.slipImage !== undefined) {
+        fields.push(`slip_image = $${paramIdx++}`);
+        values.push(updates.slipImage);
+    }
+
+    if (updates.slipRef !== undefined) {
+        fields.push(`slip_ref = $${paramIdx++}`);
+        values.push(updates.slipRef);
+    }
+
+    if (updates.slipAmount !== undefined) {
+        fields.push(`slip_amount = $${paramIdx++}`);
+        values.push(updates.slipAmount);
+    }
+
+    if (updates.slipTimeText !== undefined) {
+        fields.push(`slip_time_text = $${paramIdx++}`);
+        values.push(updates.slipTimeText);
+    }
+
+    if (updates.qrGeneratedAt !== undefined) {
+        fields.push(`qr_generated_at = $${paramIdx++}`);
+        values.push(updates.qrGeneratedAt);
     }
 
     fields.push(`updated_at = NOW()`);

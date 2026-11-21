@@ -14,6 +14,7 @@
     let promptpayId = $state<string>('0966514809');
     let promptpayName = $state<string>('ทิพย์สุดา มณฑา');
     let isTestMode = $state<boolean>(false);
+    let pendingOrderId = $state<string>('');
 
     // สิทธิ์แลกแก้วฟรีจากบัตรสะสมแต้ม
     let checkoutMember = $state<any>(null);
@@ -276,6 +277,51 @@
         }
         useFreeCupReward = !useFreeCupReward;
         await generateNewQR(true);
+        await registerPendingOrder();
+    }
+
+    async function registerPendingOrder() {
+        if (!userData || !userData.name || !userData.phone || !storedBasket || storedBasket.length === 0) return;
+        const savedPendingId = pendingOrderId || (typeof localStorage !== 'undefined' ? localStorage.getItem('hmc_pending_order_id') || '' : '');
+
+        try {
+            const payload = {
+                action: 'create_pending',
+                orderId: savedPendingId || undefined,
+                name: userData.name || '',
+                memberName: memberCtx?.member?.fullName || userData.memberName || '',
+                phone: userData.phone || '',
+                address: userData.address || '',
+                message: userData.message || '',
+                basket: storedBasket || [],
+                totalPrice: totalPrice,
+                deliveryDate: userData.deliveryDate || '',
+                deliveryRound: userData.deliveryRound || '',
+                deliveryRoundId: userData.deliveryRoundId || '',
+                useFreeCupReward,
+                discountAmount: useFreeCupReward ? freeCupDiscount : 0,
+                status: 'pending'
+            };
+
+            const res = await fetch('/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                const assignedId = data.order_id || data.order?.id;
+                if (assignedId) {
+                    pendingOrderId = assignedId;
+                    if (typeof localStorage !== 'undefined') {
+                        localStorage.setItem('hmc_pending_order_id', assignedId);
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('Failed to register pending order:', err);
+        }
     }
 
     function getLineExternalUrl(): string {
@@ -602,7 +648,9 @@
             })
             .catch(() => {});
 
-        generateNewQR(false);
+        generateNewQR(false).then(() => {
+            registerPendingOrder();
+        });
 
         const timer = setInterval(updateCountdown, 1000);
         return () => clearInterval(timer);
@@ -787,6 +835,10 @@
         isSubmittingLock = true;
 
         const formData = new FormData();
+        const activePendingId = pendingOrderId || (typeof localStorage !== 'undefined' ? localStorage.getItem('hmc_pending_order_id') || '' : '');
+        if (activePendingId) {
+            formData.append('orderId', activePendingId);
+        }
         if (selectedFile) {
             formData.append('slipImage', selectedFile);
         }
@@ -821,6 +873,7 @@
                 cart.clearCart();
                 localStorage.removeItem('qrDataUrl');
                 localStorage.removeItem('hmc_qr_session');
+                localStorage.removeItem('hmc_pending_order_id');
                 if (memberCtx?.refreshMember) {
                     memberCtx.refreshMember();
                 }

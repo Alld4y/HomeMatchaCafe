@@ -737,41 +737,11 @@ export async function validateDeliverySlot(
         }
     }
 
-    // 2. ตรวจสอบเวลาตัดรอบของรอบส่งนั้นๆ
+    // 2. ตรวจสอบเวลาตัดรอบของรอบส่งนั้นๆ (เวลาเผื่อชงล่วงหน้า 45 นาทีสำหรับรอบรวม ถูกตรวจสอบตั้งแต่หน้าเลือกรอบ/เวลาส่งแล้ว)
     const [roundCutoffH, roundCutoffM] = (round.cutoffTime || '06:00').split(':').map(Number);
     const roundDeadline = new Date(y, m - 1, d, roundCutoffH, roundCutoffM, 59, 999);
 
-    const isAllDay = round.id === 'allday' || Boolean(round.isAllDayOpen);
-    const leadMinutes = isAllDay ? (round.leadTimeMinutes || settings.alldayLeadTimeMinutes || 45) : 0;
-
-    if (diffDays === 0 && isAllDay && leadMinutes > 0) {
-        if (now.getTime() + leadMinutes * 60 * 1000 > roundDeadline.getTime()) {
-            return {
-                isValid: false,
-                message: `รอบ ${round.name} (${round.timeSlot}) ของวันนี้ปิดรับออเดอร์แล้วค่ะ เนื่องจากต้องสั่งล่วงหน้าอย่างน้อย ${leadMinutes} นาทีเพื่อให้แอดมินมีเวลาเตรียมชงก่อนหมดรอบส่ง (${round.cutoffTime} น.)`
-            };
-        }
-
-        if (preferredDeliveryTime && preferredDeliveryTime.trim()) {
-            const timeMatch = preferredDeliveryTime.match(/(\d{1,2})[:.](\d{2})/);
-            if (timeMatch) {
-                const targetH = parseInt(timeMatch[1], 10);
-                const targetM = parseInt(timeMatch[2], 10);
-                const prefDeliveryMs = new Date(now.getFullYear(), now.getMonth(), now.getDate(), targetH, targetM, 0).getTime();
-                const minAllowedMs = now.getTime() + leadMinutes * 60 * 1000;
-
-                if (prefDeliveryMs < minAllowedMs) {
-                    const earliestD = new Date(minAllowedMs);
-                    const eH = String(earliestD.getHours()).padStart(2, '0');
-                    const eM = String(earliestD.getMinutes()).padStart(2, '0');
-                    return {
-                        isValid: false,
-                        message: `สำหรับรอบรวมของวันนี้ ต้องระบุเวลานัดรับล่วงหน้าอย่างน้อย ${leadMinutes} นาทีเพื่อให้แอดมินมีเวลาเตรียมชงค่ะ (เวลาจัดส่งที่เร็วที่สุดที่เลือกได้คือ ${eH}:${eM} น.)`
-                    };
-                }
-            }
-        }
-    } else if (now.getTime() > roundDeadline.getTime()) {
+    if (now.getTime() > roundDeadline.getTime()) {
         return {
             isValid: false,
             message: diffDays === 0
