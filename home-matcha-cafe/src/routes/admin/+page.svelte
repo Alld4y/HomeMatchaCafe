@@ -752,9 +752,94 @@
         return `${y}-${m}-${day}`;
     });
 
-    // เรียงลำดับคำสั่งซื้อตามเวลาที่สั่ง (FIFO: สั่งก่อนอยู่บนสุด ตามบรีฟแม่ค้า)
+    // ฟังก์ชันช่วยแยกเวลาเป็นนาทีสำหรับจัดเรียงก่อน-หลัง
+    function extractMinutesFromString(str: string): number {
+        if (!str) return 9999;
+        // ถ้ามี '·' หรือ 'นัดส่ง' ให้ดูเวลาหลัง '·' ก่อน เพื่อไม่ให้ไป match โดนช่วงเวลาของรอบใหญ่ เช่น (09:00–13:00 น.)
+        let target = str;
+        if (str.includes('·')) {
+            target = str.split('·').slice(1).join(' ');
+        } else if (str.includes('นัดส่ง')) {
+            target = str.split('นัดส่ง').slice(1).join(' ');
+        }
+        const match = target.match(/(\d{1,2})[:.](\d{2})/);
+        if (match) {
+            return parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+        }
+        const fallbackMatch = str.match(/(\d{1,2})[:.](\d{2})/);
+        return fallbackMatch ? parseInt(fallbackMatch[1], 10) * 60 + parseInt(fallbackMatch[2], 10) : 9999;
+    }
+
+    // ดึงเวลานัดส่ง (เป็นนาที) จากออเดอร์ ถ้าไม่มีเวลานัดส่งเฉพาะให้คืนค่า null
+    function extractOrderAppointmentMinutes(order: AdminOrder): number | null {
+        // 1. ถ้ามี preferredDeliveryTime ชัดเจน
+        const prefTime = (order as any).preferredDeliveryTime as string | undefined;
+        if (prefTime && prefTime.trim()) {
+            const m = prefTime.match(/(\d{1,2})[:.](\d{2})/);
+            if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+        }
+
+        // 2. ถ้าใน deliveryRound มีการระบุ '·' หรือ 'นัดส่ง'
+        const raw = (order.deliveryRound || '').trim();
+        if (raw.includes('·') || raw.includes('นัดส่ง')) {
+            let appointmentPart = raw;
+            if (raw.includes('·')) {
+                appointmentPart = raw.split('·').slice(1).join(' ').trim();
+            } else if (raw.includes('นัดส่ง')) {
+                appointmentPart = raw.split('นัดส่ง').slice(1).join(' ').trim();
+            }
+            const m = appointmentPart.match(/(\d{1,2})[:.](\d{2})/);
+            if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+        }
+
+        return null;
+    }
+
+    // ฟังก์ชันจัดเรียงออเดอร์ตามเวลาส่ง:
+    // 1. ไม่มีข้อมูลเวลา (null) ขึ้นก่อนเลย (ของเก่า / ส่งตามคิวปกติ)
+    // 2. ถ้ามีเวลานัดส่ง ให้เรียงตามเวลานัดส่ง (เร็วไปช้า: 09:30 -> 10:00 -> 11:00 -> 13:00)
+    // 3. ถ้าเวลาเท่ากันหรือไม่มีเวลาทั้งคู่ ให้เรียงตามเวลาที่สั่งซื้อ (FIFO: สั่งก่อนขึ้นก่อน)
+    function compareOrdersByDeliveryTime(a: AdminOrder, b: AdminOrder): number {
+        const timeA = extractOrderAppointmentMinutes(a);
+        const timeB = extractOrderAppointmentMinutes(b);
+
+        const hasA = timeA !== null;
+        const hasB = timeB !== null;
+
+        // 1. ออเดอร์ที่ไม่มีเวลานัดหมายระบุ เอาขึ้นมาก่อนเลย
+        if (!hasA && hasB) return -1;
+        if (hasA && !hasB) return 1;
+
+        // 2. ถ้าไม่มีเวลาทั้งคู่ ให้เรียงตามเวลาที่สั่งซื้อ (FIFO: สั่งก่อนขึ้นก่อน)
+        if (!hasA && !hasB) {
+            return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        }
+
+        // 3. ถ้ามีเวลานัดหมายทั้งคู่ ให้เรียงตามเวลาที่นัดส่ง (เร็วไปช้า: 09:30 -> 10:00 -> 11:00 -> 13:00)
+        if (timeA! !== timeB!) {
+            return timeA! - timeB!;
+        }
+
+        // 4. ถ้าเวลานัดหมายตรงกัน ให้เรียงตามเวลาที่สั่งซื้อ (FIFO)
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    }
+
+    function compareOrdersWithDateAndDeliveryTime(a: AdminOrder, b: AdminOrder): number {
+        const dateA = a.deliveryDate || a.createdAt.slice(0, 10);
+        const dateB = b.deliveryDate || b.createdAt.slice(0, 10);
+        if (dateA !== dateB) {
+            return dateA.localeCompare(dateB);
+        }
+        return compareOrdersByDeliveryTime(a, b);
+    }
+
+    function extractOrderDeliveryMinutes(order: AdminOrder): number {
+        return extractOrderAppointmentMinutes(order) ?? 9999;
+    }
+
+    // เรียงลำดับคำสั่งซื้อตามวันจัดส่ง, คิวที่ไม่มีเวลานัดส่งขึ้นก่อน, ตามด้วยเวลานัดส่ง (เร็วไปช้า), และเวลาสั่งซื้อ (FIFO)
     let sortedOrders = $derived(
-        [...orders].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+        [...orders].sort(compareOrdersWithDateAndDeliveryTime)
     );
 
     // 🍵 คิวงานปัจจุบัน ณ ตอนนั้น (Live Working Queue):
@@ -787,18 +872,6 @@
     let readyToShipCount = $derived(liveOrders.filter((o) => o.status === 'ready_to_ship').length);
     let todayCompletedCount = $derived(liveOrders.filter((o) => o.status === 'completed').length);
     let completedCount = $derived(orders.filter((o) => o.status === 'completed').length);
-
-    // ฟังก์ชันช่วยแยกเวลาเป็นนาทีสำหรับจัดเรียงก่อน-หลัง
-    function extractMinutesFromString(str: string): number {
-        if (!str) return 9999;
-        const match = str.match(/(\d{1,2})[:.](\d{2})/);
-        return match ? parseInt(match[1], 10) * 60 + parseInt(match[2], 10) : 9999;
-    }
-
-    function extractOrderDeliveryMinutes(order: AdminOrder): number {
-        const raw = (order.deliveryRound || '').trim();
-        return extractMinutesFromString(raw);
-    }
 
     function formatThaiDateDisplay(dateStr: string): string {
         if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr || 'ไม่ระบุวันที่';
@@ -1536,15 +1609,10 @@
         });
     });
 
-    // ออเดอร์ที่ค้างส่ง (รอชง / กำลังชง / พร้อมส่ง / กำลังนำส่ง) เรียงตามเวลาที่ต้องส่ง (เร็วไปช้า)
+    // ออเดอร์ที่ค้างส่ง (รอชง / กำลังชง / พร้อมส่ง / กำลังนำส่ง) เรียงตามเวลาที่ต้องส่ง (ไม่มีเวลานัดขึ้นก่อน -> เวลาเร็วไปช้า -> FIFO)
     let pendingDeliveryOrders = $derived.by(() => {
         const list = deliveryAssistantOrders.filter((o) => o.status !== 'completed');
-        return list.slice().sort((a, b) => {
-            const timeA = extractOrderDeliveryMinutes(a);
-            const timeB = extractOrderDeliveryMinutes(b);
-            if (timeA !== timeB) return timeA - timeB;
-            return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        });
+        return list.slice().sort(compareOrdersByDeliveryTime);
     });
 
     // ออเดอร์ที่ส่งเสร็จแล้วในรอบนี้
