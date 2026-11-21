@@ -108,6 +108,9 @@ export interface StoreSettings {
     loyaltyRedeemableItemIds: string[];
     notifications?: NotificationSettings;
     lineOa: LineOaSettings;
+    adminPhone?: string;
+    adminTestPriceEnabled?: boolean;
+    adminTestPrice?: number;
 }
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
@@ -258,7 +261,10 @@ const DEFAULT_SETTINGS: StoreSettings = {
         },
         ALLDAY_ROUND_DEFAULT
     ],
-    calendar: {}
+    calendar: {},
+    adminPhone: '0641163533, 0966514809',
+    adminTestPriceEnabled: false,
+    adminTestPrice: 1
 };
 
 export function formatDateKey(d: Date): string {
@@ -436,7 +442,10 @@ function normalizeSettings(parsed: any): StoreSettings {
             notifyAdminOnSlipUploaded: parsedLineOa.notifyAdminOnSlipUploaded !== false
         },
         deliveryRounds: rounds,
-        calendar: parsed?.calendar || {}
+        calendar: parsed?.calendar || {},
+        adminPhone: typeof parsed?.adminPhone === 'string' && parsed.adminPhone.trim() ? parsed.adminPhone.trim() : (parsedLineOa?.adminPhone || '0641163533, 0966514809'),
+        adminTestPriceEnabled: Boolean(parsed?.adminTestPriceEnabled),
+        adminTestPrice: typeof parsed?.adminTestPrice === 'number' && parsed.adminTestPrice > 0 ? parsed.adminTestPrice : 1
     };
 }
 

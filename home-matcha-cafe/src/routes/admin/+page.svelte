@@ -77,6 +77,9 @@
             lineOaChannelSecret?: string;
         };
         lineOa: LineOaSettingsData;
+        adminPhone?: string;
+        adminTestPriceEnabled?: boolean;
+        adminTestPrice?: number;
     }
 
     interface LineOaKeywordReply {
@@ -234,7 +237,10 @@
             { id: 'noon', name: 'รอบเที่ยง', timeSlot: '12:30–13:00 น.', cutoffTime: '11:30', allowFermented: true, isAllDayOpen: false, enabled: true },
             { id: 'allday', name: 'รอบสาย–บ่าย', timeSlot: '09:00–13:00 น.', cutoffTime: '13:00', allowFermented: true, isAllDayOpen: true, leadTimeMinutes: 45, enabled: true }
         ],
-        calendar: {}
+        calendar: {},
+        adminPhone: '0641163533, 0966514809',
+        adminTestPriceEnabled: false,
+        adminTestPrice: 1
     });
     let isSavingSettings = $state(false);
 
@@ -355,6 +361,18 @@
         newOrderCustomTotal !== null && newOrderCustomTotal >= 0 ? newOrderCustomTotal : newOrderCalculatedTotal
     );
 
+    let newOrderAppointmentTime = $state<string>('');
+
+    function selectAppointmentTimeForNewOrder(t: string) {
+        newOrderAppointmentTime = t;
+        const cleanRound = (newOrderDeliveryRound || 'รอบสาย–บ่าย (09:00–13:00 น.)').split('·')[0].trim();
+        if (t) {
+            newOrderDeliveryRound = `${cleanRound} · นัดส่ง ${t} น.`;
+        } else {
+            newOrderDeliveryRound = cleanRound;
+        }
+    }
+
     function openCreateOrderModal() {
         loadMembers();
         loadMenus();
@@ -367,8 +385,9 @@
         newOrderAddress = 'หน้าร้าน (รับเอง)';
         newOrderSellerMessage = '';
         newOrderDeliveryDate = new Date().toISOString().split('T')[0];
-        newOrderDeliveryRound = 'รับหน้าร้าน / เสิร์ฟทันที';
-        newOrderDeliveryRoundId = 'walkin';
+        newOrderDeliveryRound = 'รอบสาย–บ่าย (09:00–13:00 น.)';
+        newOrderDeliveryRoundId = 'allday';
+        newOrderAppointmentTime = '';
         newOrderStatus = 'paid';
         newOrderPaymentNote = 'ชำระแล้ว (เงินสด/แอดมินรับยอด)';
         newOrderCustomTotal = null;
@@ -5766,6 +5785,73 @@
                 {/if}
             </div>
 
+            <!-- 8. กำหนดราคาทดสอบสำหรับบัญชีแอดมิน (Admin Test Mode & Test Price) -->
+            <div class="form-card" style="padding: 1.5rem; text-align: left; border: 1.5px solid #fde047; background: #fefce8; border-radius: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 1.35rem;">🧪</span>
+                            <h3 style="margin: 0; font-size: 1.2rem; color: #854d0e; font-weight: 800;">
+                                โหมดทดสอบการชำระเงินสำหรับแอดมิน (Admin Test Price)
+                            </h3>
+                        </div>
+                        <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #a16207;">
+                            กำหนดราคาทดสอบ (เช่น 1 บาท) สำหรับบัญชีผู้ดูแลร้าน เพื่อใช้ทดสอบสแกนจ่ายเงินจริงและตรวจสลิปโดยไม่ต้องโอนยอดเต็ม
+                        </p>
+                    </div>
+
+                    <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; background: #ffffff; padding: 0.4rem 0.85rem; border-radius: 999px; border: 1.5px solid #facc15; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <input
+                            type="checkbox"
+                            bind:checked={settings.adminTestPriceEnabled}
+                            style="width: 20px; height: 20px; accent-color: #ca8a04; cursor: pointer;"
+                        />
+                        <span style="font-size: 0.88rem; font-weight: 800; color: {settings.adminTestPriceEnabled ? '#854d0e' : '#64748b'};">
+                            {settings.adminTestPriceEnabled ? '🟢 เปิดใช้งานราคาทดสอบ' : '⚪ ปิดใช้งาน (คิดราคาตามจริง)'}
+                        </span>
+                    </label>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; align-items: flex-end;">
+                    <div>
+                        <label class="form-label" style="font-size: 0.85rem; font-weight: 700; color: #713f12; display: block; margin-bottom: 0.35rem;" for="adminTestPriceInput">
+                            💰 กำหนดยอดเงินทดสอบ (บาท):
+                        </label>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <input
+                                id="adminTestPriceInput"
+                                type="number"
+                                min="1"
+                                step="1"
+                                class="form-input"
+                                bind:value={settings.adminTestPrice}
+                                placeholder="1"
+                                style="font-size: 1.1rem; font-weight: 800; max-width: 140px;"
+                            />
+                            <span style="font-weight: 700; color: #854d0e;">บาท</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="form-label" style="font-size: 0.85rem; font-weight: 700; color: #713f12; display: block; margin-bottom: 0.35rem;" for="adminPhoneList">
+                            📱 เบอร์โทรศัพท์บัญชีแอดมิน (คั่นด้วยจุลภาค):
+                        </label>
+                        <input
+                            id="adminPhoneList"
+                            type="text"
+                            class="form-input"
+                            bind:value={settings.adminPhone}
+                            placeholder="0641163533, 0966514809"
+                            style="font-size: 0.85rem;"
+                        />
+                    </div>
+                </div>
+
+                <p style="margin: 0.85rem 0 0 0; font-size: 0.78rem; color: #854d0e; line-height: 1.45; background: #ffffff; padding: 0.6rem 0.85rem; border-radius: 8px; border: 1px dashed #fde047;">
+                    💡 <strong>หมายเหตุ:</strong> เมื่อเปิดใช้งาน เฉพาะคำสั่งซื้อที่ใส่เบอร์โทรศัพท์ของแอดมิน หรือเข้าใช้งานจากเครื่องแอดมิน จะมีปุ่มลัดเลือกใช้ยอด <strong>{settings.adminTestPrice || 1} บาท</strong> ที่หน้าชำระเงิน และระบบตรวจสลิปจะตรวจสอบตามยอดทดสอบนี้โดยอัตโนมัติ สำหรับลูกค้าทั่วไปจะยังคงคิดราคาปกติเสมอ
+                </p>
+            </div>
+
             <!-- ปุ่มบันทึกการตั้งค่าทั้งหมด -->
             <div style="position: sticky; bottom: 1.5rem; z-index: 1000; width: 100%; display: flex; justify-content: flex-end;">
                 <button 
@@ -8915,21 +9001,77 @@
                                         const val = (e.target as HTMLSelectElement).value;
                                         if (val.includes('เช้า')) newOrderDeliveryRoundId = 'morning';
                                         else if (val.includes('เที่ยง')) newOrderDeliveryRoundId = 'noon';
+                                        else if (val.includes('สาย') || val.includes('บ่าย') || val.includes('รวม') || val.includes('09:00')) newOrderDeliveryRoundId = 'allday';
                                         else newOrderDeliveryRoundId = 'walkin';
+                                        if (newOrderDeliveryRoundId !== 'allday') {
+                                            newOrderAppointmentTime = '';
+                                        }
                                     }}
                                     style="font-size: 0.85rem;"
                                 >
+                                    <option value="รอบสาย–บ่าย (09:00–13:00 น.)">🌿 รอบสาย–บ่าย (09:00–13:00 น.)</option>
                                     <option value="รับหน้าร้าน / เสิร์ฟทันที">☕ รับหน้าร้าน / เสิร์ฟทันที</option>
                                     <option value="รอบเช้า (07:00–08:00 น.)">🌅 รอบเช้า (07:00–08:00 น.)</option>
                                     <option value="รอบเที่ยง (12:30–13:00 น.)">☀️ รอบเที่ยง (12:30–13:00 น.)</option>
                                     {#each settings.deliveryRounds as round}
-                                        <option value="{round.name} ({round.timeSlot})">
-                                            📦 {round.name} ({round.timeSlot})
-                                        </option>
+                                        {#if !['morning', 'noon', 'allday'].includes(round.id)}
+                                            <option value="{round.name} ({round.timeSlot})">
+                                                📦 {round.name} ({round.timeSlot})
+                                            </option>
+                                        {/if}
                                     {/each}
                                 </select>
                             </div>
                         </div>
+
+                        <!-- ⏰ กล่องเลือกรอบเวลานัดส่ง (สำหรับรอบสาย-บ่าย หรือรอบรวม) -->
+                        {#if newOrderDeliveryRoundId === 'allday' || newOrderDeliveryRound.includes('สาย') || newOrderDeliveryRound.includes('บ่าย') || newOrderDeliveryRound.includes('รวม')}
+                            <div style="background: #faf5ff; border: 1.5px solid #d8b4fe; border-radius: 12px; padding: 0.75rem 0.85rem; margin-bottom: 0.75rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; gap: 0.35rem;">
+                                    <label class="form-label" style="font-size: 0.8rem; font-weight: 800; color: #6b21a8; margin: 0;" for="newOrderAppointInput">
+                                        ⏰ เลือกรอบเวลานัดส่ง (รอบสาย–บ่าย):
+                                    </label>
+                                    <span style="font-size: 0.74rem; background: #f3e8ff; color: #7e22ce; font-weight: 800; padding: 0.15rem 0.55rem; border-radius: 999px; border: 1px solid #d8b4fe;">
+                                        {newOrderAppointmentTime ? `นัดส่ง ${newOrderAppointmentTime} น.` : 'คิวทั่วไป (ไม่ระบุเวลา)'}
+                                    </span>
+                                </div>
+
+                                <!-- ปุ่มลัดเวลานัดส่งยอดนิยม -->
+                                <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+                                    {#each ['09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00'] as slotTime}
+                                        <button
+                                            type="button"
+                                            onclick={() => selectAppointmentTimeForNewOrder(slotTime)}
+                                            style="padding: 0.25rem 0.6rem; font-size: 0.76rem; font-weight: 700; border-radius: 8px; border: 1.5px solid {newOrderAppointmentTime === slotTime ? '#7e22ce' : '#cbd5e1'}; background: {newOrderAppointmentTime === slotTime ? '#7e22ce' : '#ffffff'}; color: {newOrderAppointmentTime === slotTime ? '#ffffff' : '#475569'}; cursor: pointer; transition: all 0.15s;"
+                                        >
+                                            {slotTime} น.
+                                        </button>
+                                    {/each}
+                                    <button
+                                        type="button"
+                                        onclick={() => selectAppointmentTimeForNewOrder('')}
+                                        style="padding: 0.25rem 0.6rem; font-size: 0.76rem; font-weight: 600; border-radius: 8px; border: 1px dashed #cbd5e1; background: #ffffff; color: #64748b; cursor: pointer;"
+                                    >
+                                        ล้างเวลา
+                                    </button>
+                                </div>
+
+                                <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                                    <span style="font-size: 0.75rem; color: #7e22ce; font-weight: 600;">หรือพิมพ์ระบุเวลา:</span>
+                                    <input
+                                        id="newOrderAppointInput"
+                                        type="time"
+                                        class="form-input"
+                                        bind:value={newOrderAppointmentTime}
+                                        onchange={(e) => selectAppointmentTimeForNewOrder((e.target as HTMLInputElement).value)}
+                                        style="font-size: 0.82rem; padding: 0.25rem 0.6rem; max-width: 130px;"
+                                    />
+                                    <span style="font-size: 0.72rem; color: #a855f7;">
+                                        (จะถูกนำไปจัดกลุ่มใน "สรุปคิวชงแยกตามเวลา" อัตโนมัติ)
+                                    </span>
+                                </div>
+                            </div>
+                        {/if}
 
                         <!-- สถานที่จัดส่งและปุ่มด่วน -->
                         <div>

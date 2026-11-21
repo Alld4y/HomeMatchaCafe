@@ -4,7 +4,7 @@ import { createOrder, getAllOrders, getOrdersByPhone, saveSlipFile, updateOrder,
 import { validateSlip } from '$lib/server/slipValidator';
 import { getPromptPayConfig } from '$lib/server/promptpay';
 import { redeemFreeCupPoints } from '$lib/server/members';
-import { validateDeliverySlot } from '$lib/server/settings';
+import { validateDeliverySlot, getStoreSettings, parseAdminPhones } from '$lib/server/settings';
 
 export const GET: RequestHandler = async ({ url }) => {
     const phone = url.searchParams.get('phone');
@@ -41,6 +41,8 @@ export const POST: RequestHandler = async ({ request }) => {
         let useFreeCupReward = false;
         let discountAmount = 0;
         let customStatus: any = undefined;
+        let isAdminCreated = false;
+        let isAdminTest = false;
 
         if (contentType.includes('multipart/form-data')) {
             const formData = await request.formData();
@@ -57,6 +59,8 @@ export const POST: RequestHandler = async ({ request }) => {
             const isManualReviewRequest = formData.get('requestAdminReview') === 'true';
             useFreeCupReward = formData.get('useFreeCupReward') === 'true';
             discountAmount = Number(formData.get('discountAmount') || 0);
+            isAdminCreated = formData.get('isAdminCreated') === 'true';
+            isAdminTest = formData.get('isAdminTest') === 'true';
 
             const rawBasket = formData.get('basket');
             if (rawBasket && typeof rawBasket === 'string') {
@@ -74,12 +78,25 @@ export const POST: RequestHandler = async ({ request }) => {
                 totalPrice = Math.max(0, basket.reduce((sum, it) => sum + ((it.price || 0) * (it.quantity || 1)), 0) - discountAmount);
             }
 
+            const settings = await getStoreSettings();
+            const adminPhones = parseAdminPhones(settings.adminPhone || settings.lineOa?.adminPhone);
+            const cleanPhone = phone.replace(/[^0-9]/g, '');
+            const isAdminUser = isAdminCreated || isAdminTest || adminPhones.includes(cleanPhone);
+
             const promptpayConfig = getPromptPayConfig();
-            const expectedAmount =
-                totalPrice === 0 && useFreeCupReward
-                    ? 0
-                    : (promptpayConfig.forceTestPrice > 0 ? promptpayConfig.forceTestPrice : totalPrice);
-            totalPrice = expectedAmount;
+            let expectedAmount = totalPrice === 0 && useFreeCupReward ? 0 : totalPrice;
+
+            // ตรวจสอบราคาทดสอบ (ทั้งจาก .env และจาก Admin Test Price ในการตั้งค่า)
+            if (promptpayConfig.forceTestPrice > 0) {
+                expectedAmount = promptpayConfig.forceTestPrice;
+                totalPrice = expectedAmount;
+            } else if (isAdminUser && (settings.adminTestPriceEnabled || isAdminTest)) {
+                const adminTestPrice = typeof settings.adminTestPrice === 'number' && settings.adminTestPrice > 0 ? settings.adminTestPrice : 1;
+                if (totalPrice === adminTestPrice || isAdminTest) {
+                    expectedAmount = adminTestPrice;
+                    totalPrice = adminTestPrice;
+                }
+            }
 
             const slipFile = formData.get('slipImage');
 
@@ -148,6 +165,8 @@ export const POST: RequestHandler = async ({ request }) => {
             slipImageUrl = body.slipImage || '';
             useFreeCupReward = Boolean(body.useFreeCupReward);
             discountAmount = Number(body.discountAmount || 0);
+            isAdminCreated = Boolean(body.isAdminCreated);
+            isAdminTest = Boolean(body.isAdminTest);
             if (body.status) {
                 customStatus = body.status;
             }
@@ -174,12 +193,24 @@ export const POST: RequestHandler = async ({ request }) => {
                 note: item.note || ''
             }));
 
+        const settings = await getStoreSettings();
+        const adminPhones = parseAdminPhones(settings.adminPhone || settings.lineOa?.adminPhone);
+        const cleanPhone = phone.replace(/[^0-9]/g, '');
+        const isAdminUser = isAdminCreated || isAdminTest || adminPhones.includes(cleanPhone);
+
         if (totalPrice === 0 && !useFreeCupReward && validBasket.length > 0) {
             totalPrice = validBasket.reduce((sum, it) => sum + (it.price * it.quantity), 0);
         }
 
-        // ตรวจสอบความถูกต้องของวันและรอบจัดส่ง
-        if (deliveryDate && deliveryRoundId) {
+        if (isAdminUser && (settings.adminTestPriceEnabled || isAdminTest)) {
+            const adminTestPrice = typeof settings.adminTestPrice === 'number' && settings.adminTestPrice > 0 ? settings.adminTestPrice : 1;
+            if (totalPrice === adminTestPrice || isAdminTest) {
+                totalPrice = adminTestPrice;
+            }
+        }
+
+        // ตรวจสอบความถูกต้องของวันและรอบจัดส่ง (ข้ามการตรวจสอบตัดรอบสำหรับแอดมิน หรือคิว walkin หน้าร้าน)
+        if (deliveryDate && deliveryRoundId && !isAdminCreated && deliveryRoundId !== 'walkin') {
             const hasFermented = validBasket.some(item => 
                 (item.name || '').includes('บ่ม') || (item.thaiName || '').includes('บ่ม') || item.id === 'cold-fermented-matcha-oat-latte'
             );

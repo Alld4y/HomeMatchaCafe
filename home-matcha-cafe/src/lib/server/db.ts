@@ -599,10 +599,6 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
     if (updates.status !== undefined) {
         fields.push(`status = $${paramIdx++}`);
         values.push(updates.status);
-
-        if (updates.status === 'paid') {
-            fields.push(`needs_manual_review = FALSE`);
-        }
     }
 
     if (updates.name !== undefined) {
@@ -665,6 +661,8 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
     if (updates.needsManualReview !== undefined) {
         fields.push(`needs_manual_review = $${paramIdx++}`);
         values.push(Boolean(updates.needsManualReview));
+    } else if (updates.status === 'paid') {
+        fields.push(`needs_manual_review = FALSE`);
     }
 
     if (updates.reviewReason !== undefined) {

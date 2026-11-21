@@ -16,6 +16,12 @@
     let isTestMode = $state<boolean>(false);
     let pendingOrderId = $state<string>('');
 
+    // โหมดทดสอบสำหรับบัญชีแอดมิน (Admin Test Mode)
+    let isUserAdmin = $state<boolean>(false);
+    let adminTestPrice = $state<number>(1);
+    let adminTestPriceEnabled = $state<boolean>(false);
+    let isUsingAdminTestPrice = $state<boolean>(false);
+
     // สิทธิ์แลกแก้วฟรีจากบัตรสะสมแต้ม
     let checkoutMember = $state<any>(null);
     let loyaltyEnabled = $state<boolean>(true);
@@ -86,7 +92,7 @@
     let successData = $state<{ orderId: string; isManualReview: boolean } | null>(null);
     let isSubmittingLock = $state<boolean>(false);
 
-    let fileInputRef!: HTMLInputElement;
+    let fileInputRef = $state<HTMLInputElement | null>(null);
 
     function getBasketSignature(items: any[], targetTotal: number, freeRewardUsed: boolean): string {
         const cleanItems = (items || [])
@@ -160,6 +166,15 @@
         }
     }
 
+    async function toggleAdminTestPrice() {
+        isUsingAdminTestPrice = !isUsingAdminTestPrice;
+        localStorage.removeItem('hmc_qr_session');
+        await generateNewQR(true);
+        if (pendingOrderId) {
+            await registerPendingOrder();
+        }
+    }
+
     async function generateNewQR(forceNewTimestamp = false) {
         try {
             isFetchingQR = true;
@@ -215,11 +230,20 @@
                 }
             }
 
+            const targetAmount = isUsingAdminTestPrice
+                ? (adminTestPrice > 0 ? adminTestPrice : 1)
+                : netCartAmount;
+
             // หากตะกร้าหรือราคาเปลี่ยน ให้ล้างสลิปที่อาจเลือกค้างไว้และขอ QR ใหม่พร้อมรีเซ็ตเวลา 1 ชม.
             const res = await fetch('/api/qrcode', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ totalPrice: netCartAmount || 55 })
+                body: JSON.stringify({
+                    totalPrice: targetAmount || 55,
+                    phone: userData?.phone,
+                    isAdmin: isUserAdmin,
+                    useAdminTestPrice: isUsingAdminTestPrice
+                })
             });
             const data = await res.json();
             if (data.qrDataUrl) {
@@ -229,8 +253,8 @@
                 totalPrice = data.amount;
                 isTestMode = true;
             } else {
-                totalPrice = netCartAmount;
-                isTestMode = false;
+                totalPrice = targetAmount;
+                isTestMode = isUsingAdminTestPrice;
             }
             if (data.promptpayId) {
                 promptpayId = data.promptpayId;
@@ -295,6 +319,7 @@
                 message: userData.message || '',
                 basket: storedBasket || [],
                 totalPrice: totalPrice,
+                isAdminTest: isUsingAdminTestPrice,
                 deliveryDate: userData.deliveryDate || '',
                 deliveryRound: userData.deliveryRound || '',
                 deliveryRoundId: userData.deliveryRoundId || '',
@@ -627,6 +652,28 @@
             })
             .catch(() => {});
 
+        // ตรวจสอบสิทธิ์บัญชีผู้ดูแลร้าน (Admin) และโหลดการตั้งค่าราคาทดสอบ
+        fetch('/api/settings')
+            .then(r => r.json())
+            .then(data => {
+                if (data.settings) {
+                    adminTestPriceEnabled = Boolean(data.settings.adminTestPriceEnabled);
+                    adminTestPrice = typeof data.settings.adminTestPrice === 'number' && data.settings.adminTestPrice > 0 ? data.settings.adminTestPrice : 1;
+                }
+                const adminPhones: string[] = Array.isArray(data.adminPhones) ? data.adminPhones : [];
+                const cleanPhone = (userData?.phone || '').replace(/[^0-9]/g, '');
+                const isAdminAuth = typeof window !== 'undefined' && (
+                    sessionStorage.getItem('hmc_admin_auth') === 'true' ||
+                    localStorage.getItem('hmc_admin_auth') === 'true'
+                );
+                isUserAdmin = isAdminAuth || (cleanPhone.length >= 9 && adminPhones.includes(cleanPhone));
+                if (isUserAdmin && adminTestPriceEnabled) {
+                    isUsingAdminTestPrice = true;
+                    totalPrice = adminTestPrice;
+                }
+            })
+            .catch(() => {});
+
         // โหลดข้อมูลแต้มสะสมของเบอร์โทรที่สั่งซื้อ + เมนูที่อนุญาตให้แลกฟรี
         fetch(`/api/members?phone=${encodeURIComponent(userData.phone)}`)
             .then(r => r.json())
@@ -848,6 +895,7 @@
         formData.append('address', userData.address || '');
         formData.append('sellerMessage', userData.message || '');
         formData.append('totalPrice', String(totalPrice));
+        formData.append('isAdminTest', String(isUsingAdminTestPrice));
         formData.append('basket', JSON.stringify(storedBasket || []));
         formData.append('qrGeneratedAt', qrGeneratedAt || new Date().toISOString());
         formData.append('deliveryDate', userData.deliveryDate || '');
@@ -993,6 +1041,29 @@
     {/if}
 
     <div class="checkout-card">
+        {#if isUserAdmin}
+            <div style="width: 100%; margin-bottom: 0.85rem; padding: 0.65rem 0.95rem; border-radius: 14px; background: #fffbeb; border: 1.5px solid #f59e0b; display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; flex-wrap: wrap; text-align: left; box-sizing: border-box;">
+                <div style="display: flex; align-items: center; gap: 0.45rem;">
+                    <span style="font-size: 1.15rem;">🧪</span>
+                    <div>
+                        <span style="font-size: 0.82rem; font-weight: 800; color: #92400e; display: block;">
+                            บัญชีผู้ดูแลร้าน (Admin Mode)
+                        </span>
+                        <span style="font-size: 0.74rem; color: #b45309;">
+                            {isUsingAdminTestPrice ? `กำลังใช้ราคาทดสอบ ${adminTestPrice} บาท (ยอดจริง ${baseCartTotal} ฿)` : `ยอดปกติ ${totalPrice} บาท`}
+                        </span>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onclick={toggleAdminTestPrice}
+                    style="padding: 0.35rem 0.8rem; font-size: 0.76rem; font-weight: 800; border-radius: 8px; cursor: pointer; background: {isUsingAdminTestPrice ? '#ffffff' : '#d97706'}; color: {isUsingAdminTestPrice ? '#92400e' : '#ffffff'}; border: {isUsingAdminTestPrice ? '1.5px solid #d97706' : 'none'}; box-shadow: 0 2px 5px rgba(217, 119, 6, 0.2);"
+                >
+                    {isUsingAdminTestPrice ? '↩️ ใช้ยอดปกติ' : `⚡ ใช้ราคาทดสอบ ${adminTestPrice} ฿`}
+                </button>
+            </div>
+        {/if}
+
         {#if isTestMode}
             <div style="background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; padding: 0.4rem 0.85rem; border-radius: var(--radius-full); font-size: 0.8rem; font-weight: 700; margin-bottom: 0.65rem; display: inline-flex; align-items: center; gap: 0.35rem;">
                 <span>🧪 โหมดทดสอบการโอนเงิน (บังคับยอด {totalPrice} บาท จาก .env)</span>

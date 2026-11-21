@@ -1,15 +1,32 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { generatePromptPayQR, getPromptPayConfig } from '$lib/server/promptpay';
+import { getStoreSettings, parseAdminPhones } from '$lib/server/settings';
 
 export const POST: RequestHandler = async ({ request }) => {
     try {
         const body = await request.json();
         const config = getPromptPayConfig();
+        const settings = await getStoreSettings();
         const inputPrice = Number(body.totalPrice) || 0;
-        
-        // ถ้าเปิด FORCE_TEST_PRICE ใน .env ให้ล็อกยอดเงินตามค่าทดสอบ
-        const effectiveAmount = config.forceTestPrice > 0 ? config.forceTestPrice : inputPrice;
+        const cleanPhone = String(body.phone || '').replace(/[^0-9]/g, '');
+        const adminPhones = parseAdminPhones(settings.adminPhone || settings.lineOa?.adminPhone);
+        const isAdminUser = body.isAdmin === true || (cleanPhone && adminPhones.includes(cleanPhone));
+
+        // ตรวจสอบราคาทดสอบ (ทั้งจาก .env และจากการตั้งค่า Admin Test Price ในระบบ)
+        let effectiveAmount = inputPrice;
+        let isTestMode = false;
+
+        if (config.forceTestPrice > 0) {
+            effectiveAmount = config.forceTestPrice;
+            isTestMode = true;
+        } else if (isAdminUser && (settings.adminTestPriceEnabled || body.useAdminTestPrice)) {
+            effectiveAmount = typeof settings.adminTestPrice === 'number' && settings.adminTestPrice > 0
+                ? settings.adminTestPrice
+                : 1;
+            isTestMode = true;
+        }
+
         const targetPromptPay = body.promptpayId || config.id;
 
         const { payload, qrDataUrl, qrSvg, accountName } = await generatePromptPayQR({
@@ -26,8 +43,8 @@ export const POST: RequestHandler = async ({ request }) => {
             promptpayId: targetPromptPay,
             accountName: accountName,
             amount: effectiveAmount,
-            isTestMode: config.forceTestPrice > 0,
-            forceTestPrice: config.forceTestPrice,
+            isTestMode,
+            forceTestPrice: isTestMode ? effectiveAmount : 0,
             qrImage: qrDataUrl,
             qrDataUrl: qrDataUrl,
             qrSvg: qrSvg,
@@ -44,8 +61,25 @@ export const POST: RequestHandler = async ({ request }) => {
 export const GET: RequestHandler = async ({ url }) => {
     try {
         const config = getPromptPayConfig();
+        const settings = await getStoreSettings();
         const inputAmount = Number(url.searchParams.get('amount')) || 0;
-        const effectiveAmount = config.forceTestPrice > 0 ? config.forceTestPrice : inputAmount;
+        const phone = String(url.searchParams.get('phone') || '').replace(/[^0-9]/g, '');
+        const adminPhones = parseAdminPhones(settings.adminPhone || settings.lineOa?.adminPhone);
+        const isAdminUser = url.searchParams.get('isAdmin') === 'true' || (phone && adminPhones.includes(phone));
+
+        let effectiveAmount = inputAmount;
+        let isTestMode = false;
+
+        if (config.forceTestPrice > 0) {
+            effectiveAmount = config.forceTestPrice;
+            isTestMode = true;
+        } else if (isAdminUser && (settings.adminTestPriceEnabled || url.searchParams.get('useAdminTestPrice') === 'true')) {
+            effectiveAmount = typeof settings.adminTestPrice === 'number' && settings.adminTestPrice > 0
+                ? settings.adminTestPrice
+                : 1;
+            isTestMode = true;
+        }
+
         const target = url.searchParams.get('target') || config.id;
 
         const { payload, qrDataUrl, qrSvg, accountName } = await generatePromptPayQR({
@@ -62,8 +96,8 @@ export const GET: RequestHandler = async ({ url }) => {
             promptpayId: target,
             accountName: accountName,
             amount: effectiveAmount,
-            isTestMode: config.forceTestPrice > 0,
-            forceTestPrice: config.forceTestPrice,
+            isTestMode,
+            forceTestPrice: isTestMode ? effectiveAmount : 0,
             qrImage: qrDataUrl,
             qrDataUrl: qrDataUrl,
             qrSvg: qrSvg,
