@@ -130,6 +130,14 @@
         notifyOnPhoneLinked: boolean;
         notifyOnMemberRegistered: boolean;
         customStatusCards?: Record<string, { enabled: boolean; bubble: any; blocks?: any[] | null }>;
+        customTemplates?: Array<{
+            id: string;
+            name: string;
+            altText?: string;
+            blocks: any[];
+            createdAt?: string;
+            updatedAt?: string;
+        }>;
         notifyAdminOnNewOrder: boolean;
         notifyAdminOnSlipUploaded: boolean;
     }
@@ -229,6 +237,7 @@
             notifyOnPhoneLinked: true,
             notifyOnMemberRegistered: true,
             customStatusCards: {},
+            customTemplates: [],
             notifyAdminOnNewOrder: true,
             notifyAdminOnSlipUploaded: true
         },
@@ -1519,7 +1528,10 @@
                         },
                         lineOa: {
                             ...settings.lineOa,
-                            ...(data.settings.lineOa || {})
+                            ...(data.settings.lineOa || {}),
+                            customTemplates: Array.isArray(data.settings?.lineOa?.customTemplates)
+                                ? data.settings.lineOa.customTemplates
+                                : []
                         }
                     };
                     if (Array.isArray(data.settings?.lineOa?.welcomeCardBlocks) && data.settings.lineOa.welcomeCardBlocks.length > 0) {
@@ -1532,7 +1544,8 @@
         }
     }
 
-    async function saveAllSettings() {
+    async function saveAllSettings(silent: boolean | any = false) {
+        const isSilent = typeof silent === 'boolean' ? silent : false;
         isSavingSettings = true;
         try {
             const res = await fetch('/api/settings', {
@@ -1543,18 +1556,27 @@
             const data = await res.json();
             if (res.ok && data.success) {
                 window.dispatchEvent(new CustomEvent('loyalty-settings-updated'));
-                swal.fire({
-                    icon: 'success',
-                    title: 'บันทึกสำเร็จ!',
-                    text: 'บันทึกการตั้งค่าร้านและระบบสะสมแต้มเรียบร้อยแล้วค่ะ',
-                    confirmButtonColor: '#456f2f'
-                });
+                if (!isSilent) {
+                    swal.fire({
+                        icon: 'success',
+                        title: 'บันทึกสำเร็จ!',
+                        text: 'บันทึกการตั้งค่าร้านและระบบสะสมแต้มเรียบร้อยแล้วค่ะ',
+                        confirmButtonColor: '#456f2f'
+                    });
+                }
+                return true;
             } else {
-                swal.fire('ข้อผิดพลาด', data.message || 'บันทึกไม่สำเร็จ', 'error');
+                if (!isSilent) {
+                    swal.fire('ข้อผิดพลาด', data.message || 'บันทึกไม่สำเร็จ', 'error');
+                }
+                return false;
             }
         } catch (e) {
             console.error(e);
-            swal.fire('ข้อผิดพลาด', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', 'error');
+            if (!isSilent) {
+                swal.fire('ข้อผิดพลาด', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', 'error');
+            }
+            return false;
         } finally {
             isSavingSettings = false;
         }
@@ -1984,7 +2006,7 @@
     // 🎨 ระบบออกแบบการ์ดลูกค้า Visual Flex Card Designer
     interface DesignerCardBlock {
         id: string;
-        type: 'banner' | 'tag' | 'title' | 'body' | 'highlight' | 'button';
+        type: 'banner' | 'tag' | 'title' | 'body' | 'highlight' | 'button' | 'separator';
         imageUrl?: string;
         aspectRatio?: '20:13' | '16:9' | '4:3' | '1:1' | '3:2' | '3:4' | '9:16' | string;
         aspectMode?: 'cover' | 'fit';
@@ -1994,11 +2016,18 @@
         tagBg?: string;
         titleText?: string;
         titleSize?: 'md' | 'lg' | 'xl';
+        titleColor?: string;
+        titleWeight?: 'bold' | 'regular';
         bodyText?: string;
+        bodyColor?: string;
+        bodySize?: 'xs' | 'sm' | 'md';
         highlightText?: string;
+        highlightBg?: string;
+        highlightBorder?: string;
+        highlightColor?: string;
         buttonLabel?: string;
         buttonUrl?: string;
-        buttonStyle?: 'primary' | 'secondary' | 'gold' | 'outline';
+        buttonStyle?: 'primary' | 'secondary' | 'gold' | 'danger' | 'outline' | 'outline-gold';
         buttonAction?: 'custom' | 'register' | 'menu' | 'loyalty' | 'order';
     }
 
@@ -2074,17 +2103,24 @@
             id: 'b-title',
             type: 'title',
             titleText: 'Cold-Fermented Matcha Oat Latte',
-            titleSize: 'lg'
+            titleSize: 'lg',
+            titleColor: '#14532d',
+            titleWeight: 'bold'
         },
         {
             id: 'b-body',
             type: 'body',
-            bodyText: 'มัทฉะเกรดพิธีการสกัดเย็น 24 ชั่วโมง กลิ่นหอมอูมามิละมุน ผสานกับโอ๊ตมิลค์รสชาตินุ่มลึก สั่งจองล่วงหน้าได้เลยค่ะ'
+            bodyText: 'มัทฉะเกรดพิธีการสกัดเย็น 24 ชั่วโมง กลิ่นหอมอูมามิละมุน ผสานกับโอ๊ตมิลค์รสชาตินุ่มลึก สั่งจองล่วงหน้าได้เลยค่ะ',
+            bodyColor: '#475569',
+            bodySize: 'sm'
         },
         {
             id: 'b-highlight',
             type: 'highlight',
-            highlightText: '✨ ราคาพิเศษ 65.- (ปกติ 75.-)'
+            highlightText: '✨ ราคาพิเศษ 65.- (ปกติ 75.-)',
+            highlightBg: '#fef9c3',
+            highlightBorder: '#fde047',
+            highlightColor: '#854d0e'
         },
         {
             id: 'b-btn-1',
@@ -2105,6 +2141,11 @@
     let isSendingDesignerCard = $state(false);
     let designerTarget = $state<'admin' | 'broadcast'>('admin');
     let draggedBlockIdx = $state<number | null>(null);
+
+    // 💾 ระบบจัดการเทมเพลตอิสระ (Custom Templates Management)
+    let activeTemplateId = $state<string | null>(null);
+    let activeTemplateName = $state<string>('');
+    let showTemplateModal = $state(false);
 
     let designerHeroBlock = $derived(designerCardBlocks.find(b => b.type === 'banner' && b.imageUrl));
     let designerBodyBlocks = $derived(designerCardBlocks.filter(b => b.type !== 'banner' && b.type !== 'button'));
@@ -2127,7 +2168,7 @@
             designerCardBlocks = [...designerCardBlocks, { 
                 id, 
                 type, 
-                imageUrl: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=800&q=80', 
+                imageUrl: 'https://homematchacafe.store/image/mascot/cat-welcome.jpg', 
                 aspectRatio: '1:1',
                 aspectMode: 'cover',
                 imageSize: 'full'
@@ -2135,13 +2176,15 @@
         } else if (type === 'tag') {
             designerCardBlocks = [...designerCardBlocks, { id, type, tagText: '🔥 โปรโมชั่นพิเศษ', tagBg: '#fef3c7', tagColor: '#b45309' }];
         } else if (type === 'title') {
-            designerCardBlocks = [...designerCardBlocks, { id, type, titleText: 'หัวข้อการ์ดโปรโมชั่น', titleSize: 'lg' }];
+            designerCardBlocks = [...designerCardBlocks, { id, type, titleText: 'หัวข้อการ์ดโปรโมชั่น', titleSize: 'lg', titleColor: '#14532d', titleWeight: 'bold' }];
         } else if (type === 'body') {
-            designerCardBlocks = [...designerCardBlocks, { id, type, bodyText: 'ระบุรายละเอียดข้อความที่คุณต้องการส่งให้ลูกค้าที่นี่...' }];
+            designerCardBlocks = [...designerCardBlocks, { id, type, bodyText: 'ระบุรายละเอียดข้อความที่คุณต้องการส่งให้ลูกค้าที่นี่...', bodyColor: '#475569', bodySize: 'sm' }];
         } else if (type === 'highlight') {
-            designerCardBlocks = [...designerCardBlocks, { id, type, highlightText: '🎉 ซื้อ 2 แถม 1 ถึงสิ้นเดือนนี้เท่านั้น!' }];
+            designerCardBlocks = [...designerCardBlocks, { id, type, highlightText: '🎉 ซื้อ 2 แถม 1 ถึงสิ้นเดือนนี้เท่านั้น!', highlightBg: '#fef9c3', highlightBorder: '#fde047', highlightColor: '#854d0e' }];
         } else if (type === 'button') {
             designerCardBlocks = [...designerCardBlocks, { id, type, buttonLabel: '👉 ดูรายละเอียดเพิ่มเติม', buttonUrl: 'https://homematchacafe.store/menu', buttonStyle: 'primary' }];
+        } else if (type === 'separator') {
+            designerCardBlocks = [...designerCardBlocks, { id, type }];
         }
     }
 
@@ -2157,6 +2200,222 @@
         copy[idx] = copy[targetIdx];
         copy[targetIdx] = temp;
         designerCardBlocks = copy;
+    }
+
+    // 💾 บันทึกการ์ดปัจจุบันเป็นเทมเพลตใหม่ (ตั้งชื่อได้อิสระ)
+    async function saveCustomTemplateAsNew() {
+        const defaultName = activeTemplateName ? `${activeTemplateName} (สำเนา)` : 'เทมเพลต ' + new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+        const { value: name } = await swal.fire({
+            title: '💾 บันทึกเทมเพลตการ์ดใหม่',
+            input: 'text',
+            inputLabel: 'ตั้งชื่อเทมเพลตของคุณ (เช่น แจ้งระบบขัดข้อง, โปร 1 แถม 1)',
+            inputValue: defaultName,
+            inputPlaceholder: 'กรอกชื่อเทมเพลต...',
+            showCancelButton: true,
+            confirmButtonText: '💾 บันทึกเทมเพลต',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#166534',
+            inputValidator: (val) => {
+                if (!val || !val.trim()) return 'กรุณาระบุชื่อเทมเพลตด้วยนะคะ';
+                return null;
+            }
+        });
+
+        if (!name) return;
+
+        const newId = `tmpl-${Date.now()}`;
+        const newTemplate = {
+            id: newId,
+            name: name.trim(),
+            altText: designerAltText,
+            blocks: JSON.parse(JSON.stringify(designerCardBlocks)),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+
+        if (!Array.isArray(settings.lineOa.customTemplates)) {
+            settings.lineOa.customTemplates = [];
+        }
+
+        settings.lineOa.customTemplates = [newTemplate, ...settings.lineOa.customTemplates];
+        activeTemplateId = newId;
+        activeTemplateName = name.trim();
+
+        await saveAllSettings(true);
+        swal.fire({
+            icon: 'success',
+            title: 'บันทึกเทมเพลตสำเร็จ! 🎉',
+            text: `บันทึกเทมเพลต "${name.trim()}" เรียบร้อยแล้วค่ะ สามารถเรียกใช้ได้ตลอดเวลา`,
+            confirmButtonColor: '#166534',
+            timer: 2000
+        });
+    }
+
+    // 💾 บันทึกทับเทมเพลตเดิมที่เปิดอยู่
+    async function updateActiveTemplate() {
+        if (!activeTemplateId) {
+            await saveCustomTemplateAsNew();
+            return;
+        }
+
+        const list = settings.lineOa.customTemplates || [];
+        const idx = list.findIndex(t => t.id === activeTemplateId);
+        if (idx === -1) {
+            await saveCustomTemplateAsNew();
+            return;
+        }
+
+        const confirm = await swal.fire({
+            title: `บันทึกทับเทมเพลต "${activeTemplateName}"?`,
+            text: 'การเปลี่ยนแปลงในการ์ดจะถูกบันทึกทับลงในเทมเพลตนี้ค่ะ',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: '💾 ยืนยันบันทึกทับ',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#166534'
+        });
+        if (!confirm.isConfirmed) return;
+
+        list[idx] = {
+            ...list[idx],
+            altText: designerAltText,
+            blocks: JSON.parse(JSON.stringify(designerCardBlocks)),
+            updatedAt: new Date().toISOString()
+        };
+        settings.lineOa.customTemplates = [...list];
+
+        await saveAllSettings(true);
+        swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: `บันทึกทับ "${activeTemplateName}" สำเร็จ!`,
+            showConfirmButton: false,
+            timer: 1800
+        });
+    }
+
+    // 📂 โหลดเทมเพลตที่บันทึกไว้
+    function loadCustomTemplate(templateId: string) {
+        const list = settings.lineOa.customTemplates || [];
+        const tmpl = list.find(t => t.id === templateId);
+        if (!tmpl) return;
+
+        designerCardBlocks = JSON.parse(JSON.stringify(tmpl.blocks));
+        if (tmpl.altText) designerAltText = tmpl.altText;
+        activeTemplateId = tmpl.id;
+        activeTemplateName = tmpl.name;
+        showTemplateModal = false;
+
+        swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: `โหลดเทมเพลต "${tmpl.name}" สำเร็จ! 🍵`,
+            showConfirmButton: false,
+            timer: 1600
+        });
+    }
+
+    // 🗑️ ลบเทมเพลต
+    async function deleteCustomTemplate(templateId: string) {
+        const list = settings.lineOa.customTemplates || [];
+        const tmpl = list.find(t => t.id === templateId);
+        if (!tmpl) return;
+
+        const confirm = await swal.fire({
+            title: `ลบเทมเพลต "${tmpl.name}"?`,
+            text: 'เทมเพลตนี้จะถูกลบออกจากระบบและไม่สามารถกู้คืนได้ค่ะ',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: '🗑️ ลบเทมเพลต',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#dc2626'
+        });
+        if (!confirm.isConfirmed) return;
+
+        settings.lineOa.customTemplates = list.filter(t => t.id !== templateId);
+        if (activeTemplateId === templateId) {
+            activeTemplateId = null;
+            activeTemplateName = '';
+        }
+
+        await saveAllSettings(true);
+        swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: `ลบเทมเพลต "${tmpl.name}" เรียบร้อยแล้ว`,
+            showConfirmButton: false,
+            timer: 1600
+        });
+    }
+
+    // ✏️ เปลี่ยนชื่อเทมเพลต
+    async function renameCustomTemplate(templateId: string) {
+        const list = settings.lineOa.customTemplates || [];
+        const tmpl = list.find(t => t.id === templateId);
+        if (!tmpl) return;
+
+        const { value: newName } = await swal.fire({
+            title: '✏️ เปลี่ยนชื่อเทมเพลต',
+            input: 'text',
+            inputValue: tmpl.name,
+            showCancelButton: true,
+            confirmButtonText: 'บันทึกชื่อใหม่',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#166534',
+            inputValidator: (val) => {
+                if (!val || !val.trim()) return 'กรุณาระบุชื่อเทมเพลตด้วยนะคะ';
+                return null;
+            }
+        });
+
+        if (!newName || !newName.trim()) return;
+
+        tmpl.name = newName.trim();
+        tmpl.updatedAt = new Date().toISOString();
+        if (activeTemplateId === templateId) {
+            activeTemplateName = tmpl.name;
+        }
+        settings.lineOa.customTemplates = [...list];
+
+        await saveAllSettings(true);
+        swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: `เปลี่ยนชื่อเป็น "${tmpl.name}" เรียบร้อย`,
+            showConfirmButton: false,
+            timer: 1600
+        });
+    }
+
+    // 📋 คัดลอกเทมเพลต
+    async function duplicateCustomTemplate(templateId: string) {
+        const list = settings.lineOa.customTemplates || [];
+        const tmpl = list.find(t => t.id === templateId);
+        if (!tmpl) return;
+
+        const newId = `tmpl-${Date.now()}`;
+        const dupTemplate = {
+            id: newId,
+            name: `${tmpl.name} (สำเนา)`,
+            altText: tmpl.altText,
+            blocks: JSON.parse(JSON.stringify(tmpl.blocks)),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        settings.lineOa.customTemplates = [dupTemplate, ...list];
+        await saveAllSettings(true);
+        swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: `คัดลอกเทมเพลต "${dupTemplate.name}" สำเร็จ!`,
+            showConfirmButton: false,
+            timer: 1600
+        });
     }
 
     function replacePreviewVars(text?: string): string {
@@ -2177,9 +2436,125 @@
             .replace(/\{menuUrl\}/g, 'https://homematchacafe.store/menu');
     }
 
-    function loadDesignerPreset(preset: 'promo' | 'loyalty' | 'delivery' | 'welcome' | 'register' | 'member' | 'status_order_created' | 'status_slip_approved' | 'status_member_registered' | 'status_brewing' | 'status_ready' | 'status_delivering' | 'status_completed' | 'status_cancelled') {
+    function loadDesignerPreset(preset: 'hotfix' | 'announcement' | 'promo' | 'loyalty' | 'delivery' | 'welcome' | 'register' | 'member' | 'status_order_created' | 'status_slip_approved' | 'status_member_registered' | 'status_brewing' | 'status_ready' | 'status_delivering' | 'status_completed' | 'status_cancelled') {
         const now = Date.now();
-        if (preset === 'welcome') {
+        if (preset === 'hotfix') {
+            designerAltText = '⚠️ แจ้งเตือน: แก้ไขระบบขัดข้อง Home Matcha Cafe 🍵';
+            activeTemplateId = null;
+            activeTemplateName = 'แจ้งแก้ไขระบบขัดข้อง (Hotfix)';
+            designerCardBlocks = [
+                {
+                    id: `b-${now}-1`,
+                    type: 'banner',
+                    imageUrl: 'https://homematchacafe.store/image/mascot/cat-cancelled.jpg',
+                    aspectRatio: '1:1',
+                    aspectMode: 'cover',
+                    imageSize: '4xl'
+                },
+                {
+                    id: `b-${now}-2`,
+                    type: 'tag',
+                    tagText: 'Hotfix',
+                    tagBg: '#dcfce7',
+                    tagColor: '#166534'
+                },
+                {
+                    id: `b-${now}-3`,
+                    type: 'title',
+                    titleText: 'แก้ไขระบบขัดข้อง',
+                    titleSize: 'lg',
+                    titleColor: '#14532d',
+                    titleWeight: 'bold'
+                },
+                {
+                    id: `b-${now}-4`,
+                    type: 'body',
+                    bodyText: 'น้องเซเว่นขออภัยในความไม่สะดวก เนื่องจากเกิดระบบขัดข้องเมื่อเวลา 10.00-10.30 น. วันที่ 21 พย. 2569\n\nกรณีที่สั่งมาในช่วงเวลานี้ แล้วไม่สามารถยืนยันสลิปได้ น้องเซเว่นจึงขอความกรุณาคุณลูกค้า พิมพ์แจ้งเมนูแม่ค้าใหม่อีกครั้งในแชทนี้ หรือแนบสลิปอีกครั้ง แล้วกดปุ่ม "โอนเงินแล้ว แต่ยืนยันไม่ผ่าน"',
+                    bodyColor: '#475569',
+                    bodySize: 'sm'
+                },
+                {
+                    id: `b-${now}-5`,
+                    type: 'highlight',
+                    highlightText: 'ขณะนี้ระบบสามารถกลับมาใช้งานได้ตามปกติ',
+                    highlightBg: '#fef9c3',
+                    highlightBorder: '#fde047',
+                    highlightColor: '#854d0e'
+                },
+                {
+                    id: `b-${now}-6`,
+                    type: 'button',
+                    buttonLabel: '✨ บัตรสะสมแต้มของฉัน',
+                    buttonUrl: 'https://homematchacafe.store/loyalty',
+                    buttonStyle: 'gold'
+                },
+                {
+                    id: `b-${now}-7`,
+                    type: 'button',
+                    buttonLabel: '🍵 สั่งเครื่องดื่มเลย',
+                    buttonUrl: 'https://homematchacafe.store/menu',
+                    buttonStyle: 'primary'
+                }
+            ];
+        } else if (preset === 'announcement') {
+            designerAltText = '📢 ข่าวสารและประกาศจากทางร้าน Home Matcha Cafe 🍵';
+            activeTemplateId = null;
+            activeTemplateName = 'ประกาศข่าวสารทั่วไป';
+            designerCardBlocks = [
+                {
+                    id: `b-${now}-1`,
+                    type: 'banner',
+                    imageUrl: 'https://homematchacafe.store/image/mascot/cat-welcome.jpg',
+                    aspectRatio: '1:1',
+                    aspectMode: 'cover',
+                    imageSize: '4xl'
+                },
+                {
+                    id: `b-${now}-2`,
+                    type: 'tag',
+                    tagText: '📢 ข่าวสารและประกาศ',
+                    tagBg: '#e0f2fe',
+                    tagColor: '#0369a1'
+                },
+                {
+                    id: `b-${now}-3`,
+                    type: 'title',
+                    titleText: 'แจ้งข้อมูลข่าวสารจากร้าน Home Matcha Cafe',
+                    titleSize: 'lg',
+                    titleColor: '#14532d',
+                    titleWeight: 'bold'
+                },
+                {
+                    id: `b-${now}-4`,
+                    type: 'body',
+                    bodyText: 'สวัสดีค่ะคุณลูกค้าทุกท่าน ทางร้านขอแจ้งข้อมูลการเปิดให้บริการ และเมนูพิเศษประจำวัน ให้คุณลูกค้าทราบค่ะ 🍵✨',
+                    bodyColor: '#475569',
+                    bodySize: 'sm'
+                },
+                {
+                    id: `b-${now}-5`,
+                    type: 'highlight',
+                    highlightText: '🍵 ร้านเปิดให้บริการตามปกติ ยินดีต้อนรับทุกท่านค่ะ',
+                    highlightBg: '#f0fdf4',
+                    highlightBorder: '#86efac',
+                    highlightColor: '#166534'
+                },
+                {
+                    id: `b-${now}-6`,
+                    type: 'button',
+                    buttonLabel: '🍵 ดูเมนูและสั่งเครื่องดื่ม',
+                    buttonUrl: 'https://homematchacafe.store/menu',
+                    buttonStyle: 'primary'
+                },
+                {
+                    id: `b-${now}-7`,
+                    type: 'button',
+                    buttonLabel: '⭐ ตรวจสอบแต้มสะสม',
+                    buttonUrl: 'https://homematchacafe.store/loyalty',
+                    buttonStyle: 'gold'
+                }
+            ];
+        } else if (preset === 'welcome') {
             designerCardBlocks = [
                 { id: `b-${now}-1`, type: 'banner', imageUrl: 'https://homematchacafe.store/image/mascot/cat-welcome.jpg', aspectRatio: '1:1' },
                 { id: `b-${now}-2`, type: 'tag', tagText: '🍵 ยินดีต้อนรับสู่ Home Matcha Cafe', tagBg: '#dcfce7', tagColor: '#166534' },
@@ -2359,9 +2734,9 @@
                 bodyContents.push({
                     type: 'text',
                     text: b.titleText,
-                    weight: 'bold',
+                    weight: b.titleWeight || 'bold',
                     size: b.titleSize === 'xl' ? 'xl' : b.titleSize === 'md' ? 'md' : 'lg',
-                    color: '#14532d',
+                    color: b.titleColor || '#14532d',
                     wrap: true,
                     margin: bodyContents.length > 0 ? 'md' : 'none'
                 });
@@ -2369,8 +2744,8 @@
                 bodyContents.push({
                     type: 'text',
                     text: b.bodyText,
-                    size: 'sm',
-                    color: '#475569',
+                    size: b.bodySize === 'xs' ? 'xs' : b.bodySize === 'md' ? 'md' : 'sm',
+                    color: b.bodyColor || '#475569',
                     wrap: true,
                     lineSpacing: '4px',
                     margin: bodyContents.length > 0 ? 'sm' : 'none'
@@ -2379,11 +2754,11 @@
                 bodyContents.push({
                     type: 'box',
                     layout: 'vertical',
-                    backgroundColor: '#fef3c7',
+                    backgroundColor: b.highlightBg || '#fef9c3',
                     borderWidth: '1.5px',
-                    borderColor: '#fde047',
+                    borderColor: b.highlightBorder || '#fde047',
                     cornerRadius: '8px',
-                    paddingAll: '8px',
+                    paddingAll: '10px',
                     margin: 'md',
                     contents: [
                         {
@@ -2391,18 +2766,29 @@
                             text: b.highlightText,
                             size: 'sm',
                             weight: 'bold',
-                            color: '#92400e',
+                            color: b.highlightColor || '#854d0e',
                             wrap: true
                         }
                     ]
                 });
+            } else if (b.type === 'separator') {
+                bodyContents.push({
+                    type: 'separator',
+                    margin: 'md',
+                    color: '#e2e8f0'
+                });
             } else if (b.type === 'button' && b.buttonLabel) {
-                const btnColor = b.buttonStyle === 'gold' ? '#d97706' : b.buttonStyle === 'secondary' ? '#475569' : '#166534';
-                const isOutline = b.buttonStyle === 'outline';
+                const isOutline = b.buttonStyle === 'outline' || b.buttonStyle === 'outline-gold';
+                let btnColor: string | undefined = '#166534';
+                if (b.buttonStyle === 'gold') btnColor = '#d97706';
+                else if (b.buttonStyle === 'danger') btnColor = '#dc2626';
+                else if (b.buttonStyle === 'secondary') btnColor = '#334155';
+                else if (isOutline) btnColor = undefined;
+
                 footerContents.push({
                     type: 'button',
                     style: isOutline ? 'secondary' : 'primary',
-                    color: isOutline ? undefined : btnColor,
+                    color: btnColor,
                     height: 'sm',
                     action: {
                         type: 'uri',
@@ -2446,20 +2832,45 @@
             return;
         }
 
-        const targetLabel = designerTarget === 'admin' ? 'LINE ของแอดมิน' : 'ลูกค้าทุกคน (บรอดแคสต์)';
-        const confirmResult = await swal.fire({
-            icon: 'question',
-            title: `ยืนยันส่งการ์ดไปยัง ${targetLabel}?`,
-            text: designerTarget === 'broadcast'
-                ? 'ระบบจะส่งการ์ดนี้เป็นข้อความบรอดแคสต์หาเพื่อนทุกคนใน LINE OA ทันทีค่ะ'
-                : 'ระบบจะส่งการ์ดทดสอบไปยัง LINE ID ของแอดมิน เพื่อให้ตรวจดูความสวยงามในแอป LINE จริงค่ะ',
-            showCancelButton: true,
-            confirmButtonColor: '#166534',
-            confirmButtonText: '✓ ยืนยันส่ง',
-            cancelButtonText: 'ยกเลิก'
-        });
-
-        if (!confirmResult.isConfirmed) return;
+        if (designerTarget === 'admin') {
+            const confirmResult = await swal.fire({
+                icon: 'question',
+                title: '📱 ส่งทดสอบเข้า LINE แอดมิน?',
+                html: `
+                    <div style="font-size: 0.9rem; color: #334155; line-height: 1.5; text-align: left;">
+                        <p>ระบบจะส่งการ์ดนี้เป็นข้อความเข้าบัญชี LINE ของแอดมินโดยเฉพาะ เพื่อให้ตรวจดูความสวยงามในแอปจริงก่อนส่งหาลูกค้าค่ะ</p>
+                        <p style="font-size: 0.8rem; color: #64748b; margin-top: 0.3rem;">💡 แอดมินต้องเพิ่มเพื่อนกับบอท LINE OA (@719wvlgi) ไว้แล้วนะคะ</p>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#166534',
+                confirmButtonText: '🚀 ส่งทดสอบทันที',
+                cancelButtonText: 'ยกเลิก'
+            });
+            if (!confirmResult.isConfirmed) return;
+        } else {
+            const confirmResult = await swal.fire({
+                icon: 'warning',
+                title: '📢 ยืนยันการบรอดแคสต์หาทุกคน?',
+                html: `
+                    <div style="text-align: left; font-size: 0.9rem; line-height: 1.5; color: #334155; background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 8px; padding: 0.85rem;">
+                        <strong style="color: #b91c1c; font-size: 0.95rem; display: block; margin-bottom: 0.4rem;">
+                            ⚠️ การส่งนี้จะแจ้งเตือนไปยังผู้ติดตามทุกคนใน LINE OA ทันที!
+                        </strong>
+                        <ul style="padding-left: 1.2rem; margin: 0; font-size: 0.84rem; color: #7f1d1d; display: flex; flex-direction: column; gap: 0.3rem;">
+                            <li>ข้อความจะส่งตรงถึงลูกค้าทุกคนเพื่อแจ้งข่าวสาร / โปรโมชั่น / แก้ไขระบบ</li>
+                            <li>หากยังไม่แน่ใจ แนะนำให้เลือก <b>"📱 ส่งทดสอบเข้า LINE แอดมิน"</b> เพื่อเช็คการแสดงผลในมือถือก่อน</li>
+                        </ul>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                confirmButtonText: '📢 ยืนยันบรอดแคสต์ส่งทุกคน',
+                cancelButtonText: 'ยกเลิก',
+                focusCancel: true
+            });
+            if (!confirmResult.isConfirmed) return;
+        }
 
         isSendingDesignerCard = true;
         try {
@@ -2470,8 +2881,8 @@
                 body: JSON.stringify({
                     target: designerTarget,
                     flexBubble,
-                    altText: designerAltText,
-                    testVars
+                    altText: replacePreviewVars(designerAltText),
+                    testVars: designerTarget === 'admin' ? testVars : undefined
                 })
             });
 
@@ -2479,8 +2890,8 @@
             if (data.success) {
                 swal.fire({
                     icon: 'success',
-                    title: 'ส่งการ์ดสำเร็จ! 💬',
-                    text: data.message,
+                    title: designerTarget === 'admin' ? 'ส่งทดสอบสำเร็จ! 🎉' : 'บรอดแคสต์ส่งทุกคนสำเร็จ! 📢',
+                    text: data.message || 'ส่งการ์ดเรียบร้อยแล้วค่ะ',
                     confirmButtonColor: '#166534'
                 });
             } else {
@@ -2517,7 +2928,7 @@
         settings.lineOa.welcomeCardBubble = bubble;
         settings.lineOa.welcomeCardBlocks = JSON.parse(JSON.stringify(designerCardBlocks));
 
-        await saveAllSettings();
+        await saveAllSettings(true);
         swal.fire({
             icon: 'success',
             title: 'ตั้งเป็นการ์ดต้อนรับสำเร็จ! 🎉',
@@ -2528,7 +2939,7 @@
 
     async function unsetWelcomeCard() {
         settings.lineOa.useCustomWelcomeCard = false;
-        await saveAllSettings();
+        await saveAllSettings(true);
         swal.fire({
             icon: 'info',
             title: 'เปลี่ยนกลับเป็นข้อความต้อนรับปกติแล้วค่ะ',
@@ -2543,7 +2954,7 @@
         settings.lineOa.memberCardBubble = bubble;
         settings.lineOa.memberCardBlocks = JSON.parse(JSON.stringify(designerCardBlocks));
 
-        await saveAllSettings();
+        await saveAllSettings(true);
         swal.fire({
             icon: 'success',
             title: 'ตั้งเป็นการ์ดแจ้งเตือนสมาชิกเดิมสำเร็จ! 🎉',
@@ -2554,7 +2965,7 @@
 
     async function unsetMemberCard() {
         settings.lineOa.useCustomMemberCard = false;
-        await saveAllSettings();
+        await saveAllSettings(true);
         swal.fire({
             icon: 'info',
             title: 'เปลี่ยนกลับเป็นการ์ดสมาชิกมาตรฐานแล้วค่ะ',
@@ -2578,7 +2989,7 @@
         settings.lineOa.registerCardBubble = bubble;
         settings.lineOa.registerCardBlocks = JSON.parse(JSON.stringify(designerCardBlocks));
 
-        await saveAllSettings();
+        await saveAllSettings(true);
         swal.fire({
             icon: 'success',
             title: 'ตั้งเป็นการ์ดชวนสมัครสมาชิกสำเร็จ! 🎉',
@@ -2589,7 +3000,7 @@
 
     async function unsetRegisterCard() {
         settings.lineOa.useCustomRegisterCard = false;
-        await saveAllSettings();
+        await saveAllSettings(true);
         swal.fire({
             icon: 'info',
             title: 'เปลี่ยนกลับเป็นการ์ดสมัครสมาชิกมาตรฐานแล้วค่ะ',
@@ -2626,7 +3037,7 @@
             bubble: bubble,
             blocks: JSON.parse(JSON.stringify(designerCardBlocks))
         };
-        await saveAllSettings();
+        await saveAllSettings(true);
         const statusNameMap: Record<string, string> = {
             order_created: '📝 รับออเดอร์ใหม่ (Order Created)',
             member_registered: '🎉 ลูกค้าสมัครสมาชิกเสร็จแล้ว',
@@ -2648,7 +3059,7 @@
     async function unsetStatusCard(statusKey: string) {
         if (settings.lineOa.customStatusCards?.[statusKey]) {
             settings.lineOa.customStatusCards[statusKey].enabled = false;
-            await saveAllSettings();
+            await saveAllSettings(true);
             swal.fire({
                 icon: 'info',
                 title: 'สลับกลับเป็นการ์ดมาตรฐานของระบบแล้วค่ะ',
@@ -6861,10 +7272,72 @@
                         </p>
                     </div>
 
-                    <!-- แถบเลือกเทมเพลตด่วน -->
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem; max-width: 620px;">
+                    <!-- แถบจัดการเทมเพลตอิสระ & พรีเซ็ตด่วน (Template Management Bar) -->
+                    <div style="display: flex; flex-direction: column; gap: 0.65rem; max-width: 720px; width: 100%;">
+                        <!-- แถวที่ 1: ชื่อเทมเพลตปัจจุบัน + ปุ่มบันทึกทับ + ปุ่มบันทึกใหม่ + คลังเทมเพลต -->
+                        <div style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 0.65rem 0.85rem; display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                            <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; min-width: 0;">
+                                <span style="font-size: 0.82rem; font-weight: 800; color: #1e293b;">
+                                    🏷️ เทมเพลต:
+                                </span>
+                                {#if activeTemplateName}
+                                    <span style="background: #dcfce7; color: #166534; font-size: 0.8rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 6px; border: 1px solid #86efac; display: inline-flex; align-items: center; gap: 0.35rem;">
+                                        ★ {activeTemplateName}
+                                        {#if activeTemplateId}
+                                            <button type="button" onclick={() => renameCustomTemplate(activeTemplateId!)} style="background: none; border: none; font-size: 0.75rem; cursor: pointer; color: #15803d; padding: 0;" title="เปลี่ยนชื่อเทมเพลต">✏️</button>
+                                        {/if}
+                                    </span>
+                                {:else}
+                                    <span style="background: #f1f5f9; color: #64748b; font-size: 0.78rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 6px; border: 1px dashed #cbd5e1;">
+                                        การ์ดอิสระ (ยังไม่ได้บันทึกชื่อ)
+                                    </span>
+                                {/if}
+                            </div>
+
+                            <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                                {#if activeTemplateId}
+                                    <button
+                                        type="button"
+                                        onclick={updateActiveTemplate}
+                                        style="padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 800; background: #f0fdf4; border: 1.5px solid #22c55e; color: #15803d; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;"
+                                        title="บันทึกการเปลี่ยนแปลงทับเทมเพลตเดิม"
+                                    >
+                                        💾 บันทึกทับ
+                                    </button>
+                                {/if}
+                                <button
+                                    type="button"
+                                    onclick={saveCustomTemplateAsNew}
+                                    style="padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 800; background: #166534; border: 1px solid #14532d; color: #ffffff; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;"
+                                    title="บันทึกการ์ดปัจจุบันเป็นเทมเพลตใหม่ ตั้งชื่อได้อิสระ"
+                                >
+                                    ➕ บันทึกเป็นเทมเพลตใหม่
+                                </button>
+                                <button
+                                    type="button"
+                                    onclick={() => (showTemplateModal = true)}
+                                    style="padding: 0.35rem 0.7rem; font-size: 0.78rem; font-weight: 800; background: #eff6ff; border: 1.5px solid #3b82f6; color: #1d4ed8; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;"
+                                    title="เปิดคลังดูรายการเทมเพลตที่บันทึกไว้ทั้งหมด"
+                                >
+                                    📂 คลังเทมเพลต ({settings.lineOa.customTemplates?.length || 0})
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- แถวที่ 2: พรีเซ็ตแนะนำพร้อมใช้ทันที -->
                         <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;">
-                            <span style="font-size: 0.74rem; color: #475569; font-weight: 800;">🏷️ ทั่วไป & ต้อนรับ:</span>
+                            <span style="font-size: 0.74rem; color: #475569; font-weight: 800;">🏷️ พรีเซ็ตพร้อมใช้:</span>
+                            <button
+                                type="button"
+                                onclick={() => loadDesignerPreset('hotfix')}
+                                style="padding: 0.25rem 0.6rem; font-size: 0.75rem; font-weight: 800; background: #fef2f2; border: 1.5px solid #ef4444; color: #b91c1c; border-radius: 6px; cursor: pointer; box-shadow: 0 1px 3px rgba(239,68,68,0.15);"
+                                title="โหลดเทมเพลตแจ้งระบบขัดข้อง/ขออภัยลูกค้า"
+                            >
+                                🛠️ แจ้งระบบขัดข้อง (Hotfix)
+                            </button>
+                            <button type="button" onclick={() => loadDesignerPreset('announcement')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 800; background: #eff6ff; border: 1.5px solid #60a5fa; color: #1e40af; border-radius: 6px; cursor: pointer;">
+                                📢 ข่าวสารทั่วไป
+                            </button>
                             <button type="button" onclick={() => loadDesignerPreset('welcome')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 800; background: #ecfdf5; border: 1.5px solid #10b981; color: #065f46; border-radius: 6px; cursor: pointer;">
                                 👋 ต้อนรับเพื่อนใหม่
                             </button>
@@ -6885,32 +7358,17 @@
                             </button>
                         </div>
 
+                        <!-- แถวที่ 3: การ์ดแจ้งเตือนสถานะออเดอร์ -->
                         <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; border-top: 1px dashed #e2e8f0; padding-top: 0.4rem;">
-                            <span style="font-size: 0.74rem; color: #0f766e; font-weight: 800;">📢 แจ้งเตือนสถานะออเดอร์:</span>
-                            <button type="button" onclick={() => loadDesignerPreset('status_order_created')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #f8fafc; border: 1.5px solid #94a3b8; color: #334155; border-radius: 6px; cursor: pointer;" title="โหลดพรีเซ็ตการ์ดรับออเดอร์ใหม่ (ปุ่มลิงก์ไปหน้า /success ให้แนบสลิป)">
-                                📝 รับออเดอร์ (Order Created)
-                            </button>
-                            <button type="button" onclick={() => loadDesignerPreset('status_slip_approved')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #f0fdf4; border: 1.5px solid #86efac; color: #15803d; border-radius: 6px; cursor: pointer;" title="โหลดพรีเซ็ตการ์ดอนุมัติสลิป (ปุ่มลิงก์ไปหน้า /success)">
-                                💳 อนุมัติสลิป (/success)
-                            </button>
-                            <button type="button" onclick={() => loadDesignerPreset('status_member_registered')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #fdf2f8; border: 1.5px solid #f472b6; color: #9d174d; border-radius: 6px; cursor: pointer;" title="โหลดพรีเซ็ตการ์ดแจ้งเตือนลูกค้าสมัครสมาชิกสำเร็จ">
-                                ✨ สมัครสมาชิกเสร็จ
-                            </button>
-                            <button type="button" onclick={() => loadDesignerPreset('status_brewing')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #ccfbf1; border: 1.5px solid #14b8a6; color: #0f766e; border-radius: 6px; cursor: pointer;">
-                                🍵 กำลังชง
-                            </button>
-                            <button type="button" onclick={() => loadDesignerPreset('status_ready')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #d1fae5; border: 1.5px solid #10b981; color: #065f46; border-radius: 6px; cursor: pointer;">
-                                ✨ ชงเสร็จ
-                            </button>
-                            <button type="button" onclick={() => loadDesignerPreset('status_delivering')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #e0f2fe; border: 1.5px solid #38bdf8; color: #0284c7; border-radius: 6px; cursor: pointer;">
-                                🛵 กำลังส่ง
-                            </button>
-                            <button type="button" onclick={() => loadDesignerPreset('status_completed')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #dcfce7; border: 1.5px solid #86efac; color: #166534; border-radius: 6px; cursor: pointer;">
-                                🎉 ส่งสำเร็จ
-                            </button>
-                            <button type="button" onclick={() => loadDesignerPreset('status_cancelled')} style="padding: 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 700; background: #fee2e2; border: 1.5px solid #f87171; color: #991b1b; border-radius: 6px; cursor: pointer;">
-                                ❌ ยกเลิก
-                            </button>
+                            <span style="font-size: 0.74rem; color: #0f766e; font-weight: 800;">📢 สถานะออเดอร์:</span>
+                            <button type="button" onclick={() => loadDesignerPreset('status_order_created')} style="padding: 0.22rem 0.5rem; font-size: 0.73rem; font-weight: 700; background: #f8fafc; border: 1px solid #94a3b8; color: #334155; border-radius: 6px; cursor: pointer;">📝 รับออเดอร์</button>
+                            <button type="button" onclick={() => loadDesignerPreset('status_slip_approved')} style="padding: 0.22rem 0.5rem; font-size: 0.73rem; font-weight: 700; background: #f0fdf4; border: 1px solid #86efac; color: #15803d; border-radius: 6px; cursor: pointer;">💳 อนุมัติสลิป</button>
+                            <button type="button" onclick={() => loadDesignerPreset('status_member_registered')} style="padding: 0.22rem 0.5rem; font-size: 0.73rem; font-weight: 700; background: #fdf2f8; border: 1px solid #f472b6; color: #9d174d; border-radius: 6px; cursor: pointer;">✨ สมัครเสร็จ</button>
+                            <button type="button" onclick={() => loadDesignerPreset('status_brewing')} style="padding: 0.22rem 0.5rem; font-size: 0.73rem; font-weight: 700; background: #ccfbf1; border: 1px solid #14b8a6; color: #0f766e; border-radius: 6px; cursor: pointer;">🍵 กำลังชง</button>
+                            <button type="button" onclick={() => loadDesignerPreset('status_ready')} style="padding: 0.22rem 0.5rem; font-size: 0.73rem; font-weight: 700; background: #d1fae5; border: 1px solid #10b981; color: #065f46; border-radius: 6px; cursor: pointer;">✨ ชงเสร็จ</button>
+                            <button type="button" onclick={() => loadDesignerPreset('status_delivering')} style="padding: 0.22rem 0.5rem; font-size: 0.73rem; font-weight: 700; background: #e0f2fe; border: 1px solid #38bdf8; color: #0284c7; border-radius: 6px; cursor: pointer;">🛵 กำลังส่ง</button>
+                            <button type="button" onclick={() => loadDesignerPreset('status_completed')} style="padding: 0.22rem 0.5rem; font-size: 0.73rem; font-weight: 700; background: #dcfce7; border: 1px solid #86efac; color: #166534; border-radius: 6px; cursor: pointer;">🎉 ส่งสำเร็จ</button>
+                            <button type="button" onclick={() => loadDesignerPreset('status_cancelled')} style="padding: 0.22rem 0.5rem; font-size: 0.73rem; font-weight: 700; background: #fee2e2; border: 1px solid #f87171; color: #991b1b; border-radius: 6px; cursor: pointer;">❌ ยกเลิก</button>
                         </div>
 
                         {#if settings.lineOa.useCustomWelcomeCard || settings.lineOa.useCustomMemberCard || settings.lineOa.useCustomRegisterCard || Object.values(settings.lineOa.customStatusCards || {}).some(c => c?.enabled)}
@@ -7173,21 +7631,31 @@
                                                     type="text"
                                                     class="form-input"
                                                     bind:value={block.tagText}
-                                                    placeholder="ข้อความป้าย เช่น 🍵 เมนูใหม่แนะนำ"
+                                                    placeholder="ข้อความป้าย เช่น 🍵 เมนูใหม่แนะนำ หรือ Hotfix"
                                                     style="font-size: 0.82rem; padding: 0.35rem 0.65rem;"
                                                 />
                                                 <input
                                                     type="color"
                                                     bind:value={block.tagBg}
                                                     title="สีพื้นหลังป้าย"
-                                                    style="width: 38px; height: 34px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;"
+                                                    style="width: 36px; height: 32px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;"
                                                 />
                                                 <input
                                                     type="color"
                                                     bind:value={block.tagColor}
                                                     title="สีตัวอักษรป้าย"
-                                                    style="width: 38px; height: 34px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;"
+                                                    style="width: 36px; height: 32px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;"
                                                 />
+                                            </div>
+                                            <!-- พรีเซ็ตสีป้ายแท็กด่วน -->
+                                            <div style="display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap; margin-top: 0.35rem;">
+                                                <span style="font-size: 0.68rem; color: #64748b;">สไตล์สีป้าย:</span>
+                                                <button type="button" onclick={() => { block.tagBg = '#dcfce7'; block.tagColor = '#166534'; }} style="font-size: 0.66rem; padding: 0.1rem 0.4rem; background: #dcfce7; color: #166534; border: 1px solid #86efac; border-radius: 999px; cursor: pointer; font-weight: 700;">🟢 เขียว</button>
+                                                <button type="button" onclick={() => { block.tagBg = '#fef3c7'; block.tagColor = '#b45309'; }} style="font-size: 0.66rem; padding: 0.1rem 0.4rem; background: #fef3c7; color: #b45309; border: 1px solid #fde047; border-radius: 999px; cursor: pointer; font-weight: 700;">🟡 ส้มเตือน</button>
+                                                <button type="button" onclick={() => { block.tagBg = '#fee2e2'; block.tagColor = '#991b1b'; }} style="font-size: 0.66rem; padding: 0.1rem 0.4rem; background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; border-radius: 999px; cursor: pointer; font-weight: 700;">🔴 แดงด่วน</button>
+                                                <button type="button" onclick={() => { block.tagBg = '#e0f2fe'; block.tagColor = '#0369a1'; }} style="font-size: 0.66rem; padding: 0.1rem 0.4rem; background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; border-radius: 999px; cursor: pointer; font-weight: 700;">🔵 ฟ้าข้อมูล</button>
+                                                <button type="button" onclick={() => { block.tagBg = '#f3e8ff'; block.tagColor = '#6b21a8'; }} style="font-size: 0.66rem; padding: 0.1rem 0.4rem; background: #f3e8ff; color: #6b21a8; border: 1px solid #d8b4fe; border-radius: 999px; cursor: pointer; font-weight: 700;">🟣 ม่วง</button>
+                                                <button type="button" onclick={() => { block.tagBg = '#f1f5f9'; block.tagColor = '#334155'; }} style="font-size: 0.66rem; padding: 0.1rem 0.4rem; background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; border-radius: 999px; cursor: pointer; font-weight: 700;">⚪ เทา</button>
                                             </div>
                                             <div style="display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.3rem;">
                                                 <span style="font-size: 0.68rem; color: #64748b;">กดเลือกตัวแปร:</span>
@@ -7197,23 +7665,36 @@
                                         </div>
                                     {:else if block.type === 'title'}
                                         <div>
-                                            <div style="display: flex; gap: 0.4rem; align-items: center;">
+                                            <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
                                                 <input
                                                     type="text"
                                                     class="form-input"
                                                     bind:value={block.titleText}
-                                                    placeholder="หัวข้อการ์ด เช่น Cold-Fermented Matcha Oat Latte"
-                                                    style="font-size: 0.85rem; font-weight: 700; padding: 0.4rem 0.65rem;"
+                                                    placeholder="หัวข้อการ์ด เช่น แก้ไขระบบขัดข้อง"
+                                                    style="font-size: 0.85rem; font-weight: 700; padding: 0.4rem 0.65rem; flex: 1; min-width: 160px;"
                                                 />
                                                 <select
                                                     class="form-input"
                                                     bind:value={block.titleSize}
-                                                    style="width: 100px; font-size: 0.8rem; padding: 0.4rem 0.5rem;"
+                                                    style="width: 95px; font-size: 0.8rem; padding: 0.4rem 0.5rem;"
                                                 >
-                                                    <option value="md">ขนาดปกติ</option>
-                                                    <option value="lg">ขนาดใหญ่</option>
+                                                    <option value="md">ปกติ</option>
+                                                    <option value="lg">ใหญ่</option>
                                                     <option value="xl">ใหญ่พิเศษ</option>
                                                 </select>
+                                                <input
+                                                    type="color"
+                                                    bind:value={block.titleColor}
+                                                    title="สีตัวอักษรหัวข้อ"
+                                                    style="width: 36px; height: 32px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;"
+                                                />
+                                            </div>
+                                            <div style="display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap; margin-top: 0.35rem;">
+                                                <span style="font-size: 0.68rem; color: #64748b;">สีด่วน:</span>
+                                                <button type="button" onclick={() => (block.titleColor = '#14532d')} style="font-size: 0.66rem; padding: 0.1rem 0.35rem; background: #f0fdf4; color: #14532d; border: 1px solid #86efac; border-radius: 4px; cursor: pointer; font-weight: 700;">เขียวเข้ม</button>
+                                                <button type="button" onclick={() => (block.titleColor = '#1e293b')} style="font-size: 0.66rem; padding: 0.1rem 0.35rem; background: #f8fafc; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; font-weight: 700;">ดำสนิท</button>
+                                                <button type="button" onclick={() => (block.titleColor = '#991b1b')} style="font-size: 0.66rem; padding: 0.1rem 0.35rem; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; border-radius: 4px; cursor: pointer; font-weight: 700;">แดงเข้ม</button>
+                                                <button type="button" onclick={() => (block.titleColor = '#92400e')} style="font-size: 0.66rem; padding: 0.1rem 0.35rem; background: #fefce8; color: #92400e; border: 1px solid #fde047; border-radius: 4px; cursor: pointer; font-weight: 700;">ส้มทอง</button>
                                             </div>
                                             <div style="display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.3rem;">
                                                 <span style="font-size: 0.68rem; color: #64748b;">กดเลือกตัวแปร:</span>
@@ -7230,10 +7711,29 @@
                                             <textarea
                                                 class="form-input"
                                                 bind:value={block.bodyText}
-                                                rows="2"
-                                                placeholder="รายละเอียดข้อความ หรือคำโปรยสินค้า..."
-                                                style="font-size: 0.82rem; padding: 0.4rem 0.65rem; line-height: 1.45;"
+                                                rows="3"
+                                                placeholder="รายละเอียดข้อความ หรือคำโปรยสินค้า (สามารถเว้นบรรทัดได้)..."
+                                                style="font-size: 0.82rem; padding: 0.4rem 0.65rem; line-height: 1.45; width: 100%; resize: vertical;"
                                             ></textarea>
+                                            <div style="display: flex; gap: 0.4rem; align-items: center; margin-top: 0.3rem; flex-wrap: wrap;">
+                                                <span style="font-size: 0.68rem; color: #64748b;">ขนาด:</span>
+                                                <select
+                                                    class="form-input"
+                                                    bind:value={block.bodySize}
+                                                    style="width: 80px; font-size: 0.75rem; padding: 0.2rem 0.3rem;"
+                                                >
+                                                    <option value="xs">เล็ก</option>
+                                                    <option value="sm">ปกติ</option>
+                                                    <option value="md">กลาง</option>
+                                                </select>
+                                                <span style="font-size: 0.68rem; color: #64748b; margin-left: 0.3rem;">สีตัวอักษร:</span>
+                                                <input
+                                                    type="color"
+                                                    bind:value={block.bodyColor}
+                                                    title="สีตัวอักษรข้อความ"
+                                                    style="width: 30px; height: 26px; padding: 1px; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;"
+                                                />
+                                            </div>
                                             <div style="display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.3rem;">
                                                 <span style="font-size: 0.68rem; color: #64748b;">กดเลือกตัวแปร:</span>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'bodyText', '{orderCode}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 4px; cursor: pointer;">+{'{orderCode}'}</button>
@@ -7252,9 +7752,18 @@
                                                 type="text"
                                                 class="form-input"
                                                 bind:value={block.highlightText}
-                                                placeholder="ข้อความเน้น เช่น ✨ ราคาพิเศษ 65.- หรือ ซื้อ 2 ฟรี 1"
-                                                style="font-size: 0.85rem; font-weight: 700; color: #92400e; padding: 0.4rem 0.65rem; background: #fffdf5; border-color: #fde047;"
+                                                placeholder="ข้อความเน้น เช่น ขณะนี้ระบบสามารถกลับมาใช้งานได้ตามปกติ"
+                                                style="font-size: 0.85rem; font-weight: 700; color: {block.highlightColor || '#854d0e'}; padding: 0.4rem 0.65rem; background: {block.highlightBg || '#fef9c3'}; border-color: {block.highlightBorder || '#fde047'}; width: 100%;"
                                             />
+                                            <!-- พรีเซ็ตสไตล์กล่องไฮไลต์ด่วน -->
+                                            <div style="display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap; margin-top: 0.35rem;">
+                                                <span style="font-size: 0.68rem; color: #64748b;">สไตล์กล่อง:</span>
+                                                <button type="button" onclick={() => { block.highlightBg = '#fef9c3'; block.highlightBorder = '#fde047'; block.highlightColor = '#854d0e'; }} style="font-size: 0.66rem; padding: 0.1rem 0.4rem; background: #fef9c3; color: #854d0e; border: 1px solid #fde047; border-radius: 6px; cursor: pointer; font-weight: 700;">🟡 ส้ม/เหลืองเตือน</button>
+                                                <button type="button" onclick={() => { block.highlightBg = '#f0fdf4'; block.highlightBorder = '#86efac'; block.highlightColor = '#166534'; }} style="font-size: 0.66rem; padding: 0.1rem 0.4rem; background: #f0fdf4; color: #166534; border: 1px solid #86efac; border-radius: 6px; cursor: pointer; font-weight: 700;">🟢 เขียวสำเร็จ</button>
+                                                <button type="button" onclick={() => { block.highlightBg = '#eff6ff'; block.highlightBorder = '#93c5fd'; block.highlightColor = '#1e40af'; }} style="font-size: 0.66rem; padding: 0.1rem 0.4rem; background: #eff6ff; color: #1e40af; border: 1px solid #93c5fd; border-radius: 6px; cursor: pointer; font-weight: 700;">🔵 ฟ้าข้อมูล</button>
+                                                <button type="button" onclick={() => { block.highlightBg = '#fef2f2'; block.highlightBorder = '#fca5a5'; block.highlightColor = '#991b1b'; }} style="font-size: 0.66rem; padding: 0.1rem 0.4rem; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; border-radius: 6px; cursor: pointer; font-weight: 700;">🔴 แดงสำคัญ</button>
+                                                <button type="button" onclick={() => { block.highlightBg = '#f8fafc'; block.highlightBorder = '#cbd5e1'; block.highlightColor = '#334155'; }} style="font-size: 0.66rem; padding: 0.1rem 0.4rem; background: #f8fafc; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; font-weight: 700;">⚪ เทาสะอาด</button>
+                                            </div>
                                             <div style="display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.3rem;">
                                                 <span style="font-size: 0.68rem; color: #64748b;">กดเลือกตัวแปร:</span>
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'highlightText', '{orderCode}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 4px; cursor: pointer;">+{'{orderCode}'}</button>
@@ -7264,9 +7773,14 @@
                                                 <button type="button" onclick={() => insertVariableToBlock(block, 'highlightText', '{points}')} style="padding: 0.1rem 0.35rem; font-size: 0.68rem; background: #fff7ed; border: 1px solid #fed7aa; color: #c2410c; border-radius: 4px; cursor: pointer;">+{'{points}'}</button>
                                             </div>
                                         </div>
+                                    {:else if block.type === 'separator'}
+                                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.5rem 0.75rem;">
+                                            <hr style="border: none; border-top: 1.5px dashed #cbd5e1; margin: 0.25rem 0;" />
+                                            <span style="font-size: 0.7rem; color: #64748b; display: block; text-align: center;">➖ เส้นคั่นแบ่งส่วนเนื้อหา (Divider)</span>
+                                        </div>
                                     {:else if block.type === 'button'}
                                         <div style="display: flex; flex-direction: column; gap: 0.45rem; background: #ffffff; padding: 0.65rem; border-radius: 8px; border: 1px solid #e2e8f0;">
-                                            <div style="display: grid; grid-template-columns: 1fr 140px; gap: 0.4rem;">
+                                            <div style="display: grid; grid-template-columns: 1fr 150px; gap: 0.4rem;">
                                                 <div>
                                                     <div style="display: flex; justify-content: space-between; align-items: center;">
                                                         <span style="font-size: 0.72rem; color: #64748b; font-weight: 600;">ข้อความบนปุ่ม (Label):</span>
@@ -7279,7 +7793,7 @@
                                                         type="text"
                                                         class="form-input"
                                                         bind:value={block.buttonLabel}
-                                                        placeholder="เช่น 🍵 สั่งเครื่องดื่มทันที"
+                                                        placeholder="เช่น ✨ บัตรสะสมแต้มของฉัน"
                                                         style="font-size: 0.82rem; padding: 0.35rem 0.6rem; font-weight: 700; margin-top: 0.15rem;"
                                                     />
                                                 </div>
@@ -7288,12 +7802,14 @@
                                                     <select
                                                         class="form-input"
                                                         bind:value={block.buttonStyle}
-                                                        style="font-size: 0.8rem; padding: 0.35rem 0.5rem;"
+                                                        style="font-size: 0.78rem; padding: 0.35rem 0.4rem;"
                                                     >
-                                                        <option value="primary">เขียวมัทฉะ (Primary)</option>
-                                                        <option value="outline">ขาวขอบเขียว (Outline)</option>
-                                                        <option value="gold">สีทอง (Gold)</option>
-                                                        <option value="secondary">สีเทา (Secondary)</option>
+                                                        <option value="primary">🟢 เขียวมัทฉะ (Primary)</option>
+                                                        <option value="gold">🟠 สีทอง/ส้ม (Gold)</option>
+                                                        <option value="danger">🔴 สีแดง (Danger)</option>
+                                                        <option value="secondary">⚫ สีเทาดำ (Secondary)</option>
+                                                        <option value="outline">⚪ ขาวขอบเขียว (Outline)</option>
+                                                        <option value="outline-gold">⚪ ขาวขอบส้ม (Outline Gold)</option>
                                                     </select>
                                                 </div>
                                             </div>
@@ -7371,10 +7887,13 @@
                                     📄 คำอธิบาย
                                 </button>
                                 <button type="button" onclick={() => addDesignerBlock('highlight')} style="padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
-                                    💰 ไฮไลต์/ราคา
+                                    💰 ไฮไลต์/กล่องข้อความ
                                 </button>
                                 <button type="button" onclick={() => addDesignerBlock('button')} style="padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 800; background: #166534; color: #ffffff; border: 1px solid #14532d; border-radius: 6px; cursor: pointer;">
                                     🔘 ปุ่มแอ็กชัน
+                                </button>
+                                <button type="button" onclick={() => addDesignerBlock('separator')} style="padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 700; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;">
+                                    ➖ เส้นคั่น (Divider)
                                 </button>
                             </div>
                         </div>
@@ -7431,20 +7950,22 @@
                                                 </div>
                                             {:else if b.type === 'title' && b.titleText}
                                                 <div>
-                                                    <strong style="color: #14532d; font-size: {b.titleSize === 'xl' ? '1.25rem' : b.titleSize === 'md' ? '1rem' : '1.12rem'}; line-height: 1.35; display: block; font-weight: 800;">
+                                                    <strong style="color: {b.titleColor || '#14532d'}; font-size: {b.titleSize === 'xl' ? '1.25rem' : b.titleSize === 'md' ? '1rem' : '1.12rem'}; line-height: 1.35; display: block; font-weight: {b.titleWeight === 'regular' ? '500' : '800'};">
                                                         {replacePreviewVars(b.titleText)}
                                                     </strong>
                                                 </div>
                                             {:else if b.type === 'body' && b.bodyText}
                                                 <div>
-                                                    <p style="margin: 0; color: #475569; font-size: 0.85rem; line-height: 1.5; white-space: pre-line;">
+                                                    <p style="margin: 0; color: {b.bodyColor || '#475569'}; font-size: {b.bodySize === 'xs' ? '0.75rem' : b.bodySize === 'md' ? '0.92rem' : '0.85rem'}; line-height: 1.5; white-space: pre-line;">
                                                         {replacePreviewVars(b.bodyText)}
                                                     </p>
                                                 </div>
                                             {:else if b.type === 'highlight' && b.highlightText}
-                                                <div style="background: #fef3c7; border: 1.5px solid #fde047; border-radius: 8px; padding: 0.55rem 0.85rem; color: #92400e; font-size: 0.82rem; font-weight: 700; text-align: left; line-height: 1.45;">
+                                                <div style="background: {b.highlightBg || '#fef3c7'}; border: 1.5px solid {b.highlightBorder || '#fde047'}; border-radius: 8px; padding: 0.55rem 0.85rem; color: {b.highlightColor || '#92400e'}; font-size: 0.82rem; font-weight: 700; text-align: left; line-height: 1.45;">
                                                     {replacePreviewVars(b.highlightText)}
                                                 </div>
+                                            {:else if b.type === 'separator'}
+                                                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 0.25rem 0;" />
                                             {/if}
                                         {/each}
                                     </div>
@@ -7468,9 +7989,9 @@
                                                     font-size: 0.86rem;
                                                     font-weight: 700;
                                                     border-radius: 4px;
-                                                    background: {b.buttonStyle === 'outline' ? '#ffffff' : b.buttonStyle === 'gold' ? '#d97706' : b.buttonStyle === 'secondary' ? '#475569' : '#166534'};
-                                                    color: {b.buttonStyle === 'outline' ? '#166534' : '#ffffff'};
-                                                    border: {b.buttonStyle === 'outline' ? '1px solid #166534' : 'none'};
+                                                    background: {b.buttonStyle === 'outline' || b.buttonStyle === 'outline-gold' ? '#ffffff' : b.buttonStyle === 'gold' ? '#d97706' : b.buttonStyle === 'danger' ? '#dc2626' : b.buttonStyle === 'secondary' ? '#475569' : '#166534'};
+                                                    color: {b.buttonStyle === 'outline' ? '#166534' : b.buttonStyle === 'outline-gold' ? '#d97706' : '#ffffff'};
+                                                    border: {b.buttonStyle === 'outline' ? '1.5px solid #166534' : b.buttonStyle === 'outline-gold' ? '1.5px solid #d97706' : 'none'};
                                                     box-sizing: border-box;
                                                     letter-spacing: 0.01em;
                                                 "
@@ -7814,17 +8335,38 @@
                             </div>
 
                             <div style="margin-bottom: 0.85rem;">
-                                <span style="font-size: 0.75rem; color: #475569; font-weight: 700; display: block; margin-bottom: 0.25rem;">
-                                    เป้าหมายการส่ง:
+                                <span style="font-size: 0.78rem; color: #334155; font-weight: 800; display: block; margin-bottom: 0.4rem;">
+                                    🎯 เลือกเป้าหมายการส่ง:
                                 </span>
-                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                    <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; font-weight: 700; color: #166534; cursor: pointer;">
-                                        <input type="radio" bind:group={designerTarget} value="admin" style="accent-color: #166534;" />
-                                        📱 ส่งทดสอบเข้า LINE แอดมิน
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                    <!-- Option 1: Admin Test -->
+                                    <label
+                                        style="display: flex; flex-direction: column; gap: 0.25rem; padding: 0.65rem 0.75rem; border-radius: 10px; cursor: pointer; transition: all 0.15s ease; border: 2px solid {designerTarget === 'admin' ? '#166534' : '#e2e8f0'}; background: {designerTarget === 'admin' ? '#f0fdf4' : '#ffffff'};"
+                                    >
+                                        <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                            <input type="radio" bind:group={designerTarget} value="admin" style="accent-color: #166534;" />
+                                            <strong style="font-size: 0.82rem; color: {designerTarget === 'admin' ? '#166534' : '#1e293b'};">
+                                                📱 ส่งทดสอบแอดมิน
+                                            </strong>
+                                        </div>
+                                        <span style="font-size: 0.7rem; color: #64748b; line-height: 1.35; padding-left: 1.25rem;">
+                                            ส่งเข้า LINE ผู้ดูแลเท่านั้น เพื่อพรีวิวความถูกต้อง ปลอดภัย 100%
+                                        </span>
                                     </label>
-                                    <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; font-weight: 700; color: #0284c7; cursor: pointer;">
-                                        <input type="radio" bind:group={designerTarget} value="broadcast" style="accent-color: #0284c7;" />
-                                        📢 ส่งบรอดแคสต์หาลูกค้าทุกคน
+
+                                    <!-- Option 2: Broadcast All -->
+                                    <label
+                                        style="display: flex; flex-direction: column; gap: 0.25rem; padding: 0.65rem 0.75rem; border-radius: 10px; cursor: pointer; transition: all 0.15s ease; border: 2px solid {designerTarget === 'broadcast' ? '#ea580c' : '#e2e8f0'}; background: {designerTarget === 'broadcast' ? '#fff7ed' : '#ffffff'};"
+                                    >
+                                        <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                            <input type="radio" bind:group={designerTarget} value="broadcast" style="accent-color: #ea580c;" />
+                                            <strong style="font-size: 0.82rem; color: {designerTarget === 'broadcast' ? '#ea580c' : '#1e293b'};">
+                                                📢 บรอดแคสต์ทุกคน
+                                            </strong>
+                                        </div>
+                                        <span style="font-size: 0.7rem; color: #64748b; line-height: 1.35; padding-left: 1.25rem;">
+                                            ส่งแจ้งข่าวสาร/แก้ระบบ เข้าแชทลูกค้าทุกคนที่ติดตาม LINE OA
+                                        </span>
                                     </label>
                                 </div>
                             </div>
@@ -7834,10 +8376,30 @@
                                     type="button"
                                     onclick={sendDesignerCard}
                                     disabled={isSendingDesignerCard}
-                                    class="btn-matcha-primary"
-                                    style="flex: 1; padding: 0.55rem 0.9rem; font-size: 0.88rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;"
+                                    style="
+                                        flex: 1;
+                                        padding: 0.65rem 1rem;
+                                        font-size: 0.88rem;
+                                        font-weight: 800;
+                                        display: inline-flex;
+                                        align-items: center;
+                                        justify-content: center;
+                                        gap: 0.45rem;
+                                        border: none;
+                                        border-radius: 8px;
+                                        cursor: pointer;
+                                        color: #ffffff;
+                                        background: {designerTarget === 'broadcast' ? '#ea580c' : '#166534'};
+                                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                                    "
                                 >
-                                    🚀 {isSendingDesignerCard ? 'กำลังส่ง...' : designerTarget === 'admin' ? 'ส่งทดสอบเข้า LINE แอดมิน' : 'บรอดแคสต์ส่งหาลูกค้าทุกคน'}
+                                    {#if isSendingDesignerCard}
+                                        ⏳ กำลังส่งข้อความ...
+                                    {:else if designerTarget === 'broadcast'}
+                                        📢 ยืนยันบรอดแคสต์หาลูกค้าทุกคน
+                                    {:else}
+                                        📱 ส่งทดสอบเข้า LINE แอดมิน
+                                    {/if}
                                 </button>
                                 <button
                                     type="button"
@@ -7853,6 +8415,108 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Modal คลังเทมเพลตที่บันทึกไว้ (Custom Templates Manager) -->
+            {#if showTemplateModal}
+                <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(4px); z-index: 99999; display: flex; align-items: center; justify-content: center; padding: 1rem;">
+                    <div style="background: #ffffff; border-radius: 16px; width: 100%; max-width: 580px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2), 0 10px 10px -5px rgba(0,0,0,0.1); overflow: hidden;">
+                        <!-- Header -->
+                        <div style="padding: 1rem 1.25rem; background: #f8fafc; border-bottom: 1.5px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 1.25rem;">📚</span>
+                                <div>
+                                    <h3 style="margin: 0; font-size: 1rem; font-weight: 800; color: #1e293b;">คลังเทมเพลตการ์ดที่บันทึกไว้</h3>
+                                    <p style="margin: 0; font-size: 0.72rem; color: #64748b;">จัดการ โหลด ทำซ้ำ หรือลบเทมเพลตการ์ดที่เคยบันทึกไว้</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onclick={() => (showTemplateModal = false)}
+                                style="border: none; background: #f1f5f9; color: #64748b; width: 32px; height: 32px; border-radius: 999px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <!-- Content List -->
+                        <div style="padding: 1rem 1.25rem; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 0.75rem;">
+                            {#if !settings.lineOa.customTemplates || settings.lineOa.customTemplates.length === 0}
+                                <div style="text-align: center; padding: 2.5rem 1rem; color: #94a3b8;">
+                                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📂</div>
+                                    <div style="font-size: 0.9rem; font-weight: 700; color: #475569;">ยังไม่มีเทมเพลตที่บันทึกไว้</div>
+                                    <div style="font-size: 0.78rem; margin-top: 0.25rem;">คุณสามารถออกแบบการ์ดแล้วกดปุ่ม <strong>"💾 เซฟเทมเพลตใหม่"</strong> บนแถบควบคุมเพื่อบันทึกไว้ใช้งานซ้ำได้ค่ะ</div>
+                                </div>
+                            {:else}
+                                {#each settings.lineOa.customTemplates as tpl}
+                                    <div style="background: {activeTemplateId === tpl.id ? '#f0fdf4' : '#ffffff'}; border: 1.5px solid {activeTemplateId === tpl.id ? '#22c55e' : '#e2e8f0'}; border-radius: 12px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; transition: all 0.15s ease;">
+                                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
+                                            <div>
+                                                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                                    <strong style="font-size: 0.92rem; color: #1e293b;">{tpl.name}</strong>
+                                                    {#if activeTemplateId === tpl.id}
+                                                        <span style="font-size: 0.65rem; background: #22c55e; color: #ffffff; padding: 0.1rem 0.4rem; border-radius: 999px; font-weight: 800;">กำลังเปิดใช้งาน</span>
+                                                    {/if}
+                                                </div>
+                                                <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem;">
+                                                    มี {tpl.blocks?.length || 0} บล็อก • อัปเดตล่าสุด: {tpl.updatedAt ? new Date(tpl.updatedAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '-'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end; border-top: 1px dashed #f1f5f9; padding-top: 0.5rem;">
+                                            <button
+                                                type="button"
+                                                onclick={() => loadCustomTemplate(tpl.id)}
+                                                style="padding: 0.3rem 0.65rem; font-size: 0.76rem; font-weight: 700; background: #166534; color: #ffffff; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"
+                                            >
+                                                📂 โหลดมาแก้ไข
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onclick={() => duplicateCustomTemplate(tpl.id)}
+                                                style="padding: 0.3rem 0.55rem; font-size: 0.76rem; font-weight: 700; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"
+                                                title="สร้างสำเนาเทมเพลตนี้"
+                                            >
+                                                📋 ทำซ้ำ
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onclick={() => renameCustomTemplate(tpl.id)}
+                                                style="padding: 0.3rem 0.55rem; font-size: 0.76rem; font-weight: 700; background: #f1f5f9; color: #0284c7; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"
+                                                title="เปลี่ยนชื่อเทมเพลต"
+                                            >
+                                                ✏️ เปลี่ยนชื่อ
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onclick={() => deleteCustomTemplate(tpl.id)}
+                                                style="padding: 0.3rem 0.55rem; font-size: 0.76rem; font-weight: 700; background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.25rem;"
+                                                title="ลบเทมเพลตนี้"
+                                            >
+                                                🗑️ ลบ
+                                            </button>
+                                        </div>
+                                    </div>
+                                {/each}
+                            {/if}
+                        </div>
+
+                        <!-- Footer -->
+                        <div style="padding: 0.85rem 1.25rem; background: #f8fafc; border-top: 1.5px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 0.75rem; color: #64748b;">
+                                ทั้งหมด {settings.lineOa.customTemplates?.length || 0} เทมเพลต
+                            </span>
+                            <button
+                                type="button"
+                                onclick={() => (showTemplateModal = false)}
+                                style="padding: 0.4rem 1rem; font-size: 0.82rem; font-weight: 700; background: #e2e8f0; color: #1e293b; border: none; border-radius: 8px; cursor: pointer;"
+                            >
+                                ปิด
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {/if}
                 </div>
             {/if}
 
