@@ -9,6 +9,7 @@ export interface DeliveryRound {
     cutoffTime: string; // 'HH:mm' on same day
     allowFermented: boolean;
     isAllDayOpen?: boolean; // ถ้าเป็น true เมนูไม่บ่มสามารถสั่งได้ตลอดจนจบช่วงเวลาส่ง
+    leadTimeMinutes?: number; // เวลาเตรียมชงล่วงหน้าเป็นนาที (เช่น 45 นาที) สำหรับรอบรวม
     enabled: boolean;
 }
 
@@ -98,6 +99,7 @@ export interface StoreSettings {
     limitDropdownToAdvanceWindow?: boolean; // บังคับจำกัดวันในดรอปดาวน์ให้เหลือเฉพาะวันที่สั่งได้ตามจำนวนวัน/ชั่วโมงที่ตั้ง
     fermentedCutoffTime: string; // 'HH:mm' on day before delivery date
     fermentedItemIds: string[];
+    alldayLeadTimeMinutes?: number; // เวลาเตรียมชงล่วงหน้าสำหรับรอบรวม (นาที) ค่าเริ่มต้น 45 นาที
     deliveryRounds: DeliveryRound[];
     calendar: Record<string, DaySchedule>; // keyed by 'YYYY-MM-DD'
     loyaltyEnabled: boolean;
@@ -118,6 +120,7 @@ const ALLDAY_ROUND_DEFAULT: DeliveryRound = {
     cutoffTime: '13:00',
     allowFermented: true,
     isAllDayOpen: true,
+    leadTimeMinutes: 45,
     enabled: true
 };
 
@@ -130,6 +133,7 @@ const DEFAULT_SETTINGS: StoreSettings = {
     limitDropdownToAdvanceWindow: true,
     fermentedCutoffTime: '23:00',
     fermentedItemIds: ['cold-fermented-matcha-oat-latte'],
+    alldayLeadTimeMinutes: 45,
     loyaltyEnabled: true,
     loyaltyStampsRequired: 10,
     loyaltyExpireDays: 60,
@@ -325,9 +329,10 @@ function normalizeSettings(parsed: any): StoreSettings {
     rounds = rounds.map(r => {
         if (r.id === 'allday') {
             const name = (!r.name || r.name === 'รอบรวมเช้า-บ่าย' || r.name === 'รอบรวม') ? ALLDAY_ROUND_DEFAULT.name : r.name;
-            return { ...ALLDAY_ROUND_DEFAULT, ...r, name, isAllDayOpen: true, allowFermented: true };
+            const leadMinutes = typeof r.leadTimeMinutes === 'number' && r.leadTimeMinutes > 0 ? r.leadTimeMinutes : (typeof parsed?.alldayLeadTimeMinutes === 'number' && parsed.alldayLeadTimeMinutes > 0 ? parsed.alldayLeadTimeMinutes : 45);
+            return { ...ALLDAY_ROUND_DEFAULT, ...r, name, isAllDayOpen: true, allowFermented: true, leadTimeMinutes: leadMinutes };
         }
-        return { ...r, allowFermented: true };
+        return { ...r, allowFermented: true, leadTimeMinutes: typeof r.leadTimeMinutes === 'number' && r.leadTimeMinutes > 0 ? r.leadTimeMinutes : undefined };
     });
 
     const defaultLineOa = DEFAULT_SETTINGS.lineOa;
@@ -361,6 +366,7 @@ function normalizeSettings(parsed: any): StoreSettings {
     return {
         ...DEFAULT_SETTINGS,
         ...(parsed || {}),
+        alldayLeadTimeMinutes: typeof parsed?.alldayLeadTimeMinutes === 'number' && parsed.alldayLeadTimeMinutes > 0 ? parsed.alldayLeadTimeMinutes : 45,
         maxAdvanceDays: typeof parsed?.maxAdvanceDays === 'number' && parsed.maxAdvanceDays > 0 ? parsed.maxAdvanceDays : 3,
         advanceBookingMode: parsed?.advanceBookingMode === 'hours' ? 'hours' : 'days',
         advanceBookingHours: typeof parsed?.advanceBookingHours === 'number' && parsed.advanceBookingHours > 0 ? parsed.advanceBookingHours : 72,
@@ -577,11 +583,13 @@ export async function getNext7DaysSchedule(): Promise<ScheduleResponse> {
             canOrderNow = false;
             closeReason = 'ร้านปิดบริการในวันนี้';
         } else if (isToday) {
-            // กรณีเป็น "วันนี้": ตรวจสอบเวลาตัดรอบของทุกรอบส่งในวันนี้
+            // กรณีเป็น "วันนี้": ตรวจสอบเวลาตัดรอบของทุกรอบส่งในวันนี้ (สำหรับรอบรวมต้องมีเวลาเตรียมชงอย่างน้อย leadTimeMinutes นาที)
             const availableRoundsToday = activeRounds.filter(round => {
                 const [rCutoffH, rCutoffM] = (round.cutoffTime || '06:00').split(':').map(Number);
                 const roundDeadline = new Date(d.getFullYear(), d.getMonth(), d.getDate(), rCutoffH, rCutoffM, 59, 999);
-                return now.getTime() <= roundDeadline.getTime();
+                const isAllDay = round.id === 'allday' || Boolean(round.isAllDayOpen);
+                const leadMinutes = isAllDay ? (round.leadTimeMinutes || settings.alldayLeadTimeMinutes || 45) : 0;
+                return (now.getTime() + leadMinutes * 60 * 1000) <= roundDeadline.getTime();
             });
 
             if (activeRounds.length === 0 || availableRoundsToday.length === 0) {
@@ -663,7 +671,8 @@ export async function getNext7DaysSchedule(): Promise<ScheduleResponse> {
 export async function validateDeliverySlot(
     deliveryDateStr: string,
     roundId: string,
-    hasFermentedItem: boolean
+    hasFermentedItem: boolean,
+    preferredDeliveryTime?: string
 ): Promise<{ isValid: boolean; message?: string; round?: DeliveryRound }> {
     const settings = await getStoreSettings();
 
@@ -732,7 +741,37 @@ export async function validateDeliverySlot(
     const [roundCutoffH, roundCutoffM] = (round.cutoffTime || '06:00').split(':').map(Number);
     const roundDeadline = new Date(y, m - 1, d, roundCutoffH, roundCutoffM, 59, 999);
 
-    if (now.getTime() > roundDeadline.getTime()) {
+    const isAllDay = round.id === 'allday' || Boolean(round.isAllDayOpen);
+    const leadMinutes = isAllDay ? (round.leadTimeMinutes || settings.alldayLeadTimeMinutes || 45) : 0;
+
+    if (diffDays === 0 && isAllDay && leadMinutes > 0) {
+        if (now.getTime() + leadMinutes * 60 * 1000 > roundDeadline.getTime()) {
+            return {
+                isValid: false,
+                message: `รอบ ${round.name} (${round.timeSlot}) ของวันนี้ปิดรับออเดอร์แล้วค่ะ เนื่องจากต้องสั่งล่วงหน้าอย่างน้อย ${leadMinutes} นาทีเพื่อให้แอดมินมีเวลาเตรียมชงก่อนหมดรอบส่ง (${round.cutoffTime} น.)`
+            };
+        }
+
+        if (preferredDeliveryTime && preferredDeliveryTime.trim()) {
+            const timeMatch = preferredDeliveryTime.match(/(\d{1,2})[:.](\d{2})/);
+            if (timeMatch) {
+                const targetH = parseInt(timeMatch[1], 10);
+                const targetM = parseInt(timeMatch[2], 10);
+                const prefDeliveryMs = new Date(now.getFullYear(), now.getMonth(), now.getDate(), targetH, targetM, 0).getTime();
+                const minAllowedMs = now.getTime() + leadMinutes * 60 * 1000;
+
+                if (prefDeliveryMs < minAllowedMs) {
+                    const earliestD = new Date(minAllowedMs);
+                    const eH = String(earliestD.getHours()).padStart(2, '0');
+                    const eM = String(earliestD.getMinutes()).padStart(2, '0');
+                    return {
+                        isValid: false,
+                        message: `สำหรับรอบรวมของวันนี้ ต้องระบุเวลานัดรับล่วงหน้าอย่างน้อย ${leadMinutes} นาทีเพื่อให้แอดมินมีเวลาเตรียมชงค่ะ (เวลาจัดส่งที่เร็วที่สุดที่เลือกได้คือ ${eH}:${eM} น.)`
+                    };
+                }
+            }
+        }
+    } else if (now.getTime() > roundDeadline.getTime()) {
         return {
             isValid: false,
             message: diffDays === 0

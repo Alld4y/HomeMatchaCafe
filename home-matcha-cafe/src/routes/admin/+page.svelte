@@ -46,6 +46,7 @@
         cutoffTime: string;
         allowFermented: boolean;
         isAllDayOpen?: boolean;
+        leadTimeMinutes?: number;
         enabled: boolean;
     }
 
@@ -58,6 +59,7 @@
         limitDropdownToAdvanceWindow?: boolean;
         fermentedCutoffTime: string;
         fermentedItemIds: string[];
+        alldayLeadTimeMinutes?: number;
         deliveryRounds: DeliveryRoundConfig[];
         calendar: Record<string, { isOpen: boolean; customRounds?: string[]; note?: string }>;
         loyaltyEnabled?: boolean;
@@ -158,6 +160,7 @@
         limitDropdownToAdvanceWindow: true,
         fermentedCutoffTime: '23:00',
         fermentedItemIds: ['cold-fermented-matcha-oat-latte'],
+        alldayLeadTimeMinutes: 45,
         loyaltyEnabled: true,
         loyaltyStampsRequired: 10,
         loyaltyExpireDays: 60,
@@ -229,7 +232,7 @@
         deliveryRounds: [
             { id: 'morning', name: 'รอบเช้า', timeSlot: '07:00–08:00 น.', cutoffTime: '06:00', allowFermented: true, isAllDayOpen: false, enabled: true },
             { id: 'noon', name: 'รอบเที่ยง', timeSlot: '12:30–13:00 น.', cutoffTime: '11:30', allowFermented: true, isAllDayOpen: false, enabled: true },
-            { id: 'allday', name: 'รอบสาย–บ่าย', timeSlot: '09:00–13:00 น.', cutoffTime: '13:00', allowFermented: true, isAllDayOpen: true, enabled: true }
+            { id: 'allday', name: 'รอบสาย–บ่าย', timeSlot: '09:00–13:00 น.', cutoffTime: '13:00', allowFermented: true, isAllDayOpen: true, leadTimeMinutes: 45, enabled: true }
         ],
         calendar: {}
     });
@@ -3343,7 +3346,7 @@
                                     </span>
                                     {#if isCombined}
                                         <span style="font-size: 0.75rem; color: #6d28d9; line-height: 1.35;">
-                                            ✨ รวบเช้า-บ่ายเป็นรอบเดียว · เมนูไม่บ่มสั่งได้ตลอด / เมนูบ่มสั่งล่วงหน้าก่อน {settings.fermentedCutoffTime} น. วันก่อนเปิด
+                                            ✨ รวบเช้า-บ่ายเป็นรอบเดียว · เมนูไม่บ่มสั่งได้ตลอด (ต้องเผื่อเวลาชงล่วงหน้า {round.leadTimeMinutes || settings.alldayLeadTimeMinutes || 45} นาที) / เมนูบ่มสั่งล่วงหน้าก่อน {settings.fermentedCutoffTime} น. วันก่อนเปิด
                                         </span>
                                     {:else if round.id === 'morning'}
                                         <span style="font-size: 0.74rem; color: #64748b;">
@@ -5615,6 +5618,35 @@
                                     </label>
                                 </div>
                             </div>
+
+                            {#if round.id === 'allday' || round.isAllDayOpen}
+                                <div style="margin-top: 0.85rem; background: #f5f3ff; border: 1.5px solid #ddd6fe; border-radius: 12px; padding: 0.85rem 1rem;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                                        <div>
+                                            <label class="form-label" style="font-size: 0.84rem; color: #5b21b6; font-weight: 800; margin-bottom: 0.15rem;" for="leadTime{idx}">
+                                                ⏱️ เวลาเตรียมชงล่วงหน้าสำหรับรอบรวม (นาที):
+                                            </label>
+                                            <p style="margin: 0; font-size: 0.75rem; color: #6d28d9; line-height: 1.4;">
+                                                ลูกค้าที่สั่งรอบรวมจะต้องระบุเวลารับล่วงหน้าอย่างน้อยกี่นาที เพื่อให้แอดมินมีเวลาชงเครื่องดื่ม (ค่าเริ่มต้น 45 นาที)
+                                            </p>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                            <input 
+                                                id="leadTime{idx}"
+                                                type="number" 
+                                                min="5" 
+                                                max="180" 
+                                                step="5" 
+                                                class="form-input" 
+                                                bind:value={round.leadTimeMinutes} 
+                                                placeholder="45" 
+                                                style="width: 85px; text-align: center; font-size: 1.05rem; font-weight: 800; color: #5b21b6; border-color: #c4b5fd; background: #ffffff;"
+                                            />
+                                            <span style="font-size: 0.85rem; font-weight: 800; color: #5b21b6;">นาที</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            {/if}
                         </div>
                     {/each}
                 </div>

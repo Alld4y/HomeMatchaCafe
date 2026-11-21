@@ -4,6 +4,7 @@ import { createOrder, getAllOrders, getOrdersByPhone, saveSlipFile, type OrderIt
 import { validateSlip } from '$lib/server/slipValidator';
 import { getPromptPayConfig } from '$lib/server/promptpay';
 import { redeemFreeCupPoints } from '$lib/server/members';
+import { validateDeliverySlot } from '$lib/server/settings';
 
 export const GET: RequestHandler = async ({ url }) => {
     const phone = url.searchParams.get('phone');
@@ -159,6 +160,17 @@ export const POST: RequestHandler = async ({ request }) => {
 
         if (totalPrice === 0 && !useFreeCupReward && validBasket.length > 0) {
             totalPrice = validBasket.reduce((sum, it) => sum + (it.price * it.quantity), 0);
+        }
+
+        // ตรวจสอบความถูกต้องของวันและรอบจัดส่ง รวมถึงเวลาเตรียมชงล่วงหน้าสำหรับรอบรวม
+        if (deliveryDate && deliveryRoundId) {
+            const hasFermented = validBasket.some(item => 
+                (item.name || '').includes('บ่ม') || (item.thaiName || '').includes('บ่ม') || item.id === 'cold-fermented-matcha-oat-latte'
+            );
+            const slotValidation = await validateDeliverySlot(deliveryDate, deliveryRoundId, hasFermented, deliveryRound);
+            if (!slotValidation.isValid) {
+                return json({ success: false, message: slotValidation.message || 'รอบเวลาจัดส่งที่เลือกไม่พร้อมให้บริการ' }, { status: 400 });
+            }
         }
 
         // หากลูกค้าเลือกใช้สิทธิ์แลกฟรี 1 แก้ว ให้หักแต้มทันทีที่สั่งซื้อสำเร็จ

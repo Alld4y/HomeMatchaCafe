@@ -20,11 +20,46 @@
     let selectedRoundId = $state<string>('morning');
     let preferredDeliveryTime = $state<string>('');
 
+    function parseTimeToMinutes(timeStr: string): number | null {
+        if (!timeStr) return null;
+        const match = timeStr.match(/(\d{1,2})[:.](\d{2})/);
+        if (!match) return null;
+        const h = parseInt(match[1], 10);
+        const m = parseInt(match[2], 10);
+        return h * 60 + m;
+    }
+
+    function formatTimeHM(d: Date): string {
+        const h = String(d.getHours()).padStart(2, '0');
+        const m = String(d.getMinutes()).padStart(2, '0');
+        return `${h}:${m}`;
+    }
+
+    function getTodayDateStr(): string {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
     function getSuggestedTimes(round: any): string[] {
         if (!round) return [];
-        const isAllday = round.id === 'allday' || (round.timeSlot && round.timeSlot.includes('09:00') && round.timeSlot.includes('13:00'));
+        const isAllday = round.id === 'allday' || (round.timeSlot && round.timeSlot.includes('09:00') && round.timeSlot.includes('13:00')) || Boolean(round.isAllDayOpen);
         if (isAllday) {
-            return ['09:30 น.', '10:00 น.', '10:30 น.', '11:00 น.', '11:30 น.', '12:00 น.', '12:30 น.', '13:00 น.'];
+            const allTimes = ['09:30 น.', '10:00 น.', '10:30 น.', '11:00 น.', '11:30 น.', '12:00 น.', '12:30 น.', '13:00 น.'];
+            const todayStr = getTodayDateStr();
+            if (selectedDateStr === todayStr) {
+                const leadMinutes = round.leadTimeMinutes || storeSettings?.alldayLeadTimeMinutes || 45;
+                const now = new Date();
+                const minAllowedMinutes = now.getHours() * 60 + now.getMinutes() + leadMinutes;
+
+                return allTimes.filter((t) => {
+                    const mins = parseTimeToMinutes(t);
+                    return mins !== null && mins >= minAllowedMinutes;
+                });
+            }
+            return allTimes;
         }
         if (round.id === 'morning' || (round.timeSlot && round.timeSlot.includes('07:00'))) {
             return ['07:00 น.', '07:15 น.', '07:30 น.', '07:45 น.', '08:00 น.'];
@@ -122,7 +157,18 @@
         const [rCutoffH, rCutoffM] = (round.cutoffTime || '06:00').split(':').map(Number);
         const roundDeadline = new Date(y, m - 1, d, rCutoffH, rCutoffM, 59, 999);
 
-        if (now.getTime() > roundDeadline.getTime()) {
+        const isToday = dateStr === getTodayDateStr();
+        const isAllDay = round.id === 'allday' || Boolean(round.isAllDayOpen);
+        const leadMinutes = isAllDay ? (round.leadTimeMinutes || storeSettings?.alldayLeadTimeMinutes || 45) : 0;
+
+        if (isToday && isAllDay && leadMinutes > 0) {
+            if (now.getTime() + leadMinutes * 60 * 1000 > roundDeadline.getTime()) {
+                return {
+                    available: false,
+                    reason: `ปิดรับรอบรวมของวันนี้แล้ว (ต้องสั่งล่วงหน้าอย่างน้อย ${leadMinutes} นาทีเพื่อให้ร้านมีเวลาเตรียมชงก่อน ${round.cutoffTime} น.)`
+                };
+            }
+        } else if (now.getTime() > roundDeadline.getTime()) {
             return { 
                 available: false, 
                 reason: `ปิดรับแล้วเมื่อ ${round.cutoffTime} น. (เกินเวลาตัดรอบ)` 
@@ -284,12 +330,38 @@
             return;
         }
 
-        // ตรวจสอบว่าเป็นการสั่งล่วงหน้า (ไม่ใช่วันนี้) หรือสั่งล่วงหน้าข้ามวัน เพื่อแจ้งเตือนยืนยันรอบจัดส่ง ป้องกันลูกค้าเข้าใจผิดเรื่องวัน
+        // ตรวจสอบเวลาเตรียมชงสำหรับรอบรวมของวันนี้ (Lead Time 45 นาที หรือตามที่ร้านกำหนด)
         const now = new Date();
         const todayYear = now.getFullYear();
         const todayMonth = String(now.getMonth() + 1).padStart(2, '0');
         const todayDate = String(now.getDate()).padStart(2, '0');
         const todayStr = `${todayYear}-${todayMonth}-${todayDate}`;
+
+        const isAllDayChosen = chosenRound.id === 'allday' || Boolean(chosenRound.isAllDayOpen);
+        if (isAllDayChosen && selectedDateStr === todayStr) {
+            const leadMinutes = chosenRound.leadTimeMinutes || storeSettings?.alldayLeadTimeMinutes || 45;
+            const earliestTime = new Date(Date.now() + leadMinutes * 60 * 1000);
+            const earliestStr = formatTimeHM(earliestTime);
+            const minAllowedMins = earliestTime.getHours() * 60 + earliestTime.getMinutes();
+
+            if (preferredDeliveryTime.trim()) {
+                const enteredMins = parseTimeToMinutes(preferredDeliveryTime);
+                if (enteredMins !== null && enteredMins < minAllowedMins) {
+                    errorMessage = `สำหรับรอบรวมวันนี้ ต้องสั่งล่วงหน้าอย่างน้อย ${leadMinutes} นาทีเพื่อให้แอดมินมีเวลาเตรียมชงค่ะ (เวลาจัดส่งที่เร็วที่สุดคือ ${earliestStr} น.)`;
+                    swal.fire({
+                        icon: 'warning',
+                        title: 'เวลาจัดส่งเร็วเกินไป',
+                        text: errorMessage,
+                        confirmButtonColor: '#456f2f'
+                    });
+                    return;
+                }
+            } else {
+                preferredDeliveryTime = `เร็วสุดประมาณ ${earliestStr} น. (ตามคิวชง)`;
+            }
+        }
+
+        // ตรวจสอบว่าเป็นการสั่งล่วงหน้า (ไม่ใช่วันนี้) หรือสั่งล่วงหน้าข้ามวัน เพื่อแจ้งเตือนยืนยันรอบจัดส่ง ป้องกันลูกค้าเข้าใจผิดเรื่องวัน
 
         if (selectedDateStr !== todayStr) {
             const thaiDays = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
@@ -582,6 +654,13 @@
                     {#if selectedRoundId}
                         {@const currentRoundObj = (selectedDayInfo?.availableRounds || storeSettings?.deliveryRounds || []).find((r: any) => r.id === selectedRoundId)}
                         {#if currentRoundObj && getRoundAvailability(currentRoundObj, selectedDateStr).available}
+                            {@const isAllDayRound = currentRoundObj.id === 'allday' || Boolean(currentRoundObj.isAllDayOpen)}
+                            {@const isTodaySelected = selectedDateStr === getTodayDateStr()}
+                            {@const leadMin = isAllDayRound ? (currentRoundObj.leadTimeMinutes || storeSettings?.alldayLeadTimeMinutes || 45) : 0}
+                            {@const earliestTimeObj = new Date(Date.now() + leadMin * 60 * 1000)}
+                            {@const earliestStr = formatTimeHM(earliestTimeObj)}
+                            {@const suggestedTimeList = getSuggestedTimes(currentRoundObj)}
+
                             <div style="margin-top: 1rem; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px; padding: 0.85rem 1rem;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; flex-wrap: wrap; gap: 0.25rem;">
                                     <label class="form-label" for="customPreferredTime" style="margin-bottom: 0; color: #166534; font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 0.35rem;">
@@ -592,35 +671,49 @@
                                         ช่วงรอบ: {currentRoundObj.timeSlot}
                                     </span>
                                 </div>
+
+                                {#if isAllDayRound && isTodaySelected && leadMin > 0}
+                                    <div style="margin-bottom: 0.6rem; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 0.45rem 0.65rem; font-size: 0.78rem; color: #5b21b6; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                                        <span style="font-weight: 800;">⏱️ เวลาเตรียมชง {leadMin} นาที:</span>
+                                        <span>สั่งส่งวันนี้ แอดมินต้องมีเวลาเตรียมชงล่วงหน้า (เร็วสุดที่จัดส่งได้คือ <strong>{earliestStr} น.</strong>)</span>
+                                    </div>
+                                {/if}
+
                                 <p style="margin: 0 0 0.5rem 0; font-size: 0.78rem; color: #374151;">
                                     คุณสามารถแตะเลือกเวลาที่สะดวกรับเครื่องดื่ม หรือพิมพ์เวลาเฉพาะเจาะจงได้ค่ะ:
                                 </p>
                                 
                                 <!-- Suggested Time Grid: ปุ่มขนาดคงที่ ไม่ไหล ไม่กระตุกเวลาคลิก -->
-                                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 0.45rem; margin-bottom: 0.65rem;">
-                                    {#each getSuggestedTimes(currentRoundObj) as t}
-                                        <button
-                                            type="button"
-                                            onclick={() => (preferredDeliveryTime = preferredDeliveryTime === t ? '' : t)}
-                                            style="
-                                                padding: 0.4rem 0.25rem;
-                                                font-size: 0.82rem;
-                                                font-weight: {preferredDeliveryTime === t ? '800' : '600'};
-                                                text-align: center;
-                                                border-radius: 8px;
-                                                border: 1.5px solid {preferredDeliveryTime === t ? '#15803d' : '#86efac'};
-                                                background: {preferredDeliveryTime === t ? '#15803d' : '#ffffff'};
-                                                color: {preferredDeliveryTime === t ? '#ffffff' : '#14532d'};
-                                                cursor: pointer;
-                                                box-shadow: {preferredDeliveryTime === t ? '0 2px 6px rgba(21, 128, 61, 0.25)' : 'none'};
-                                                transition: background 0.12s, color 0.12s, border-color 0.12s;
-                                                white-space: nowrap;
-                                            "
-                                        >
-                                            {t}
-                                        </button>
-                                    {/each}
-                                </div>
+                                {#if suggestedTimeList.length > 0}
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 0.45rem; margin-bottom: 0.65rem;">
+                                        {#each suggestedTimeList as t}
+                                            <button
+                                                type="button"
+                                                onclick={() => (preferredDeliveryTime = preferredDeliveryTime === t ? '' : t)}
+                                                style="
+                                                    padding: 0.4rem 0.25rem;
+                                                    font-size: 0.82rem;
+                                                    font-weight: {preferredDeliveryTime === t ? '800' : '600'};
+                                                    text-align: center;
+                                                    border-radius: 8px;
+                                                    border: 1.5px solid {preferredDeliveryTime === t ? '#15803d' : '#86efac'};
+                                                    background: {preferredDeliveryTime === t ? '#15803d' : '#ffffff'};
+                                                    color: {preferredDeliveryTime === t ? '#ffffff' : '#14532d'};
+                                                    cursor: pointer;
+                                                    box-shadow: {preferredDeliveryTime === t ? '0 2px 6px rgba(21, 128, 61, 0.25)' : 'none'};
+                                                    transition: background 0.12s, color 0.12s, border-color 0.12s;
+                                                    white-space: nowrap;
+                                                "
+                                            >
+                                                {t}
+                                            </button>
+                                        {/each}
+                                    </div>
+                                {:else if isAllDayRound && isTodaySelected}
+                                    <div style="margin-bottom: 0.65rem; padding: 0.5rem; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 8px; font-size: 0.78rem; color: #dc2626; font-weight: 700;">
+                                        ⚠️ ทุกช่วงเวลานัดส่งของวันนี้เหลือน้อยกว่าเวลาเตรียมชง {leadMin} นาทีแล้วค่ะ
+                                    </div>
+                                {/if}
 
                                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                                     <span style="font-size: 0.8rem; color: #475569; font-weight: 600; white-space: nowrap;">หรือพิมพ์ระบุ:</span>
@@ -645,6 +738,16 @@
                                         {/if}
                                     </div>
                                 </div>
+
+                                {#if isAllDayRound && isTodaySelected && leadMin > 0 && preferredDeliveryTime}
+                                    {@const prefM = parseTimeToMinutes(preferredDeliveryTime)}
+                                    {@const minM = earliestTimeObj.getHours() * 60 + earliestTimeObj.getMinutes()}
+                                    {#if prefM !== null && prefM < minM}
+                                        <div style="margin-top: 0.45rem; font-size: 0.78rem; color: #dc2626; font-weight: 700; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 8px; padding: 0.35rem 0.65rem;">
+                                            ⚠️ เวลาที่ระบุ ({preferredDeliveryTime}) เร็วเกินไปค่ะ ต้องเผื่อเวลาให้แอดมินชงอย่างน้อย {leadMin} นาที (เร็วสุดที่จัดส่งได้คือ {earliestStr} น.)
+                                        </div>
+                                    {/if}
+                                {/if}
                             </div>
                         {/if}
                     {/if}
